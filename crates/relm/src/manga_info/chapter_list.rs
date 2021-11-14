@@ -15,7 +15,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 pub use gtk::prelude::*;
 pub use gtk::subclass::prelude::*;
@@ -24,12 +25,47 @@ use relm4::{ComponentUpdate, Model, Widgets};
 
 #[derive(Debug)]
 pub struct ChapterListModel {
-  chapters: gio::ListStore,
+  views: gio::ListStore,
+  chapters: RefCell<Vec<Rc<ChapterInfo>>>,
+  filter: RefCell<Option<FilterFunction>>,
+}
+
+pub struct FilterFunction {
+  inner: Box<dyn Fn(&ChapterInfo) -> bool>,
+}
+
+impl FilterFunction {
+  pub fn call(&self, chapter: &ChapterInfo) -> bool {
+    (*self.inner)(chapter)
+  }
+}
+
+impl<T> From<T> for FilterFunction
+where
+  T: Fn(&ChapterInfo) -> bool + 'static,
+{
+  fn from(v: T) -> Self {
+    Self { inner: Box::new(v) }
+  }
+}
+
+impl std::fmt::Debug for FilterFunction {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let inner_ptr = &*self.inner as *const dyn Fn(&ChapterInfo) -> bool;
+    f.debug_struct("FilterFunction")
+      .field(&"inner", &inner_ptr)
+      .finish()
+  }
 }
 
 pub enum ChapterListMsg {
   Push(ChapterInfo),
   Extend(Vec<ChapterInfo>),
+  // Filter to Check if ChapterInfo
+  // should be displayed if true then
+  // displayed
+  #[allow(dead_code)]
+  Filter(Option<FilterFunction>),
   Clear,
 }
 
@@ -39,17 +75,62 @@ impl Model for ChapterListModel {
   type Components = ();
 }
 
-#[derive(Default, Debug)]
-pub struct CheckChapterInfo {
-  info: ChapterInfo,
-  active: Cell<bool>,
+impl ChapterListModel {
+  /// Push chapter. and if filter return true (or None)
+  /// then push to view
+  pub fn push(&self, chapter: ChapterInfo) {
+    let chapter = Rc::new(chapter);
+    self.push_view(chapter.clone());
+    self.chapters.borrow_mut().push(chapter);
+  }
+
+  /// Push to view if filter return true (or None)
+  fn push_view(&self, chapter: Rc<ChapterInfo>) {
+    let should_push = self
+      .filter
+      .borrow()
+      .as_ref()
+      // if filter exists then use it
+      .map(|v| v.call(&chapter))
+      // or default to true
+      .unwrap_or(true);
+
+    if should_push {
+      let gchapter = GChapterInfo::to_gobject(chapter.into());
+      self.views.append(&gchapter);
+    }
+  }
+
+  /// change filter and then re-push content to fit filter
+  pub fn change_filter(&self, filter: Option<FilterFunction>) {
+    self.filter.replace(filter);
+    // call remove_all directly because we don't want to clear the content too
+    self.views.remove_all();
+
+    for it in self.chapters.borrow().iter() {
+      self.push_view(it.clone());
+    }
+  }
+
+  pub fn clear(&self) {
+    self.views.remove_all();
+    self.chapters.borrow_mut().clear();
+  }
 }
 
-impl From<ChapterInfo> for CheckChapterInfo {
-  fn from(info: ChapterInfo) -> Self {
+#[derive(Default, Debug)]
+pub struct CheckChapterInfo {
+  info: Rc<ChapterInfo>,
+  active: Cell<bool>,
+  filter: Option<FilterFunction>,
+}
+
+impl From<Rc<ChapterInfo>> for CheckChapterInfo {
+  fn from(info: Rc<ChapterInfo>) -> Self {
     Self {
       info,
       active: Cell::default(),
+      filter: Default::default(),
     }
   }
 }
@@ -79,7 +160,7 @@ impl<ParentModel: Model> Widgets<ChapterListModel, ParentModel>
             ChapterListModel::connect_bind,
         },
         set_model:
-          Some(&gtk::MultiSelection::new(Some(&model.chapters))),
+          Some(&gtk::MultiSelection::new(Some(&model.views))),
         set_single_click_activate: false,
 
         connect_activate: ChapterListModel::connect_activate,
@@ -90,10 +171,12 @@ impl<ParentModel: Model> Widgets<ChapterListModel, ParentModel>
 }
 
 impl ChapterListModel {
+  /// initialize Widget and keep view with state in sync
   pub fn connect_bind(_: &gtk::SignalListItemFactory, item: &gtk::ListItem) {
     let child = item.item().unwrap().downcast::<GChapterInfo>().unwrap();
     let child = child.borrow();
     if let Some(chapter) = child.as_ref() {
+      // initialize widget when no Child yet
       if let None = item.child() {
         item.set_child(Some(&Self::create_chapter_info(&chapter.info)));
       }
@@ -105,10 +188,12 @@ impl ChapterListModel {
         .downcast::<gtk::CheckButton>()
         .unwrap();
 
+      // keep checkbox sync with its item
       check.set_active(chapter.active.get());
     }
   }
 
+  /// toggle selected item when activate emitted from ListView
   fn connect_activate(list: &gtk::ListView, _: u32) {
     let model = list.model().unwrap();
     let selection = model.selection();
@@ -120,6 +205,8 @@ impl ChapterListModel {
           it.active.set(!it.active.get())
         }
 
+        // make sure connect_bind is called after
+        // changing state to update view
         model.selection_changed(i, 1);
       }
     });
@@ -153,20 +240,15 @@ impl ChapterListModel {
   }
 }
 
-impl ChapterListModel {
-  pub fn push(&self, chapter: ChapterInfo) {
-    let gchapter = GChapterInfo::to_gobject(chapter.into());
-    self.chapters.append(&gchapter);
-  }
-}
-
 impl<ParentModel> ComponentUpdate<ParentModel> for ChapterListModel
 where
   ParentModel: Model,
 {
   fn init_model(_: &ParentModel) -> Self {
     Self {
-      chapters: create_list_store(),
+      views: create_list_store(),
+      chapters: Default::default(),
+      filter: Default::default(),
     }
   }
 
@@ -181,6 +263,7 @@ where
       ChapterListMsg::Push(chapter) => {
         self.push(chapter);
       }
+
       ChapterListMsg::Extend(chapters) => {
         for it in chapters {
           self.push(it);
@@ -188,7 +271,11 @@ where
       }
 
       ChapterListMsg::Clear => {
-        self.chapters.remove_all();
+        self.clear();
+      }
+
+      ChapterListMsg::Filter(filter) => {
+        self.change_filter(filter);
       }
     }
   }
