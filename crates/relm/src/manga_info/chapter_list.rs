@@ -174,12 +174,16 @@ impl ChapterListModel {
     let child = item.item().unwrap().downcast::<GChapterInfo>().unwrap();
     let child = child.borrow();
     if let Some(chapter) = child.as_ref() {
-      // initialize widget when no Child yet
-      if let None = item.child() {
-        item.set_child(Some(&Self::create_chapter_info(&chapter.info)));
-      }
+      let child = match item.child() {
+        Some(child) => child.downcast::<gtk::Grid>().unwrap(),
+        // create if child doesn't exists yet
+        None => {
+          let grid = Self::create_chapter_info(&chapter.info);
+          item.set_child(Some(&grid));
+          grid
+        }
+      };
 
-      let child = item.child().unwrap().downcast::<gtk::Grid>().unwrap();
       let check = child
         .child_at(0, 0)
         .unwrap()
