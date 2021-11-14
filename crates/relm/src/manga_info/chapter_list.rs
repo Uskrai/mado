@@ -26,7 +26,7 @@ use relm4::{ComponentUpdate, Model, Widgets};
 #[derive(Debug)]
 pub struct ChapterListModel {
   views: gio::ListStore,
-  chapters: RefCell<Vec<Rc<ChapterInfo>>>,
+  chapters: RefCell<Vec<Rc<CheckChapterInfo>>>,
   filter: RefCell<Option<FilterFunction>>,
 }
 
@@ -79,20 +79,18 @@ impl ChapterListModel {
   /// Push chapter. and if filter return true (or None)
   /// then push to view
   pub fn push(&self, chapter: ChapterInfo) {
-    let chapter = Rc::new(chapter);
+    let chapter: Rc<CheckChapterInfo> = Rc::new(chapter.into());
     self.push_view(chapter.clone());
     self.chapters.borrow_mut().push(chapter);
   }
 
   /// Push to view if filter return true (or None)
-  fn push_view(&self, chapter: Rc<ChapterInfo>) {
+  fn push_view(&self, chapter: Rc<CheckChapterInfo>) {
     let should_push = self
       .filter
       .borrow()
       .as_ref()
-      // if filter exists then use it
-      .map(|v| v.call(&chapter))
-      // or default to true
+      .map(|v| v.call(&chapter.info))
       .unwrap_or(true);
 
     if should_push {
@@ -120,24 +118,22 @@ impl ChapterListModel {
 
 #[derive(Default, Debug)]
 pub struct CheckChapterInfo {
-  info: Rc<ChapterInfo>,
+  info: ChapterInfo,
   active: Cell<bool>,
-  filter: Option<FilterFunction>,
 }
 
-impl From<Rc<ChapterInfo>> for CheckChapterInfo {
-  fn from(info: Rc<ChapterInfo>) -> Self {
+impl From<ChapterInfo> for CheckChapterInfo {
+  fn from(info: ChapterInfo) -> Self {
     Self {
       info,
       active: Cell::default(),
-      filter: Default::default(),
     }
   }
 }
 
 crate::gobject::struct_wrapper!(
   GChapterInfo,
-  crate::manga_info::chapter_list::CheckChapterInfo,
+  std::rc::Rc<crate::manga_info::chapter_list::CheckChapterInfo>,
   "MadoRelmChapterInfo",
   info_wrapper
 );
