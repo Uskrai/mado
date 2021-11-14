@@ -1,0 +1,22 @@
+
+
+struct WebsiteModule {
+  id, name, domain,
+
+  data,
+
+  get_info
+}
+
+// Name of the website, e.g MangaDex.
+// used to display website name
+// Domain of the website, e.g https://mangadex.org, https://mangakakalot.com
+// the domain should always contain 'https://' or 'http://, not doing so will result in error.
+// this is used to search which module is used when given url
+pub fn new(id, name, domain, data, method) {
+  WebsiteModule {
+    id, name, domain,
+    data,
+    get_info: method.get("get_info").expect("get_info not found")
+  }
+}

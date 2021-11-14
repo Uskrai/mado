@@ -1,0 +1,51 @@
+[package]
+name = "mado-rune"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+
+
+tracing = { git = "https://github.com/tokio-rs/tracing" }
+# tracing = "0.1"
+
+serde = "1.0"
+serde_json = "1.0"
+serde_path_to_error = "0.1"
+
+# git dependency is temporary for workaround rust-analyzer bug
+# 
+rune = { git = "https://github.com/rune-rs/rune", rev = "25fe7acb68a0c38dcccbcde5588c7a646647a8a9" }
+rune-modules = { git = "https://github.com/rune-rs/rune", rev = "25fe7acb68a0c38dcccbcde5588c7a646647a8a9", features = ["full"] }
+runestick = { git = "https://github.com/rune-rs/rune", rev = "25fe7acb68a0c38dcccbcde5588c7a646647a8a9" }
+
+reqwest = { version = "0.11", features = ["json"] }
+
+thiserror = "1.0"
+
+url = "2.2"
+
+regex = "1"
+
+jsonpath_lib = "0.3"
+
+nipper = "0.1"
+tendril = "0.4"
+
+[dependencies.mado-core]
+path = "../core"
+
+[dependencies.mado-rune-macros]
+path = "../rune-macros"
+
+[[test]]
+name = "script"
+path = "script-test/test.rs"
+harness = false
+
+[dev-dependencies]
+tempfile = "3.2"
+tokio = {version = "1.12", features = ["macros", "rt-multi-thread"] }
+futures = { version = "0.3", features = ["std"] }

@@ -1,0 +1,166 @@
+
+mod module;
+
+pub fn load_module() {
+  WebsiteModule::to_module(1, "manganato", "https://manganato.com")
+}
+
+pub struct WebsiteModule {
+  client,
+  name_regex
+}
+
+impl WebsiteModule {
+  pub fn new() {
+    let reg = mado::regex::Regex::compile("(?x)
+      # Get volume (optional)
+      (Vol.(?P<vol>\\d+)\\s+?)?
+      # Get Chapter
+      (Chapter\\s+?(?P<ch>\\d+))
+
+      # Get Title (optional)
+      ((\\s+)?:(\\s+)?
+      (?P<title>.*))?
+    ");
+
+    Self { name_regex: reg, client: mado::http::Client::default_() }
+  }
+
+  pub fn to_module(id,name,domain) {
+    module::new(
+      id, name, domain, Self::new(),
+      #{
+         get_info: Self::r_get_info
+      }
+    )
+  }
+
+  pub fn from_module(data) {
+    Self {
+      client: data.client,
+      name_regex: data.name_regex
+    }
+  }
+
+  pub async fn r_get_info(data, url) {
+    let this = Self::from_module(data);
+    this.get_info(url).await
+  }
+
+  pub async fn get_info(self, url) {
+    let response = self.client.get(url.clone()).send().await.unwrap().text().await;
+
+    let doc = mado::html::Document::new(response);
+
+    if doc.find("div.panel-not-found").len() != 0 {
+      return Err(mado::error::Error::request_error(url, "404 not found"));
+    }
+
+    let info = #{};
+
+    let find = |key, attr| {
+      doc.find(key).attr(attr).map(|v| v.to_string())
+    };
+
+
+    let property = |key| {
+      find(`meta[property='og:${key}']`, "content")
+    };
+
+    info.title = doc.find("h1").text().to_string();
+
+    info.cover_link = property("image");
+    let summary = doc.find("div.panel-story-info-description");
+    // remove <h3>Description :</h3>
+    summary.children().first().remove();
+    info.summary = summary.text().to_string().trim();
+
+    let find_info = |key| {
+      doc.find(key).parent().parent().find("td.table-value").find("a").iter().map(|v| v.text().to_string()).collect_vec()
+    };
+    info.genres = find_info("i.info-genres");
+    info.authors = find_info("i.info-author");
+    info.artists = [];
+    info.types = "Series";
+
+    info.chapters = [];
+    let chapters = doc.find("ul.row-content-chapter>li");
+    for it in chapters.iter() {
+      info.chapters.push(self.parse_chapter(it));
+    }
+
+    Ok(info)
+  }
+
+  pub fn parse_chapter(self, doc) {
+    let info = #{};
+    let reg = mado::regex::Regex::compile("(?x)
+      (Vol.(?P<vol>\\d+)\\s+?)?
+      (Chapter\\s+?(?P<ch>\\d+))
+      ((\\s+)?:(\\s+)?(?P<title>.*))?
+    ");
+
+    info.title = doc.find("a").text().to_string();
+    info.id = doc.find("a").attr("href").unwrap().to_string();
+    info.volume = None;
+    info.chapter = None;
+    info.language = "en";
+
+    let cap = reg.captures(info.title.clone());
+    if let Some(cap) = cap {
+      info.chapter = cap.name("ch");
+      info.volume = cap.name("vol");
+      info.title = cap.name("title").unwrap_or(info.title);
+    }
+
+    info
+  }
+}
+
+mod test {
+  use mado::http::Url;
+  use super::*;
+
+  #[test]
+  async fn owo() {
+    // println("owo");
+  }
+
+  pub fn create_module() {
+    super::load_module().data
+  }
+
+  pub fn test_invalid_url() {
+    // let module = load_module();
+    // panic("");
+  }
+
+  #[test]
+  pub async fn get_info_success() {
+    let module = create_module();
+    let url = Url::parse("https://manganato.com/manga-yu976355").unwrap();
+    let info = WebsiteModule::r_get_info(module, url).await;
+
+    mado::test::MangaInfo(info);
+  }
+
+  #[test]
+  pub async fn get_info_404() {
+    let module = create_module();
+    let url = Url::parse("https://manganato.com/manga-yu176355").unwrap();
+    let info = WebsiteModule::r_get_info(module, url).await;
+
+    match info {
+      Ok(info) => {
+        panic(`expected error found: ${info}`);
+      }
+      Err(err) => {
+        assert_eq!(err.to_string_variant(), "RequestError");
+      }
+      _ => {
+        panic("Expected Result");
+      }
+    }
+  }
+
+}

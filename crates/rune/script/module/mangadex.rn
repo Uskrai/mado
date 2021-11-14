@@ -1,0 +1,305 @@
+
+
+mod module;
+
+const API_URL = "https://api.mangadex.org"; // This is the url to the JSON API. Call this url to look at the API documentation.
+const API_PARAMS = "includes[]=author&includes[]=artist&includes[]=cover_art";
+const COVER_URL = "https://uploads.mangadex.org/covers";
+const HEX = "[0-9a-fA-F]";
+
+// entry point
+// this function should return a WebsiteModule or array of WebsiteModule
+pub fn load_module() {
+  WebsiteModule::to_module(0, "MangaDex","https://mangadex.org")
+}
+
+pub fn create_pointer_function(url, json) {
+    |key| {
+      json.pointer(key).ok_or_else(|| {
+        mado::error::Error::
+          unexpected_response(url,
+            `${key} key doesn't exists, found: ${json.to_string_pretty()}`)
+      })
+    }
+}
+
+struct WebsiteModule {
+  // Name of the website, e.g MangaDex.
+  // used to display website name
+  // name,
+  // // Domain of the website, e.g https://mangadex.org, https://mangakakalot.com
+  // // the domain should always contain 'https://' or 'http://, not doing so will result in error.
+  // // this is used to search which module is used when given url
+  // domain,
+
+  // local data you can get from calling data() in WebsiteModule passed from rust
+  // data that rust doesnt use should be placed here because the struct will be converted Any(WebsiteModule)
+  // and doesnt retain unused data.
+  id_regex,
+  client,
+  //
+  // // methods
+  // r_get_info,
+}
+
+impl WebsiteModule {
+  pub fn new() {
+    return WebsiteModule {
+      id_regex:
+        mado::regex::Regex
+        ::compile(`${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}`),
+      client: mado::http::Client::default_()
+    };
+  }
+
+  pub fn to_module(id, name, domain) {
+    let data = Self::new();
+    let method = #{
+      get_info: WebsiteModule::r_get_info,
+    };
+
+    module::new(id, name, domain, data, method)
+      
+  }
+
+  pub fn from_module(data) {
+    Self {
+      id_regex: data.id_regex,
+      client: data.client
+    }
+  }
+
+  pub async fn r_get_info(data, url) {
+    let this = Self::from_module(data);
+    let info = this.get_info(url).await;
+
+    info
+  }
+
+  // retrieve manga info of given url frrom website
+  // url is crate::runes::http::Url
+  // return Result<MangaInfo, crate::Error>
+  pub async fn get_info(self, url) {
+    let id = self.id_regex.find(url.to_string()).get_match().ok_or_else(||{
+        Err(mado::error::Error::invalid_url(url))
+    })?;
+
+    let manga_info_req = self.get_manga_info(id);
+    let manga_ch_req = self.get_chapter_info(id);
+
+    let manga_info = #{};
+    let manga_chapters = [];
+    loop {
+      let res = select {
+        res = manga_info_req => {
+          manga_info = res?;
+          manga_info
+        }
+        res = manga_ch_req => {
+          manga_chapters = res?;
+          manga_chapters
+        }
+      };
+
+      match res {
+        () => { break; }
+      }
+    }
+
+    manga_info.chapters = manga_chapters;
+    Ok(manga_info)
+  }
+
+  async fn get_manga_info(self, id) {
+    let url = `${API_URL}/manga/${id}?${API_PARAMS}`;
+    let url = mado::http::Url::parse(url)?;
+    let response = self.client.get(url.clone()).send().await?;
+    let json = response.json().await?;
+
+    let pointer = create_pointer_function(url.clone(), json);
+    let result = pointer("/result")?;
+
+    if result == "error" {
+      let detail = pointer("/errors/0/detail")?;
+      return Err(mado::error::Error::request_error(url, detail));
+    }
+
+    let info = #{};
+    info.title = pointer("/data/attributes/title/en")
+      .or_else(|| {
+        pointer("/data/attributes/title/ja")
+      })
+      .unwrap_or("Missing Title");
+      
+    info.summary = pointer("/data/attributes/description/en").ok();
+    info.authors = json
+      .select_as_value("$.data.relationships[?(@.type=='author')].attributes.name")
+      .unwrap();
+
+    info.artists = json
+      .select_as_value("$.data.relationships[?(@.type=='artist')].attributes.name")
+      .unwrap();
+
+    info.genres = json.
+      select_as_value("$.data.attributes.tags..attributes.name.en")
+      .unwrap();
+
+    let demographic = pointer("/data/attributes/publicationDemographic")?;
+
+    match demographic {
+      None => {}
+      _ => { info.genres.push(demographic) }
+    }
+
+    info.genres.extend(
+      json
+      .select_as_value("$.data.attributes.contentRating")
+      .unwrap()
+    );
+
+    info.types = "Series";
+
+    let cover_link =
+      json.select_as_value("$.data.relationships[?(@.type=='cover_art')].attributes.fileName")
+          .unwrap();
+
+    if cover_link.len() != 0 {
+      info.cover_link = Some(`${COVER_URL}/${id}/${cover_link[0]}`);
+    } else {
+      info.cover_link = None;
+    }
+
+    Ok(info)
+  }
+
+  async fn get_chapter_info(self, id) {
+    let chapters = [];
+    let total = 1;
+    let offset = 0;
+    let request_limit = 2;
+
+    while total > offset {
+
+      let url = `${API_URL}/manga/${id}/feed?${API_PARAMS}&offset=${offset}&limit=500`;
+      let url = mado::http::Url::parse(url)?;
+      let response = self.client.get(url.clone()).send().await?;
+
+      let json = response.json().await?;
+      let pointer = create_pointer_function(url.clone(), json);
+
+      total = pointer("/total")?;
+      offset += pointer("/limit")?;
+
+      if pointer("/result").unwrap() == "error" {
+        let detail = pointer("/errors/0/detail");
+        return Err(mado::error::Error::request_error(url, detail));
+      }
+
+      let chapter_json = json.select_as_json("$.data.*").unwrap();
+
+      for it in chapter_json {
+        let ch = self.parse_chapter_info(it);
+        if let Some(ch) = ch {
+          chapters.push(ch?);
+        }
+      }
+
+    }
+
+    Ok(chapters)
+  }
+
+  fn parse_chapter_info(self, json) {
+    let info = #{};
+    let attr = json.pointer("/attributes").expect("/attributes doesn't exists");
+
+    let if_empty = |string| {
+      match string {
+        None => {
+          ""
+        },
+        _ => string
+      }
+    };
+
+    info.volume = attr.volume;
+    info.chapter = attr.chapter;
+    info.title = Some(attr.title).filter(String::is_empty);
+    info.language = if_empty(attr.translatedLanguage);
+
+    info.scanlator = json
+      .select_as_value("$.relationships[?(@.type=='scanlation_group')]..name")
+      .unwrap().get(0);
+
+    info.id = if_empty(json.pointer("/id").expect("chapter id doesn't exist"));
+
+    Some(Ok(info))
+  }
+
+}
+
+mod test {
+  use super::*;
+
+  fn create_module() {
+    super::load_module().data
+  }
+
+  fn create_client() {
+    mado::http::Client::default_()
+  }
+
+  #[test]
+  pub async fn invalid_url() {
+    let module = create_module();
+    let url = mado::http::Url
+      ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f--a2e4-5634af489ce5")
+      .unwrap();
+
+    let info = WebsiteModule::r_get_info(module, url).await;
+    match info {
+      Ok(v) => {
+        panic(`${url.to_string()} should be invalid url`);
+      },
+      Err(info) => {
+        assert_eq!(info.to_string_variant(), "InvalidUrl");
+      }
+    }
+  }
+
+  #[test]
+  pub async fn get_info() {
+    use mado::http;
+    let module = create_module();
+    let url = http::Url
+      ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-5634af489ce5")
+      .unwrap();
+
+    let info = WebsiteModule::r_get_info(module, url).await;
+
+
+    mado::test::MangaInfo(info);
+  }
+
+  #[test]
+  pub async fn err_get_info() {
+    use mado::http;
+    let module = create_module();
+
+    // this might be changed if this isn't an error
+    let url = http::Url
+      ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-56c4af489ce5")
+      .unwrap();
+
+    let info = WebsiteModule::r_get_info(module, url).await;
+
+    match info {
+      Ok(val) => {
+        panic(`should error found: ${val.to_string_debug()}`);
+      }
+      Err(info) => {
+        assert_eq!(info.to_string_variant(), "RequestError");
+      }
+    }
+  }
+}
