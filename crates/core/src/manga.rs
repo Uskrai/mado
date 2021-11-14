@@ -15,6 +15,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::fmt::Display;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -38,6 +40,29 @@ pub struct ChapterInfo {
   pub volume: Option<String>,
   pub scanlator: Option<String>,
   pub language: String,
+}
+
+impl Display for ChapterInfo {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    macro_rules! write_if {
+      ($name:ident, $fmt:literal) => {
+        match &self.$name {
+          Some(val) => {
+            write!(f, $fmt, val)?;
+          }
+          None => {}
+        }
+      };
+    }
+
+    write_if!(volume, "Vol. {} ");
+    write_if!(chapter, "Chapter {}");
+    write_if!(title, ": {}");
+    write_if!(scanlator, " [{}]");
+    write!(f, " [{}]", self.language)?;
+
+    Ok(())
+  }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]

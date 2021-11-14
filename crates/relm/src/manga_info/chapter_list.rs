@@ -125,28 +125,10 @@ impl ChapterListModel {
     });
   }
 
-  pub fn create_chapter_info(chapter: &ChapterInfo) -> gtk::Widget {
-    use std::fmt::Write;
-    let mut label = String::new();
-
-    macro_rules! write_if {
-      ($name:ident, $fmt:literal) => {
-        match &chapter.$name {
-          Some(val) => {
-            write!(label, $fmt, val).unwrap();
-          }
-          None => {}
-        }
-      };
-    }
-
-    write_if!(volume, "Vol. {} ");
-    write_if!(chapter, "Chapter {}");
-    write_if!(title, ": {}");
-    write_if!(scanlator, "[{}]");
-
+  /// Create gtk::Grid from ChapterInfo
+  pub fn create_chapter_info(chapter: &ChapterInfo) -> gtk::Grid {
     let check = gtk::CheckButton::default();
-    let label = gtk::Label::builder().label(&label).build();
+    let label = gtk::Label::builder().label(&format!("{}", chapter)).build();
 
     let grid = gtk::Grid::builder()
       .orientation(gtk::Orientation::Horizontal)
@@ -156,7 +138,7 @@ impl ChapterListModel {
     grid.attach(&label, 2, 0, 1, 1);
     grid.set_column_spacing(5);
 
-    grid.upcast()
+    grid
   }
 
   fn for_each(
