@@ -17,7 +17,6 @@
 
 mod app;
 mod download;
-mod gobject;
 pub mod manga_info;
 
 pub use app::*;
@@ -31,3 +30,9 @@ pub fn get_toplevel(mut widget: gtk::Widget) -> gtk::Window {
 
   widget.downcast::<gtk::Window>().unwrap()
 }
+
+// macros
+mod dynamic_function;
+mod gobject;
+
+pub(crate) use dynamic_function::create_dynamic_function;

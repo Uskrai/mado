@@ -30,40 +30,8 @@ pub struct ChapterListModel {
   filter: RefCell<Option<FilterFunction>>,
 }
 
-macro_rules! create_dynamic_function {
-  ($name:ident, ($($args:ident : $types:ty),+) -> $return:ty) => {
-    pub struct $name {
-      inner: Box<dyn Fn($($types),+) -> $return>
-    }
-
-    impl $name {
-      pub fn call(&self, $($args : $types),+) -> $return {
-        (*self.inner)($($args),+)
-      }
-    }
-
-    impl<T> From<T> for $name
-      where T: Fn($($types),+) -> $return + 'static
-    {
-      fn from(v: T) -> Self {
-        Self { inner: Box::new(v) }
-      }
-    }
-
-
-    impl std::fmt::Debug for $name {
-      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ptr = &*self.inner as *const dyn Fn($($types),+) -> $return;
-        f.debug_struct(stringify!($name))
-          .field("inner", &ptr)
-          .finish()
-      }
-    }
-  };
-}
-
-create_dynamic_function!(FilterFunction, (chapter: &ChapterInfo) -> bool);
-create_dynamic_function!(CallFunction, (chapter: &ChapterInfo) -> ());
+crate::create_dynamic_function!(FilterFunction, (chapter: &ChapterInfo) -> bool);
+crate::create_dynamic_function!(CallFunction, (chapter: &ChapterInfo) -> ());
 
 pub enum ChapterListMsg {
   Push(ChapterInfo),
