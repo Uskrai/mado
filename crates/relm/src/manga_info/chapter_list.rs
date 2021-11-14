@@ -86,17 +86,19 @@ impl ChapterListModel {
 
   /// Push to view if filter return true (or None)
   fn push_view(&self, chapter: Rc<CheckChapterInfo>) {
-    let should_push = self
+    if self.filter_view(&chapter.info) {
+      let gchapter = GChapterInfo::to_gobject(chapter);
+      self.views.append(&gchapter);
+    }
+  }
+
+  fn filter_view(&self, chapter: &ChapterInfo) -> bool {
+    self
       .filter
       .borrow()
       .as_ref()
-      .map(|v| v.call(&chapter.info))
-      .unwrap_or(true);
-
-    if should_push {
-      let gchapter = GChapterInfo::to_gobject(chapter.into());
-      self.views.append(&gchapter);
-    }
+      .map(|v| v.call(&chapter))
+      .unwrap_or(true)
   }
 
   /// change filter and then re-push content to fit filter
