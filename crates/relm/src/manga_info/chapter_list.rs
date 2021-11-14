@@ -73,6 +73,7 @@ pub enum ChapterListMsg {
   // displayed
   #[allow(dead_code)]
   Filter(Option<FilterFunction>),
+  ForEachSelected(CallFunction),
   Clear,
 }
 
@@ -278,7 +279,15 @@ where
           self.push(it);
         }
       }
-
+      ChapterListMsg::ForEachSelected(fun) => {
+        self
+          .chapters
+          .borrow()
+          .iter()
+          .filter(|v| v.active.get())
+          .filter(|v| self.filter_view(&v.info))
+          .for_each(|v| fun.call(&v.info));
+      }
       ChapterListMsg::Clear => {
         self.clear();
       }
