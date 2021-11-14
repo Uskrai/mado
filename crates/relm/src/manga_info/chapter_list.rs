@@ -30,33 +30,40 @@ pub struct ChapterListModel {
   filter: RefCell<Option<FilterFunction>>,
 }
 
-pub struct FilterFunction {
-  inner: Box<dyn Fn(&ChapterInfo) -> bool>,
+macro_rules! create_dynamic_function {
+  ($name:ident, ($($args:ident : $types:ty),+) -> $return:ty) => {
+    pub struct $name {
+      inner: Box<dyn Fn($($types),+) -> $return>
+    }
+
+    impl $name {
+      pub fn call(&self, $($args : $types),+) -> $return {
+        (*self.inner)($($args),+)
+      }
+    }
+
+    impl<T> From<T> for $name
+      where T: Fn($($types),+) -> $return + 'static
+    {
+      fn from(v: T) -> Self {
+        Self { inner: Box::new(v) }
+      }
+    }
+
+
+    impl std::fmt::Debug for $name {
+      fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ptr = &*self.inner as *const dyn Fn($($types),+) -> $return;
+        f.debug_struct(stringify!($name))
+          .field("inner", &ptr)
+          .finish()
+      }
+    }
+  };
 }
 
-impl FilterFunction {
-  pub fn call(&self, chapter: &ChapterInfo) -> bool {
-    (*self.inner)(chapter)
-  }
-}
-
-impl<T> From<T> for FilterFunction
-where
-  T: Fn(&ChapterInfo) -> bool + 'static,
-{
-  fn from(v: T) -> Self {
-    Self { inner: Box::new(v) }
-  }
-}
-
-impl std::fmt::Debug for FilterFunction {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let inner_ptr = &*self.inner as *const dyn Fn(&ChapterInfo) -> bool;
-    f.debug_struct("FilterFunction")
-      .field(&"inner", &inner_ptr)
-      .finish()
-  }
-}
+create_dynamic_function!(FilterFunction, (chapter: &ChapterInfo) -> bool);
+create_dynamic_function!(CallFunction, (chapter: &ChapterInfo) -> ());
 
 pub enum ChapterListMsg {
   Push(ChapterInfo),
