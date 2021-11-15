@@ -28,12 +28,37 @@ use runestick::SyncFunction;
 
 use super::Error;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WebsiteModule {
   name: String,
   domain: Url,
-  get_info: Arc<SyncFunction>,
+  get_info: DebugSyncFunction,
   data: SendValue,
+}
+
+#[derive(Clone)]
+struct DebugSyncFunction {
+  inner: Arc<SyncFunction>,
+}
+
+impl std::ops::Deref for DebugSyncFunction {
+  type Target = Arc<SyncFunction>;
+  fn deref(&self) -> &Self::Target {
+    &self.inner
+  }
+}
+
+impl std::fmt::Debug for DebugSyncFunction {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let ptr = &*self.inner as *const SyncFunction;
+    f.debug_struct("SyncFunction").field("inner", &ptr).finish()
+  }
+}
+
+impl From<Arc<SyncFunction>> for DebugSyncFunction {
+  fn from(inner: Arc<SyncFunction>) -> Self {
+    Self { inner }
+  }
 }
 
 impl WebsiteModule {
@@ -64,7 +89,8 @@ impl TryFrom<SendValue> for WebsiteModule {
       .get("get_info")
       .expect("get_info doesn't exist")
       .clone()
-      .into_function()?;
+      .into_function()?
+      .into();
 
     let data = obj.get("data").expect("cannot find data").clone();
 
