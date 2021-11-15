@@ -82,6 +82,21 @@ where
       },
 
       append: component!(components.chapters.root_widget()),
+      append = &gtk::Box {
+        set_orientation: gtk::Orientation::Horizontal,
+
+        append: download_path = &gtk::Entry {
+          set_hexpand: true,
+          set_placeholder_text: Some("Enter Download Path"),
+        },
+
+        append: download_button = &gtk::Button {
+          set_label: "Download",
+          connect_clicked(sender) => move |_| {
+            send!(sender, Msg::Download);
+          }
+        }
+      }
     }
   }
 }
