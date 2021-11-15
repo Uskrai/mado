@@ -121,41 +121,44 @@ impl MangaInfoModel {
       Ok((url, module)) => {
         components.set_url(url.as_str());
 
-        // store spawn closure first because we want to abort previous
-        // JoinHandle first before spawn task
-        let spawn = || {
-          let sender = sender.clone();
-
-          tokio::spawn(async move {
-            use mado_core::WebsiteModule;
-            let manga = module.get_info(url).await;
-
-            match manga {
-              Ok(manga) => {
-                send!(sender, Msg::Update(manga));
-              }
-              Err(err) => {
-                send!(sender, Msg::ShowError(err));
-              }
-            }
-          })
-        };
-
         // clear previous info
         send!(sender, Msg::Clear);
 
         let mut cell = components.get_cell_mut();
 
-        cell.info_handle = cell
-          .info_handle
+        let task = Self::get_info(module.clone(), url, sender);
+
+        cell.current_info = cell
+          .current_info
           .as_ref()
           // abort previous get info first if exist
-          .and_then(|v| {
-            v.abort();
+          .and_then(|(_, handle)| {
+            handle.abort();
             None
           })
           // then get  handle
-          .or_else(|| Some(spawn()));
+          .or_else(|| {
+            let handle = tokio::spawn(task);
+            Some((module, handle))
+          });
+      }
+      Err(err) => {
+        send!(sender, Msg::ShowError(err));
+      }
+    }
+  }
+
+  pub async fn get_info(
+    module: Arc<WebsiteModule>,
+    url: Url,
+    sender: relm4::Sender<Msg>,
+  ) {
+    use mado_core::WebsiteModule;
+    let manga = module.get_info(url).await;
+
+    match manga {
+      Ok(manga) => {
+        send!(sender, Msg::Update(manga));
       }
       Err(err) => {
         send!(sender, Msg::ShowError(err));
