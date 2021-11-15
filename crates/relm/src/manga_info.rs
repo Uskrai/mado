@@ -30,15 +30,6 @@ use std::sync::Arc;
 
 use chapter_list::ChapterListMsg;
 
-#[derive(Debug)]
-pub enum MangaInfoMsg {
-  Download,
-  ShowError(mado_core::Error),
-  GetInfo,
-  Update(mado_core::MangaInfo),
-  Clear,
-}
-
 type Msg = MangaInfoMsg;
 
 #[derive(Debug, Clone)]
@@ -90,7 +81,7 @@ where
         }
       },
 
-      append: component!(components.chapters.root_widget())
+      append: component!(components.chapters.root_widget()),
     }
   }
 }
@@ -156,6 +147,15 @@ impl MangaInfoModel {
     }
     //
   }
+}
+
+#[derive(Debug)]
+pub enum MangaInfoMsg {
+  Download,
+  ShowError(mado_core::Error),
+  GetInfo,
+  Update(mado_core::MangaInfo),
+  Clear,
 }
 
 impl<T> ComponentUpdate<T> for MangaInfoModel
