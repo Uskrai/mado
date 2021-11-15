@@ -224,7 +224,7 @@ impl MangaInfoModel {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MangaInfoCell {
   info_handle: Option<JoinHandle<()>>,
 }
