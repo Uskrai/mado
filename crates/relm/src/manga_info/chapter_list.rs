@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::rc::Rc;
 
 pub use gtk::prelude::*;
@@ -25,73 +25,39 @@ use relm4::{ComponentUpdate, Model, Widgets};
 
 #[derive(Debug)]
 pub struct ChapterListModel {
-  views: gio::ListStore,
-  chapters: RefCell<Vec<Rc<CheckChapterInfo>>>,
-  filter: RefCell<Option<FilterFunction>>,
+  chapters: VecChapters,
 }
 
-crate::create_dynamic_function!(FilterFunction, (chapter: &ChapterInfo) -> bool);
-crate::create_dynamic_function!(CallFunction, (chapter: &ChapterInfo) -> ());
+pub enum ChapterListMsg {}
 
-pub enum ChapterListMsg {
-  Push(ChapterInfo),
-  Extend(Vec<ChapterInfo>),
-  // Filter to Check if ChapterInfo
-  // should be displayed if true then
-  // displayed
-  #[allow(dead_code)]
-  Filter(Option<FilterFunction>),
-  ForEachSelected(CallFunction),
-  Clear,
+#[derive(Debug, Clone)]
+struct ListStore {
+  inner: gio::ListStore,
+}
+
+impl Default for ListStore {
+  fn default() -> Self {
+    Self {
+      inner: gio::ListStore::new(gio::glib::types::Type::OBJECT),
+    }
+  }
+}
+
+impl std::ops::Deref for ListStore {
+  type Target = gio::ListStore;
+  fn deref(&self) -> &Self::Target {
+    &self.inner
+  }
+}
+
+pub trait HasVecChapters {
+  fn get_vec_chapter_info(&self) -> VecChapters;
 }
 
 impl Model for ChapterListModel {
   type Msg = ChapterListMsg;
   type Widgets = ChapterListWidgets;
   type Components = ();
-}
-
-impl ChapterListModel {
-  /// Push chapter. and if filter return true (or None)
-  /// then push to view
-  pub fn push(&self, chapter: ChapterInfo) {
-    let chapter: Rc<CheckChapterInfo> = Rc::new(chapter.into());
-    self.push_view(chapter.clone());
-    self.chapters.borrow_mut().push(chapter);
-  }
-
-  /// Push to view if filter return true (or None)
-  fn push_view(&self, chapter: Rc<CheckChapterInfo>) {
-    if self.filter_view(&chapter.info) {
-      let gchapter = GChapterInfo::to_gobject(chapter);
-      self.views.append(&gchapter);
-    }
-  }
-
-  fn filter_view(&self, chapter: &ChapterInfo) -> bool {
-    self
-      .filter
-      .borrow()
-      .as_ref()
-      .map(|v| v.call(&chapter))
-      .unwrap_or(true)
-  }
-
-  /// change filter and then re-push content to fit filter
-  pub fn change_filter(&self, filter: Option<FilterFunction>) {
-    self.filter.replace(filter);
-    // call remove_all directly because we don't want to clear the content too
-    self.views.remove_all();
-
-    for it in self.chapters.borrow().iter() {
-      self.push_view(it.clone());
-    }
-  }
-
-  pub fn clear(&self) {
-    self.views.remove_all();
-    self.chapters.borrow_mut().clear();
-  }
 }
 
 #[derive(Default, Debug)]
@@ -117,10 +83,7 @@ crate::gobject::struct_wrapper!(
 );
 use info_wrapper::GChapterInfo;
 
-fn create_list_store() -> gio::ListStore {
-  gio::ListStore::new(gio::glib::types::Type::OBJECT)
-}
-
+/// Widget that show Chapter with checkbox
 #[relm4_macros::widget(pub)]
 impl<ParentModel: Model> Widgets<ChapterListModel, ParentModel>
   for ChapterListWidgets
@@ -134,7 +97,7 @@ impl<ParentModel: Model> Widgets<ChapterListModel, ParentModel>
             ChapterListModel::connect_bind,
         },
         set_model:
-          Some(&gtk::MultiSelection::new(Some(&model.views))),
+          Some(&gtk::MultiSelection::new(Some(&model.chapters.views.inner))),
         set_single_click_activate: false,
 
         connect_activate: ChapterListModel::connect_activate,
@@ -218,15 +181,49 @@ impl ChapterListModel {
   }
 }
 
+#[derive(Default, Clone, Debug)]
+pub struct VecChapters {
+  inner: RefCell<Vec<Rc<CheckChapterInfo>>>,
+  views: ListStore,
+}
+
+impl VecChapters {
+  fn borrow_mut(&self) -> RefMut<Vec<Rc<CheckChapterInfo>>> {
+    self.inner.borrow_mut()
+  }
+
+  fn borrow(&self) -> Ref<Vec<Rc<CheckChapterInfo>>> {
+    self.inner.borrow()
+  }
+
+  pub fn push(&self, chapter: ChapterInfo) {
+    let chapter = Rc::new(CheckChapterInfo::from(chapter));
+    self.borrow_mut().push(chapter.clone());
+    self.views.append(&GChapterInfo::to_gobject(chapter));
+  }
+
+  pub fn for_each_selected(&self, f: impl Fn(&ChapterInfo)) {
+    self
+      .borrow()
+      .iter()
+      .filter(|v| v.active.get())
+      .map(|v| &v.info)
+      .for_each(f)
+  }
+
+  pub fn clear(&self) {
+    self.borrow_mut().clear();
+    self.views.remove_all();
+  }
+}
+
 impl<ParentModel> ComponentUpdate<ParentModel> for ChapterListModel
 where
-  ParentModel: Model,
+  ParentModel: Model + HasVecChapters,
 {
-  fn init_model(_: &ParentModel) -> Self {
+  fn init_model(parent: &ParentModel) -> Self {
     Self {
-      views: create_list_store(),
-      chapters: Default::default(),
-      filter: Default::default(),
+      chapters: parent.get_vec_chapter_info(),
     }
   }
 
@@ -237,32 +234,6 @@ where
     _: relm4::Sender<Self::Msg>,
     _: relm4::Sender<ParentModel::Msg>,
   ) {
-    match msg {
-      ChapterListMsg::Push(chapter) => {
-        self.push(chapter);
-      }
-
-      ChapterListMsg::Extend(chapters) => {
-        for it in chapters {
-          self.push(it);
-        }
-      }
-      ChapterListMsg::ForEachSelected(fun) => {
-        self
-          .chapters
-          .borrow()
-          .iter()
-          .filter(|v| v.active.get())
-          .filter(|v| self.filter_view(&v.info))
-          .for_each(|v| fun.call(&v.info));
-      }
-      ChapterListMsg::Clear => {
-        self.clear();
-      }
-
-      ChapterListMsg::Filter(filter) => {
-        self.change_filter(filter);
-      }
-    }
+    match msg {}
   }
 }
