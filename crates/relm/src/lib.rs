@@ -35,4 +35,5 @@ pub fn get_toplevel(mut widget: gtk::Widget) -> gtk::Window {
 mod dynamic_function;
 mod gobject;
 
+#[allow(unused_imports)]
 pub(crate) use dynamic_function::create_dynamic_function;

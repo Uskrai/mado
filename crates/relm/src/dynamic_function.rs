@@ -15,6 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#[allow(unused_macros)]
 macro_rules! create_dynamic_function {
   ($name:ident, ($($args:ident : $types:ty),+) -> $return:ty) => {
     pub struct $name {
