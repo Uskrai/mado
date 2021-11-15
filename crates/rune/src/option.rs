@@ -43,9 +43,9 @@ fn filter(
   Ok(match option {
     Some(v) => {
       if predicate.call((v.clone(),))? {
-        None
-      } else {
         Some(v)
+      } else {
+        None
       }
     }
     _ => None,

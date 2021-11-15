@@ -224,7 +224,14 @@ impl WebsiteModule {
 
     info.volume = attr.volume;
     info.chapter = attr.chapter;
-    info.title = Some(attr.title).filter(String::is_empty);
+    info.title = Some(attr.title).filter(|v| {
+      match v {
+        "" => false,
+        None => false,
+        _ => true
+      }
+    });
+
     info.language = if_empty(attr.translatedLanguage);
 
     info.scanlator = json
