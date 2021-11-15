@@ -75,8 +75,8 @@ where
         // enter button
         append : enter_button = &gtk::Button {
           set_label: "⏎",
-          connect_clicked(sender) => move |_| {
-            send!(sender, Msg::GetInfo)
+          connect_clicked(sender, url_entry) => move |_| {
+            send!(sender, Msg::GetInfo(url_entry.text().to_string()))
           }
         }
       },
@@ -91,8 +91,9 @@ impl MangaInfoModel {
     &self,
     components: &MangaInfoComponents,
     sender: relm4::Sender<Msg>,
+    url: String,
   ) {
-    let url = components.get_url().trim().to_string();
+    let url = url.trim();
 
     // don't do anything when empty
     if url.is_empty() {
@@ -153,7 +154,9 @@ impl MangaInfoModel {
 pub enum MangaInfoMsg {
   Download,
   ShowError(mado_core::Error),
-  GetInfo,
+  /// Get info from string
+  /// string should be convertible to URL
+  GetInfo(String),
   Update(mado_core::MangaInfo),
   Clear,
 }
@@ -179,8 +182,8 @@ where
       Msg::Download => {
         //
       }
-      Msg::GetInfo => {
-        self.spawn_get_info(components, sender);
+      Msg::GetInfo(url) => {
+        self.spawn_get_info(components, sender, url);
       }
       Msg::Update(manga) => {
         for it in manga.chapters {
