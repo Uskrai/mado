@@ -224,13 +224,7 @@ impl WebsiteModule {
 
     info.volume = attr.volume;
     info.chapter = attr.chapter;
-    info.title = Some(attr.title).filter(|v| {
-      match v {
-        "" => false,
-        None => false,
-        _ => true
-      }
-    });
+    info.title = Some(attr.title).flatten().filter(|v| !v.is_empty());
 
     info.language = if_empty(attr.translatedLanguage);
 
