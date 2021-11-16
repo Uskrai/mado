@@ -21,7 +21,7 @@ use gtk::prelude::*;
 use mado_rune::WebsiteModuleMap;
 use relm4::{AppUpdate, Components, Model, RelmComponent, Widgets};
 
-use crate::manga_info::{self, HasWebsiteModuleMap};
+use crate::manga_info::{self, MangaInfoParentModel};
 
 pub struct App {
   pub modules: WebsiteModuleMap,
@@ -36,7 +36,7 @@ pub struct AppModel {
   pub modules: Arc<WebsiteModuleMap>,
 }
 
-impl HasWebsiteModuleMap for AppModel {
+impl MangaInfoParentModel for AppModel {
   fn get_website_module_map(&self) -> Arc<WebsiteModuleMap> {
     self.modules.clone()
   }

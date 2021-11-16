@@ -33,7 +33,7 @@ struct ChapterInfoWidget {
   root: gtk::Label,
 }
 
-pub trait HasWebsiteModuleMap {
+pub trait MangaInfoParentModel {
   fn get_website_module_map(&self) -> Arc<WebsiteModuleMap>;
 }
 

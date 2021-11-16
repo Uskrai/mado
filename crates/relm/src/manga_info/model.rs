@@ -128,7 +128,7 @@ impl MangaInfoModel {
 
 impl<T> ComponentUpdate<T> for MangaInfoModel
 where
-  T: Model + HasWebsiteModuleMap,
+  T: Model + MangaInfoParentModel,
 {
   fn init_model(parent_model: &T) -> Self {
     Self {
