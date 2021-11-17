@@ -23,7 +23,7 @@ use std::sync::Arc;
 pub async fn main() {
   let module = mado_rune::WebsiteModuleBuilder::default();
   let mut modules = mado_rune::WebsiteModuleMap::default();
-  for it in std::fs::read_dir("../rune/script/module").unwrap() {
+  for it in std::fs::read_dir("../rune/script").unwrap() {
     let it = it.unwrap();
     if it.path().is_file() {
       for it in module.load_path(&it.path()).unwrap() {

@@ -17,7 +17,7 @@
 
 #[tokio::test]
 async fn load_module_script() {
-  let scripts = std::fs::read_dir("script/module").unwrap();
+  let scripts = std::fs::read_dir("script").unwrap();
 
   let module_builder = mado_rune::WebsiteModuleBuilder::default();
 

@@ -54,7 +54,7 @@ async fn main() {
 
   let mut tests = Vec::new();
 
-  let entry = std::fs::read_dir("script/module").unwrap();
+  let entry = std::fs::read_dir("script").unwrap();
   for it in entry {
     let it = it.unwrap();
     if it.path().is_file() {
