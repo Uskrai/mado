@@ -281,7 +281,12 @@ impl SendValueKind {
       let client = value.downcast_borrow_ref::<Client>().unwrap().clone();
       Ok(Self::HttpClient(client))
     } else {
-      Err(VmError::panic(format!("converting {:?} to send value is not supported, consider adding them to SendValueKind if they implement Send safely", value)))
+      Err(VmError::panic(format!(
+        "converting {:?} to send value is not supported, \
+        consider adding them to SendValueKind if they implement \
+        Send safely",
+        value
+      )))
     }
   }
 }
