@@ -57,6 +57,16 @@ impl RequestBuilder {
   wrapper_fun!(bearer_auth, token: String);
   wrapper_fun!(timeout, timeout: Duration);
 
+  pub fn header(self, name: String, value: String) -> Self {
+    RequestBuilder {
+      inner: self.inner.header(name, value),
+    }
+  }
+
+  pub fn cookie(self, name: String, value: String) -> Self {
+    self.header(SET_COOKIE.to_string(), format!("{}={}", name, value))
+  }
+
   pub async fn send(self) -> Result<Response, crate::Error> {
     self
       .inner
@@ -67,7 +77,6 @@ impl RequestBuilder {
         url: err.url().unwrap().clone().into(),
         message: err.to_string(),
       })
-    // .map_err(|e| e.into())
   }
 }
 
@@ -97,7 +106,7 @@ pub fn load_module() -> Result<Module, ContextError> {
       associated => { default: default_ }
     },
     (RequestBuilder) => {
-      inst => { query },
+      inst => { query, cookie, header },
       async_inst => { send }
     },
     (Response) => {
