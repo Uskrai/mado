@@ -12,7 +12,11 @@ impl CompileVisitor for TestVisitor {
   fn register_meta(&self, meta: &runestick::CompileMeta) {
     let item = meta.kind.clone();
 
-    if let CompileMetaKind::Function { type_hash, .. } = item {
+    if let CompileMetaKind::Function {
+      type_hash,
+      is_test: true,
+    } = item
+    {
       let name = meta.item.item.to_string();
       let name = name.trim_start_matches("test::");
       let source = meta.source.clone().unwrap();
