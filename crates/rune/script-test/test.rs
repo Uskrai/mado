@@ -11,25 +11,19 @@ struct TestVisitor {
 impl CompileVisitor for TestVisitor {
   fn register_meta(&self, meta: &runestick::CompileMeta) {
     let item = meta.kind.clone();
-    match item {
-      CompileMetaKind::Function {
-        type_hash,
-        is_test: true,
-      } => {
-        let name = meta.item.item.to_string();
-        let name = name.trim_start_matches("test::");
-        let source = meta.source.clone().unwrap();
 
-        let path = source.clone().path.unwrap();
-        let path = path.file_stem().unwrap().to_string_lossy();
+    if let CompileMetaKind::Function { type_hash, .. } = item {
+      let name = meta.item.item.to_string();
+      let name = name.trim_start_matches("test::");
+      let source = meta.source.clone().unwrap();
 
-        self
-          .function
-          .borrow_mut()
-          .push((format!("{}::{}", path, name), type_hash));
-      }
+      let path = source.path.unwrap();
+      let path = path.file_stem().unwrap().to_string_lossy();
 
-      _ => {}
+      self
+        .function
+        .borrow_mut()
+        .push((format!("{}::{}", path, name), type_hash));
     }
   }
 }
@@ -76,9 +70,10 @@ async fn main() {
 
   let mut future = Vec::new();
 
-  let pattern = std::env::var("MADO_RUNE_TEST").unwrap_or(".*".into());
-  let pattern = regex::Regex::new(&pattern)
-    .expect(&format!("{} is not valid pattern", pattern));
+  let pattern = std::env::var("MADO_RUNE_TEST").unwrap_or_else(|_| ".*".into());
+  let pattern = regex::Regex::new(&pattern).unwrap_or_else(|_| {
+    panic!("{}", format!("{} is not valid pattern", pattern))
+  });
 
   for (vm, test) in tests {
     // filter the test

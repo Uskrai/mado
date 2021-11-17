@@ -50,24 +50,14 @@ impl Regex {
 
   fn find(&self, text: Value) -> Result<Match, VmError> {
     let text = text.into_string()?.take()?;
-
-    let range = match self.inner.find(&text) {
-      Some(val) => Some(val.range()),
-      None => None,
-    };
+    let range = self.inner.find(&text).map(|val| val.range());
 
     Ok(Match { text, range })
   }
 
   fn find_at(&self, text: Value, index: usize) -> Result<Match, VmError> {
     let text = text.into_string()?.take()?;
-
-    let range = {
-      match self.inner.find_at(&text, index) {
-        Some(val) => Some(val.range()),
-        None => None,
-      }
-    };
+    let range = self.inner.find_at(&text, index).map(|val| val.range());
 
     Ok(Match { text, range })
   }
@@ -113,10 +103,7 @@ impl Match {
   }
 
   fn get_match(&self) -> Option<String> {
-    match self.range.clone() {
-      Some(range) => Some(self.text[range].to_owned()),
-      None => None,
-    }
+    self.range.clone().map(|range| self.text[range].to_owned())
   }
 
   fn into_original(self) -> String {
