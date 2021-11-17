@@ -25,16 +25,6 @@ mod url;
 pub use self::url::Url;
 pub use client::Client;
 
-#[derive(Any, Debug)]
-pub struct RequestBuilder {
-  inner: reqwest::RequestBuilder,
-}
-
-#[derive(Any, Debug)]
-pub struct Response {
-  inner: reqwest::Response,
-}
-
 macro_rules! wrapper_fun {
   ($name:ident, $( $param:ident : $type:ty ), *) => {
     pub fn $name(self, $($param : $type), *) -> Self {
@@ -44,6 +34,11 @@ macro_rules! wrapper_fun {
     }
   };
 
+}
+
+#[derive(Any, Debug)]
+pub struct RequestBuilder {
+  inner: reqwest::RequestBuilder,
 }
 
 impl RequestBuilder {
@@ -78,6 +73,11 @@ impl RequestBuilder {
         message: err.to_string(),
       })
   }
+}
+
+#[derive(Any, Debug)]
+pub struct Response {
+  inner: reqwest::Response,
 }
 
 impl Response {
