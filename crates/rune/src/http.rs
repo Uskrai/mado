@@ -25,7 +25,7 @@ mod url;
 pub use self::url::Url;
 pub use client::Client;
 
-#[derive(Any)]
+#[derive(Any, Debug)]
 pub struct RequestBuilder {
   inner: reqwest::RequestBuilder,
 }
