@@ -17,6 +17,7 @@
 
 use std::time::Duration;
 
+use reqwest::header::SET_COOKIE;
 use runestick::{Any, ContextError, Module};
 
 mod client;
