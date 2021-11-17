@@ -110,7 +110,12 @@ pub fn load_module() -> Result<Module, ContextError> {
     },
     (Url) => {
       associated => { parse },
-      inst => { to_string, query, clone, path },
+      inst => {
+        to_string, query, clone, path
+      }
+      protocol => {
+        to_string_debug: STRING_DEBUG
+      }
     }
   }
 

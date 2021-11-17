@@ -62,6 +62,11 @@ impl Url {
   pub fn path(&self) -> String {
     self.inner.path().to_string()
   }
+
+  pub fn to_string_debug(&self, s: &mut String) -> std::fmt::Result {
+    use std::fmt::Write;
+    write!(s, "{:?}", self.inner)
+  }
 }
 
 impl Display for Url {
