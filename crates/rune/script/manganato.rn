@@ -88,6 +88,7 @@ impl WebsiteModule {
     for it in chapters.iter() {
       info.chapters.push(self.parse_chapter(it));
     }
+    info.chapters.reverse();
 
     Ok(info)
   }
