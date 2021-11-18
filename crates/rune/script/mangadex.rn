@@ -203,7 +203,6 @@ impl WebsiteModule {
           chapters.push(ch?);
         }
       }
-
     }
 
     Ok(chapters)
@@ -279,7 +278,7 @@ mod test {
     let info = WebsiteModule::r_get_info(module, url).await;
 
 
-    mado::test::MangaInfo(info);
+    info
   }
 
   #[test]

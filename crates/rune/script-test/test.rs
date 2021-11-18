@@ -1,7 +1,48 @@
 use std::{cell::RefCell, rc::Rc};
 
+use futures::Future;
+use mado_rune::DeserializeResult;
 use rune::CompileVisitor;
-use runestick::{CompileMetaKind, Hash};
+use runestick::{Any, CompileMetaKind, FromValue, Hash, VmError, VmErrorKind};
+
+// implement convert from value for
+// type that is a result and Ok is deserialize
+// and error on Err
+#[allow(dead_code)]
+struct OkDeserilizeValue<T> {
+  inner: T,
+}
+
+impl<T> FromValue for OkDeserilizeValue<T>
+where
+  T: 'static + Send + serde::de::Deserialize<'static>,
+{
+  fn from_value(value: runestick::Value) -> Result<Self, VmError> {
+    let deser = DeserializeResult::<T>::from_value(value)?;
+
+    let inner = deser.get().map_err(|err| VmErrorKind::Panic {
+      reason: runestick::Panic::custom(err),
+    })?;
+
+    Ok(Self { inner })
+  }
+}
+
+#[allow(dead_code)]
+struct OkAnyValue<T> {
+  inner: T,
+}
+
+impl<T> FromValue for OkAnyValue<T>
+where
+  T: 'static + Any,
+{
+  fn from_value(value: runestick::Value) -> Result<Self, VmError> {
+    let inner = T::from_value(value)?;
+
+    Ok(Self { inner })
+  }
+}
 
 #[derive(Default)]
 struct TestVisitor {
@@ -98,5 +139,67 @@ async fn main() {
     }
   }
 
-  futures::future::join_all(future.into_iter()).await;
+  let vec = futures::future::join_all(future.into_iter()).await;
+  // let ok: Vec<_> = vec.iter().filter_map(|it| it.as_ref().ok()).collect();
+
+  let err: Vec<_> = vec.iter().filter_map(|it| it.as_ref().err()).collect();
+
+  if !err.is_empty() {
+    for (name, err) in err {
+      println!("error on {}: {}", name, err);
+    }
+    panic!("Error");
+  }
+}
+
+async fn call_test(
+  vm: runestick::Vm,
+  name: String,
+  hash: runestick::Hash,
+) -> Result<(), (String, VmError)> {
+  let last = name.split("::").last().unwrap();
+
+  macro_rules! call {
+    ($ex:ty) => {{
+      to_name_error(name.clone(), async_call::<$ex>(vm, hash)).await?;
+      println!("{} is ok", name);
+      Ok(())
+    }};
+  }
+
+  macro_rules! match_last {
+    ($($name:pat => $ex:ty),+) => {
+      match last {
+        $($name => { call!($ex) }),+,
+      }
+    };
+  }
+
+  match_last! {
+    "get_info" => OkDeserilizeValue<mado_core::MangaInfo>,
+    _ => ()
+  }
+}
+
+// call fut then add name if return fut error
+async fn to_name_error<R>(
+  name: String,
+  fut: impl Future<Output = Result<R, VmError>>,
+) -> Result<R, (String, VmError)> {
+  let val = fut.await;
+
+  val.map_err(|err| (name, err))
+}
+
+// async call vm then cast to T with FromValue
+async fn async_call<T>(
+  mut vm: runestick::Vm,
+  hash: runestick::Hash,
+) -> Result<T, VmError>
+where
+  T: runestick::FromValue,
+{
+  let val = vm.async_call(hash, ()).await?;
+
+  T::from_value(val)
 }

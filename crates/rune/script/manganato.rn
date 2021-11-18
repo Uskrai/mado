@@ -52,6 +52,19 @@ impl WebsiteModule {
 
     let doc = mado::html::Document::new(response);
 
+    let info = self.parse_info(url, doc)?;
+
+    info.chapters = [];
+    let chapters = doc.find("ul.row-content-chapter>li");
+    for it in chapters.iter() {
+      info.chapters.push(self.parse_chapter(it));
+    }
+    info.chapters.reverse();
+
+    Ok(info)
+  }
+
+  pub fn parse_info(self, url, doc) {
     if doc.find("div.panel-not-found").len() != 0 {
       return Err(mado::error::Error::request_error(url, "404 not found"));
     }
@@ -76,19 +89,19 @@ impl WebsiteModule {
     info.summary = summary.text().to_string().trim();
 
     let find_info = |key| {
-      doc.find(key).parent().parent().find("td.table-value").find("a").iter().map(|v| v.text().to_string()).collect_vec()
+      doc.find(key)
+        .parent()
+        .parent()
+        .find("td.table-value")
+        .find("a")
+        .iter()
+        .map(|v| v.text().to_string())
+        .collect_vec()
     };
     info.genres = find_info("i.info-genres");
     info.authors = find_info("i.info-author");
     info.artists = [];
     info.types = "Series";
-
-    info.chapters = [];
-    let chapters = doc.find("ul.row-content-chapter>li");
-    for it in chapters.iter() {
-      info.chapters.push(self.parse_chapter(it));
-    }
-    info.chapters.reverse();
 
     Ok(info)
   }
@@ -137,12 +150,12 @@ mod test {
   }
 
   #[test]
-  pub async fn get_info_success() {
+  pub async fn get_info() {
     let module = create_module();
     let url = Url::parse("https://manganato.com/manga-yu976355").unwrap();
     let info = WebsiteModule::r_get_info(module, url).await;
 
-    mado::test::MangaInfo(info);
+    info
   }
 
   #[test]
