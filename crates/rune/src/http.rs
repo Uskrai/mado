@@ -107,8 +107,12 @@ pub fn load_module() -> Result<Module, ContextError> {
       associated => { default: default_ }
     },
     (RequestBuilder) => {
-      inst => { query, cookie, header },
-      async_inst => { send }
+      inst => {
+        query, cookie, header
+      },
+      async_inst => {
+        send
+      }
     },
     (Response) => {
       inst => {
