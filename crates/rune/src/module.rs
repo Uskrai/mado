@@ -15,16 +15,14 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
 use crate::SendValue;
 
+use super::function::DebugSyncFunction;
 use super::http::Url;
 use super::DeserializeResult;
 use async_trait::async_trait;
 use mado_core::MangaInfo;
 use mado_core::WebsiteModule as BaseWebsiteModule;
-use runestick::SyncFunction;
 
 use super::Error;
 
@@ -34,31 +32,6 @@ pub struct WebsiteModule {
   domain: Url,
   get_info: DebugSyncFunction,
   data: SendValue,
-}
-
-#[derive(Clone)]
-struct DebugSyncFunction {
-  inner: Arc<SyncFunction>,
-}
-
-impl std::ops::Deref for DebugSyncFunction {
-  type Target = Arc<SyncFunction>;
-  fn deref(&self) -> &Self::Target {
-    &self.inner
-  }
-}
-
-impl std::fmt::Debug for DebugSyncFunction {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let ptr = &*self.inner as *const SyncFunction;
-    f.debug_struct("SyncFunction").field("inner", &ptr).finish()
-  }
-}
-
-impl From<Arc<SyncFunction>> for DebugSyncFunction {
-  fn from(inner: Arc<SyncFunction>) -> Self {
-    Self { inner }
-  }
 }
 
 impl WebsiteModule {

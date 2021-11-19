@@ -144,11 +144,6 @@ mod test {
     super::load_module().data
   }
 
-  pub fn test_invalid_url() {
-    // let module = load_module();
-    // panic("");
-  }
-
   #[test]
   pub async fn get_info() {
     let module = create_module();

@@ -20,6 +20,7 @@ mod deserializer;
 mod error;
 mod error_impl;
 pub mod error_wrapper;
+mod function;
 pub mod http;
 pub mod json;
 mod module;
