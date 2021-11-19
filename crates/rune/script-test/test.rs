@@ -125,16 +125,7 @@ async fn main() {
     let test = test.into_iter().filter(|(s, _)| pattern.is_match(s));
 
     for (name, hash) in test {
-      let val = vm.clone().send_execute(hash, ()).unwrap();
-      let fut = async move {
-        let val = val.async_complete().await;
-        match val {
-          Ok(_) => {}
-          Err(err) => {
-            println!("error on {}: {}", name, err);
-          }
-        }
-      };
+      let fut = call_test(vm.clone(), name, hash);
       future.push(Box::pin(fut));
     }
   }
