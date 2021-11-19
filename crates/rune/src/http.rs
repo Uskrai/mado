@@ -103,8 +103,12 @@ pub fn load_module() -> Result<Module, ContextError> {
 
   mado_rune_macros::register_module! {
     (Client) => {
-      inst => { get, post, put, delete, head }
-      associated => { default: default_ }
+      inst => {
+        get, post, put, delete, head
+      }
+      associated => {
+        default: default_
+      }
     },
     (RequestBuilder) => {
       inst => {
@@ -123,7 +127,9 @@ pub fn load_module() -> Result<Module, ContextError> {
       }
     },
     (Url) => {
-      associated => { parse },
+      associated => {
+        parse
+      }
       inst => {
         to_string, query, clone, path
       }
