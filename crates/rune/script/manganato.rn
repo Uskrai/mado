@@ -35,10 +35,11 @@ impl WebsiteModule {
     )
   }
 
-  pub fn from_module(data) {
+  pub fn from_rust(data) {
     Self {
       client: data.client,
-      name_regex: data.name_regex
+      name_regex: data.name_regex,
+      from_rust: Self::from_rust
     }
   }
 

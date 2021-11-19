@@ -37,9 +37,8 @@ struct WebsiteModule {
   // and doesnt retain unused data.
   id_regex,
   client,
-  //
-  // // methods
-  // r_get_info,
+
+  from_rust,
 }
 
 impl WebsiteModule {
@@ -48,7 +47,8 @@ impl WebsiteModule {
       id_regex:
         mado::regex::Regex
         ::compile(`${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}`),
-      client: mado::http::Client::default_()
+      client: mado::http::Client::default_(),
+      from_rust: Self::from_rust
     };
   }
 
@@ -62,10 +62,11 @@ impl WebsiteModule {
       
   }
 
-  pub fn from_module(data) {
+  pub fn from_rust(data) {
     Self {
       id_regex: data.id_regex,
-      client: data.client
+      client: data.client,
+      from_rust: data.from_rust
     }
   }
 

@@ -18,10 +18,11 @@
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use runestick::{
-  AnyObj, FromValue, Object, Shared, SyncFunction, ToValue, Value, VmError,
+  AnyObj, FromValue, Object, Shared, Struct, SyncFunction, ToValue, Value,
+  VmError,
 };
 
-use crate::{http::Client, regex::Regex};
+use crate::{function::DebugSyncFunction, http::Client, regex::Regex};
 
 #[derive(Clone, Debug)]
 pub struct SendValue {
@@ -63,8 +64,12 @@ pub enum SendValueKind {
   String(String),
   Vec(Vec<SendValue>),
   Object(HashMap<String, SendValue>),
-  Struct(HashMap<String, SendValue>),
+  Struct {
+    from_rust: DebugSyncFunction,
+    data: HashMap<String, SendValue>,
+  },
 
+  Option(Box<Option<SendValue>>),
   Regex(Arc<Regex>),
   HttpClient(Client),
   Function(SendFunction),
@@ -82,7 +87,8 @@ impl SendValue {
   pub fn into_object(self) -> Result<HashMap<String, SendValue>, crate::Error> {
     use SendValueKind as This;
     match self.value {
-      This::Object(v) | This::Struct(v) => Ok(v),
+      This::Object(v) => Ok(v),
+      This::Struct { data, .. } => Ok(data),
       _ => Err(crate::Error::expected(
         "Object".to_string(),
         self.value.to_string_variant().to_string(),
@@ -131,6 +137,9 @@ impl SendValueKind {
       ($name:ident ()) => {
         Self::$name
       };
+      ($name:ident {..}) => {
+        Self::$name { .. }
+      };
     }
 
     macro_rules! variants {
@@ -153,7 +162,8 @@ impl SendValueKind {
       String(..),
       Vec(..),
       Object(..),
-      Struct(..),
+      Option(..),
+      Struct { .. },
       Function(..),
       Regex(..),
       HttpClient(..)
@@ -183,12 +193,16 @@ impl FromValue for SendValueKind {
       Value::Object(v) => {
         Self::Object(Self::to_send_value_map(v.take()?.iter())?)
       }
-      Value::Struct(v) => {
-        Self::Struct(Self::to_send_value_map(v.take()?.data().iter())?)
-      }
+      Value::Struct(v) => Self::from_struct(v.take()?)?,
       Value::Any(v) => Self::from_any(v.take()?)?,
       Value::Function(v) => {
         Self::Function(Arc::new(v.take()?.into_sync()?).into())
+      }
+      Value::Option(v) => {
+        let v = v.take()?;
+        let v = v.map(SendValue::from_value).transpose()?.into();
+
+        Self::Option(v)
       }
       _ => {
         panic!("{:#?}", value);
@@ -216,10 +230,11 @@ impl ToValue for SendValueKind {
         }
         Value::Vec(Shared::new(vec))
       }
-      Self::Struct(v) | Self::Object(v) => {
+      Self::Object(v) => {
         Value::Object(Shared::new(Self::from_send_value_map(v)?))
       }
-
+      Self::Struct { from_rust, data } => from_rust.call((data,))?,
+      Self::Option(v) => ToValue::to_value(*v)?,
       Self::Regex(v) => AnyObj::new(v.as_ref().clone()).to_value()?,
       Self::HttpClient(v) => AnyObj::new(v).to_value()?,
       Self::Function(_) => {
@@ -246,6 +261,20 @@ impl ToValue for SendValue {
 }
 
 impl SendValueKind {
+  fn from_struct(mut data: Struct) -> Result<Self, runestick::VmError> {
+    let from_rust = data.get("from_rust").ok_or_else(|| {
+          let f = "Struct should have from_rust variable to be used to convert back to rune";
+          VmError::panic(format!("{} found: {:?}", f, data))
+        })?.clone().take()?.into_function()?.take()?.into_sync()?;
+    let from_rust = Arc::new(from_rust).into();
+
+    *data.get_mut("from_rust").unwrap() =
+      ToValue::to_value(None::<String>).unwrap();
+
+    let data = Self::to_send_value_map(data.data().iter())?;
+
+    Ok(Self::Struct { from_rust, data })
+  }
   fn to_send_value_map<'a, T>(
     value: T,
   ) -> Result<HashMap<String, SendValue>, runestick::VmError>

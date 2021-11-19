@@ -90,7 +90,7 @@ impl TryFrom<SendValue> for Vec<WebsiteModule> {
         Ok(vec)
       }
 
-      Kind::Struct(_) | Kind::Object(_) => Ok([value.try_into()?].to_vec()),
+      Kind::Struct { .. } | Kind::Object(_) => Ok([value.try_into()?].to_vec()),
       val => Err(Error::expected(
         "Vector, Struct, or Object".to_string(),
         val.to_string_variant().to_string(),
