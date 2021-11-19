@@ -15,6 +15,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
+name = "ahash"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
+dependencies = [
+ "getrandom 0.2.3",
+ "once_cell",
+ "version_check",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -731,7 +742,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 dependencies = [
- "ahash",
+ "ahash 0.4.7",
  "serde",
 ]
 
@@ -740,6 +751,10 @@ name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+dependencies = [
+ "ahash 0.7.6",
+ "serde",
+]
 
 [[package]]
 name = "heck"
@@ -1003,9 +1018,8 @@ dependencies = [
  "nipper",
  "regex",
  "reqwest",
- "rune 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "rune-modules 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "runestick 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
+ "rune 0.10.0",
+ "rune-modules 0.10.0",
  "serde",
  "serde_json",
  "serde_path_to_error",
@@ -1022,9 +1036,9 @@ name = "mado-rune-macros"
 version = "0.1.0"
 dependencies = [
  "quote",
- "rune 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
- "rune-modules 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
- "runestick 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
+ "rune 0.9.1",
+ "rune-modules 0.9.1",
+ "runestick",
  "syn",
 ]
 
@@ -1106,6 +1120,15 @@ name = "nanorand"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac1378b66f7c93a1c0f8464a19bf47df8795083842e5090f4b7305973d5a22d0"
+dependencies = [
+ "getrandom 0.2.3",
+]
+
+[[package]]
+name = "nanorand"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "729eb334247daa1803e0a094d0a5c55711b85571179f5ec6e53eccfdf7008958"
 dependencies = [
  "getrandom 0.2.3",
 ]
@@ -1752,16 +1775,16 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9#25fe7acb68a0c38dcccbcde5588c7a646647a8a9"
+source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
 dependencies = [
  "codespan-reporting",
  "hashbrown 0.9.1",
  "itoa",
  "log",
  "num",
- "rune-macros 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "rune-ssa 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "runestick 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
+ "rune-macros 0.9.1",
+ "rune-ssa",
+ "runestick",
  "ryu",
  "smallvec",
  "thiserror",
@@ -1769,109 +1792,83 @@ dependencies = [
 
 [[package]]
 name = "rune"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
+version = "0.10.0"
+source = "git+https://github.com/rune-rs/rune?rev=c2f9ae6#c2f9ae6050c3aa31f1a79b5640035fc726834cf8"
 dependencies = [
+ "anyhow",
+ "byteorder",
  "codespan-reporting",
- "hashbrown 0.9.1",
+ "futures-core",
+ "futures-util",
+ "hashbrown 0.11.2",
  "itoa",
  "log",
  "num",
- "rune-macros 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
- "rune-ssa 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
- "runestick 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
+ "num-bigint",
+ "pin-project",
+ "rune-macros 0.10.0",
  "ryu",
+ "serde",
  "smallvec",
  "thiserror",
-]
-
-[[package]]
-name = "rune-macros"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9#25fe7acb68a0c38dcccbcde5588c7a646647a8a9"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "rune-macros"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "rune-modules"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9#25fe7acb68a0c38dcccbcde5588c7a646647a8a9"
-dependencies = [
- "nanorand",
- "reqwest",
- "rune 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "runestick 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "serde_json",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "rune-modules"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
-dependencies = [
- "nanorand",
- "reqwest",
- "rune 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
- "runestick 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
- "serde_json",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "rune-ssa"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9#25fe7acb68a0c38dcccbcde5588c7a646647a8a9"
-dependencies = [
- "hashbrown 0.9.1",
- "ordered-float",
- "thiserror",
-]
-
-[[package]]
-name = "rune-ssa"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
-dependencies = [
- "hashbrown 0.9.1",
- "ordered-float",
- "thiserror",
-]
-
-[[package]]
-name = "runestick"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9#25fe7acb68a0c38dcccbcde5588c7a646647a8a9"
-dependencies = [
- "anyhow",
- "byteorder",
- "futures-core",
- "futures-util",
- "hashbrown 0.9.1",
- "itoa",
- "log",
- "num-bigint",
- "pin-project",
- "runestick-macros 0.9.1 (git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9)",
- "ryu",
- "serde",
- "thiserror",
  "twox-hash",
+]
+
+[[package]]
+name = "rune-macros"
+version = "0.9.1"
+source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "rune-macros"
+version = "0.10.0"
+source = "git+https://github.com/rune-rs/rune?rev=c2f9ae6#c2f9ae6050c3aa31f1a79b5640035fc726834cf8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "rune-modules"
+version = "0.9.1"
+source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
+dependencies = [
+ "nanorand 0.5.2",
+ "reqwest",
+ "rune 0.9.1",
+ "runestick",
+ "serde_json",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "rune-modules"
+version = "0.10.0"
+source = "git+https://github.com/rune-rs/rune?rev=c2f9ae6#c2f9ae6050c3aa31f1a79b5640035fc726834cf8"
+dependencies = [
+ "nanorand 0.6.1",
+ "reqwest",
+ "rune 0.10.0",
+ "serde_json",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "rune-ssa"
+version = "0.9.1"
+source = "git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65#f002e48180b8112cc7d50a2b7189bd5fcb419b65"
+dependencies = [
+ "hashbrown 0.9.1",
+ "ordered-float",
+ "thiserror",
 ]
 
 [[package]]
@@ -1888,21 +1885,11 @@ dependencies = [
  "log",
  "num-bigint",
  "pin-project",
- "runestick-macros 0.9.1 (git+https://github.com/rune-rs/rune?rev=f002e48180b8112cc7d50a2b7189bd5fcb419b65)",
+ "runestick-macros",
  "ryu",
  "serde",
  "thiserror",
  "twox-hash",
-]
-
-[[package]]
-name = "runestick-macros"
-version = "0.9.1"
-source = "git+https://github.com/rune-rs/rune?rev=25fe7acb68a0c38dcccbcde5588c7a646647a8a9#25fe7acb68a0c38dcccbcde5588c7a646647a8a9"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -2119,6 +2106,9 @@ name = "smallvec"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "socket2"
