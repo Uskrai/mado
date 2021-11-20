@@ -1,9 +1,10 @@
-use std::{cell::RefCell, rc::Rc};
-
 use futures::Future;
 use mado_rune::DeserializeResult;
-use rune::CompileVisitor;
-use runestick::{Any, CompileMetaKind, FromValue, Hash, VmError, VmErrorKind};
+use rune::{
+  compile::{CompileVisitor, Meta, MetaKind},
+  runtime::{FromValue, VmError, VmErrorKind},
+  Any, Hash,
+};
 
 // implement convert from value for
 // type that is a result and Ok is deserialize
@@ -17,11 +18,11 @@ impl<T> FromValue for OkDeserilizeValue<T>
 where
   T: 'static + Send + serde::de::Deserialize<'static>,
 {
-  fn from_value(value: runestick::Value) -> Result<Self, VmError> {
+  fn from_value(value: rune::runtime::Value) -> Result<Self, VmError> {
     let deser = DeserializeResult::<T>::from_value(value)?;
 
     let inner = deser.get().map_err(|err| VmErrorKind::Panic {
-      reason: runestick::Panic::custom(err),
+      reason: rune::runtime::Panic::custom(err),
     })?;
 
     Ok(Self { inner })
@@ -37,37 +38,40 @@ impl<T> FromValue for OkAnyValue<T>
 where
   T: 'static + Any,
 {
-  fn from_value(value: runestick::Value) -> Result<Self, VmError> {
+  fn from_value(value: rune::runtime::Value) -> Result<Self, VmError> {
     let inner = T::from_value(value)?;
 
     Ok(Self { inner })
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 struct TestVisitor {
-  function: RefCell<Vec<(String, Hash)>>,
+  function: Vec<(String, Hash)>,
 }
 
 impl CompileVisitor for TestVisitor {
-  fn register_meta(&self, meta: &runestick::CompileMeta) {
+  fn register_meta(&mut self, meta: &Meta) {
     let item = meta.kind.clone();
 
-    if let CompileMetaKind::Function {
+    // push to Self::function if is_test
+    if let MetaKind::Function {
       type_hash,
       is_test: true,
+      ..
     } = item
     {
+      // get root name. e.g: test::get_info, test::get_info_404
       let name = meta.item.item.to_string();
       let name = name.trim_start_matches("test::");
       let source = meta.source.clone().unwrap();
 
+      // get path
       let path = source.path.unwrap();
       let path = path.file_stem().unwrap().to_string_lossy();
 
       self
         .function
-        .borrow_mut()
         .push((format!("{}::{}", path, name), type_hash));
     }
   }
@@ -75,21 +79,15 @@ impl CompileVisitor for TestVisitor {
 
 impl TestVisitor {
   /// Clone function, clear internal, then return function
-  pub fn to_function(&self) -> Vec<(String, Hash)> {
-    let res = self.function.clone().into_inner();
-    self.function.borrow_mut().clear();
-    res
+  pub fn into_function(self) -> Vec<(String, Hash)> {
+    self.function
   }
 }
 
 #[tokio::main]
 async fn main() {
-  let mut vm_builder = mado_rune::VmBuilder::new();
-  let visitor = Rc::new(TestVisitor::default());
-
-  vm_builder.set_source_loader(Rc::new(mado_rune::SourceLoader::new()));
-  vm_builder.options().test(true);
-  vm_builder.set_compile_visitor(visitor.clone());
+  let mut options = rune::Options::default();
+  options.test(true);
 
   let mut tests = Vec::new();
 
@@ -97,12 +95,18 @@ async fn main() {
   for it in entry {
     let it = it.unwrap();
     if it.path().is_file() {
-      let source = runestick::Source::from_path(&it.path()).unwrap();
-      let vm = vm_builder.load_vm_from_source(source);
+      let mut visitor = TestVisitor::default();
+
+      let vm = mado_rune::Build::default()
+        .visitor(&mut visitor)
+        .options(&options)
+        .with_path(&it.path())
+        .unwrap()
+        .build_vm();
 
       match vm {
         Ok(vm) => {
-          let vm_function = visitor.to_function();
+          let vm_function = visitor.into_function();
           tests.push((vm, vm_function));
         }
         Err(err) => {
@@ -144,9 +148,9 @@ async fn main() {
 }
 
 async fn call_test(
-  vm: runestick::Vm,
+  vm: rune::runtime::Vm,
   name: String,
-  hash: runestick::Hash,
+  hash: rune::Hash,
 ) -> Result<(), (String, VmError)> {
   let last = name.split("::").last().unwrap();
 
@@ -184,11 +188,11 @@ async fn to_name_error<R>(
 
 // async call vm then cast to T with FromValue
 async fn async_call<T>(
-  mut vm: runestick::Vm,
-  hash: runestick::Hash,
+  mut vm: rune::runtime::Vm,
+  hash: rune::Hash,
 ) -> Result<T, VmError>
 where
-  T: runestick::FromValue,
+  T: rune::runtime::FromValue,
 {
   let val = vm.async_call(hash, ()).await?;
 

@@ -16,23 +16,36 @@
  */
 
 #[tokio::test]
-async fn load_module_script() {
+async fn test_load_module() {
   let scripts = std::fs::read_dir("script").unwrap();
 
-  let module_builder = mado_rune::WebsiteModuleBuilder::default();
+  let mut errors = Vec::new();
 
   for it in scripts.into_iter() {
     let it = it.unwrap();
     if it.path().is_file() {
-      let module = module_builder.load_path(&it.path());
+      let module = mado_rune::Build::default()
+        .with_path(&it.path())
+        .unwrap()
+        .build_for_module()
+        .unwrap()
+        .error_missing_load_module(false)
+        .build();
 
       match module {
         Ok(_) => {}
         Err(err) => {
-          println!("{}", err);
+          errors.push((it.path(), err));
         }
       }
     }
+  }
+
+  if !errors.is_empty() {
+    for (path, err) in errors {
+      println!("error on {}: {}", path.to_string_lossy(), err);
+    }
+    panic!("Error");
   }
 }
 
@@ -47,7 +60,7 @@ fn test_mangadex() {
   //     println!("{}", scripts.display());
   //
   //     let mut source = rune::Sources::new();
-  //     source.insert(runestick::Source::from_path(scripts).unwrap());
+  //     source.insert(rune::compile::from_path(scripts).unwrap());
   //
   //     loader::load([source].into_iter())
   //       .await
