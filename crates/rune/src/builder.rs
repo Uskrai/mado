@@ -38,7 +38,7 @@ pub fn create_context() -> Result<Context, ContextError> {
 
 #[derive(Default)]
 pub struct Build<'a> {
-  context: Option<&'a Context>,
+  context: Option<Arc<Context>>,
   visitor: Option<&'a mut dyn CompileVisitor>,
   options: Option<&'a Options>,
   source_loader: Option<&'a mut dyn RuneSourceLoader>,
@@ -46,9 +46,16 @@ pub struct Build<'a> {
 
 impl<'a> Build<'a> {
   #[inline(always)]
-  pub fn context(mut self, context: &'a Context) -> Self {
+  pub fn context(mut self, context: Arc<Context>) -> Self {
     self.context = Some(context);
     self
+  }
+
+  pub fn get_context_or_default(&self) -> Arc<Context> {
+    match &self.context {
+      Some(c) => c.clone(),
+      None => Self::default_context(),
+    }
   }
 
   #[inline(always)]
@@ -86,20 +93,23 @@ impl<'a> Build<'a> {
   }
 
   #[inline(always)]
-  pub fn build_unit(self, mut sources: Sources) -> Result<Unit, BuildError> {
+  fn build_unit_diagnostics(
+    self,
+    sources: &mut Sources,
+  ) -> Result<Unit, Diagnostics> {
+    let build = rune::prepare(sources);
+
+    // initialize context first to make borrow checker happy
+    let context = self.get_context_or_default();
+    let build = build.with_context(&context);
+
     let Build {
-      context,
+      // we don't need context anymore
+      context: _,
       visitor,
       options,
       source_loader,
     } = self;
-    let mut diagnostics = Diagnostics::new();
-
-    let build = rune::prepare(&mut sources);
-    let build = match context {
-      Some(context) => build.with_context(context),
-      None => build.with_context(Self::default_context()),
-    };
 
     let build = match visitor {
       Some(visitor) => build.with_visitor(visitor),
@@ -118,10 +128,17 @@ impl<'a> Build<'a> {
       None => build.with_source_loader(&mut loader),
     };
 
+    let mut diagnostics = Diagnostics::new();
     build
       .with_diagnostics(&mut diagnostics)
       .build()
-      .map_err(|_| BuildError::new(diagnostics, sources))
+      .map_err(|_| diagnostics)
+  }
+
+  pub fn build_unit(self, mut sources: Sources) -> Result<Unit, BuildError> {
+    self
+      .build_unit_diagnostics(&mut sources)
+      .map_err(|e| BuildError::new(e, sources))
   }
 
   #[inline(always)]
@@ -152,11 +169,11 @@ impl<'a> Build<'a> {
   }
 
   #[inline(always)]
-  pub fn default_context() -> &'static Context {
+  pub fn default_context() -> Arc<Context> {
     lazy_static::lazy_static! {
-      static ref CONTEXT: Context = create_context().unwrap();
+      static ref CONTEXT: Arc<Context> = Arc::new(create_context().unwrap());
     }
-    &CONTEXT
+    CONTEXT.clone()
   }
 
   #[inline(always)]
