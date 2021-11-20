@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::Any;
+use rune::Any;
 use std::{fmt::Display, str::FromStr};
 
 use crate::Error;
@@ -61,6 +61,10 @@ impl Url {
 
   pub fn path(&self) -> String {
     self.inner.path().to_string()
+  }
+
+  pub fn into_inner(self) -> url::Url {
+    self.inner
   }
 
   pub fn to_string_debug(&self, s: &mut String) -> std::fmt::Result {

@@ -15,40 +15,41 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/// this is runestick::Any implementation of Error
+/// this is rune::Any implementation of Error
 use super::Error;
 
-impl runestick::Any for Error {
-  fn type_hash() -> runestick::Hash {
-    runestick::Hash::from_type_id(std::any::TypeId::of::<Self>())
+impl rune::Any for Error {
+  fn type_hash() -> rune::Hash {
+    rune::Hash::from_type_id(std::any::TypeId::of::<Self>())
   }
 }
-impl runestick::InstallWith for Error {
+impl rune::compile::InstallWith for Error {
   fn install_with(
-    _: &mut runestick::Module,
-  ) -> ::std::result::Result<(), runestick::ContextError> {
+    _: &mut rune::compile::Module,
+  ) -> ::std::result::Result<(), rune::compile::ContextError> {
     Ok(())
   }
 }
-impl runestick::Named for Error {
-  const BASE_NAME: runestick::RawStr = runestick::RawStr::from_str("Error");
+impl rune::compile::Named for Error {
+  const BASE_NAME: rune::runtime::RawStr =
+    rune::runtime::RawStr::from_str("Error");
 }
-impl runestick::TypeOf for Error {
-  fn type_hash() -> runestick::Hash {
-    <Self as runestick::Any>::type_hash()
+impl rune::runtime::TypeOf for Error {
+  fn type_hash() -> rune::Hash {
+    <Self as rune::Any>::type_hash()
   }
-  fn type_info() -> runestick::TypeInfo {
-    runestick::TypeInfo::Any(runestick::RawStr::from_str(
+  fn type_info() -> rune::runtime::TypeInfo {
+    rune::runtime::TypeInfo::Any(rune::runtime::RawStr::from_str(
       std::any::type_name::<Self>(),
     ))
   }
 }
-impl runestick::UnsafeFromValue for &Error {
+impl rune::runtime::UnsafeFromValue for &Error {
   type Output = *const Error;
-  type Guard = runestick::RawRef;
+  type Guard = rune::runtime::RawRef;
   fn from_value(
-    value: runestick::Value,
-  ) -> ::std::result::Result<(Self::Output, Self::Guard), runestick::VmError>
+    value: rune::runtime::Value,
+  ) -> ::std::result::Result<(Self::Output, Self::Guard), rune::runtime::VmError>
   {
     value.into_any_ptr()
   }
@@ -56,12 +57,12 @@ impl runestick::UnsafeFromValue for &Error {
     &*output
   }
 }
-impl runestick::UnsafeFromValue for &mut Error {
+impl rune::runtime::UnsafeFromValue for &mut Error {
   type Output = *mut Error;
-  type Guard = runestick::RawMut;
+  type Guard = rune::runtime::RawMut;
   fn from_value(
-    value: runestick::Value,
-  ) -> ::std::result::Result<(Self::Output, Self::Guard), runestick::VmError>
+    value: rune::runtime::Value,
+  ) -> ::std::result::Result<(Self::Output, Self::Guard), rune::runtime::VmError>
   {
     value.into_any_mut()
   }
@@ -69,23 +70,27 @@ impl runestick::UnsafeFromValue for &mut Error {
     &mut *output
   }
 }
-impl runestick::UnsafeToValue for &Error {
-  type Guard = runestick::SharedPointerGuard;
+impl rune::runtime::UnsafeToValue for &Error {
+  type Guard = rune::runtime::SharedPointerGuard;
   unsafe fn unsafe_to_value(
     self,
-  ) -> ::std::result::Result<(runestick::Value, Self::Guard), runestick::VmError>
-  {
-    let (shared, guard) = runestick::Shared::from_ref(self);
-    Ok((runestick::Value::from(shared), guard))
+  ) -> ::std::result::Result<
+    (rune::runtime::Value, Self::Guard),
+    rune::runtime::VmError,
+  > {
+    let (shared, guard) = rune::runtime::Shared::from_ref(self);
+    Ok((rune::runtime::Value::from(shared), guard))
   }
 }
-impl runestick::UnsafeToValue for &mut Error {
-  type Guard = runestick::SharedPointerGuard;
+impl rune::runtime::UnsafeToValue for &mut Error {
+  type Guard = rune::runtime::SharedPointerGuard;
   unsafe fn unsafe_to_value(
     self,
-  ) -> ::std::result::Result<(runestick::Value, Self::Guard), runestick::VmError>
-  {
-    let (shared, guard) = runestick::Shared::from_mut(self);
-    Ok((runestick::Value::from(shared), guard))
+  ) -> ::std::result::Result<
+    (rune::runtime::Value, Self::Guard),
+    rune::runtime::VmError,
+  > {
+    let (shared, guard) = rune::runtime::Shared::from_mut(self);
+    Ok((rune::runtime::Value::from(shared), guard))
   }
 }

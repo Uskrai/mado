@@ -18,7 +18,10 @@
 use std::fmt::Display;
 
 use mado_rune_macros::register_module;
-use runestick::{Any, AnyObj, ContextError, Module, Shared, Value};
+use rune::{
+  runtime::{AnyObj, Shared, Value},
+  Any, ContextError, Module,
+};
 
 #[derive(Any)]
 pub struct Document {
@@ -132,14 +135,14 @@ impl Selection {
   pub fn iter(&'static self) -> Value {
     let nodes = self.iter_of_value();
 
-    let iter = runestick::Iterator::from("nodes", nodes);
+    let iter = rune::runtime::Iterator::from("nodes", nodes);
 
     Value::Iterator(Shared::new(iter))
   }
 
   pub fn to_vec(&'static self) -> Value {
     let nodes = self.iter_of_value();
-    let vec = runestick::Vec::from(nodes.collect::<Vec<_>>());
+    let vec = rune::runtime::Vec::from(nodes.collect::<Vec<_>>());
     Value::Vec(Shared::new(vec))
   }
 }

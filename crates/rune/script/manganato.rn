@@ -7,7 +7,9 @@ pub fn load_module() {
 
 pub struct WebsiteModule {
   client,
-  name_regex
+  name_regex,
+  
+  from_rust
 }
 
 impl WebsiteModule {
@@ -23,7 +25,11 @@ impl WebsiteModule {
       (?P<title>.*))?
     ");
 
-    Self { name_regex: reg, client: mado::http::Client::default_() }
+    Self { 
+      name_regex: reg, 
+      client: mado::http::Client::default_(), 
+      from_rust: Self::from_rust 
+    }
   }
 
   pub fn to_module(id,name,domain) {

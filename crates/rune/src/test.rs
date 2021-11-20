@@ -15,10 +15,9 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::{ContextError, Module};
-
 use crate::DeserializeResult;
 use mado_core::MangaInfo;
+use rune::{ContextError, Module};
 
 pub fn load_module() -> Result<Module, ContextError> {
   let mut module = Module::with_crate_item("mado", &["test"]);
@@ -29,7 +28,7 @@ pub fn load_module() -> Result<Module, ContextError> {
         &[stringify!($name)],
         |v: DeserializeResult<$name>| match v.get() {
           Ok(_) => Ok(()),
-          Err(v) => return Err(runestick::VmError::panic(v)),
+          Err(v) => return Err(rune::runtime::VmError::panic(v)),
         },
       )?;
     };

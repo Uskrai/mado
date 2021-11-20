@@ -165,7 +165,7 @@ impl VectorMethod {
           let name = syn::parse_str::<Ident>(name).unwrap();
 
           items.push(parse_quote! {
-            module.inst_fn(::runestick::Protocol::#name, #ty::#ident)?;
+            module.inst_fn(::rune::Protocol::#name, #ty::#ident)?;
           });
         }
       }
@@ -243,8 +243,8 @@ pub fn register_module(input: TokenStream) -> TokenStream {
   input.register(&mut vec);
 
   let output = quote::quote! {
-      pub fn load_module_with(mut module: ::runestick::Module)
-        -> Result<::runestick::Module, ::runestick::ContextError> {
+      pub fn load_module_with(mut module: ::rune::compile::Module)
+        -> Result<::rune::compile::Module, ::rune::compile::ContextError> {
         #(#vec)*
         Ok(module)
       }

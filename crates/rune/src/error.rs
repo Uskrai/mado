@@ -18,43 +18,33 @@
 use std::fmt::Display;
 
 use crate::deserializer;
-use rune::EmitDiagnostics;
-use runestick::{ContextError, Module};
+use rune::{ContextError, Module};
 use thiserror::Error;
 
 use super::http::Url;
 
 /// error happen when loading [`rune`] script with its diagnostics
 #[derive(Debug)]
-pub struct LoadSourcesError {
+pub struct BuildError {
   sources: rune::Sources,
   diagnostics: rune::Diagnostics,
-  error: rune::LoadSourcesError,
 }
 
-impl std::error::Error for LoadSourcesError {}
+impl std::error::Error for BuildError {}
 
-impl LoadSourcesError {
-  pub fn new(
-    error: rune::LoadSourcesError,
-    diagnostics: rune::Diagnostics,
-    sources: rune::Sources,
-  ) -> Self {
+impl BuildError {
+  pub fn new(diagnostics: rune::Diagnostics, sources: rune::Sources) -> Self {
     Self {
-      error,
       diagnostics,
       sources,
     }
   }
 }
 
-impl Display for LoadSourcesError {
+impl Display for BuildError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let mut writer = rune::termcolor::Buffer::no_color();
-    self
-      .diagnostics
-      .emit_diagnostics(&mut writer, &self.sources)
-      .unwrap();
+    self.diagnostics.emit(&mut writer, &self.sources).unwrap();
     write!(f, "{}", String::from_utf8_lossy(writer.as_slice()))
   }
 }
@@ -66,18 +56,18 @@ pub enum RuneError {
   VmError(
     #[from]
     #[source]
-    runestick::VmError,
+    rune::runtime::VmError,
   ),
 
   #[error("{0}")]
   AccessError(
     #[source]
     #[from]
-    runestick::AccessError,
+    rune::runtime::AccessError,
   ),
 
   #[error("{0}")]
-  LoadSourcesError(#[from] LoadSourcesError),
+  LoadSourcesError(#[from] BuildError),
 
   #[error("load_module function doesn't exists inside vm")]
   MissingLoadModuleFn,
@@ -179,9 +169,9 @@ where
   }
 }
 
-impl From<runestick::VmErrorKind> for Error {
-  fn from(v: runestick::VmErrorKind) -> Self {
-    Self::RuneError(runestick::VmError::from(v).into())
+impl From<rune::runtime::VmErrorKind> for Error {
+  fn from(v: rune::runtime::VmErrorKind) -> Self {
+    Self::RuneError(rune::runtime::VmError::from(v).into())
   }
 }
 

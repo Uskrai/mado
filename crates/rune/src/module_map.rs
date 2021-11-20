@@ -34,7 +34,7 @@ impl WebsiteModuleMap {
       .insert(module.get_domain().clone().into(), Arc::new(module));
   }
 
-  pub fn search_module(&self, mut url: Url) -> Option<Arc<WebsiteModule>> {
+  pub fn get(&self, mut url: Url) -> Option<Arc<WebsiteModule>> {
     url.set_path("");
     url.set_query(None);
 

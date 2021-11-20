@@ -17,12 +17,15 @@
 
 use std::{collections::VecDeque, path::PathBuf};
 
-use rune::{CompileError, CompileErrorKind};
-use runestick::{Component, Source};
+use rune::{
+  compile::{CompileError, CompileErrorKind, Component},
+  Source,
+};
+
 //
 // /// ```
-// /// use runestick::Item;
-// /// use mado_rune::SourceLoader;
+// /// use rune::compile::Item;
+// /// use mado_rune::compile::SourceLoader;
 // ///
 // /// #   use tempfile::TempDir;
 // /// # pub fn create_environment(
@@ -77,13 +80,13 @@ pub struct SourceLoader {
   //
 }
 
-impl rune::SourceLoader for SourceLoader {
+impl rune::compile::SourceLoader for SourceLoader {
   fn load(
-    &self,
+    &mut self,
     root: &std::path::Path,
-    item: &runestick::Item,
-    span: runestick::Span,
-  ) -> Result<runestick::Source, rune::CompileError> {
+    item: &rune::compile::Item,
+    span: rune::ast::Span,
+  ) -> Result<rune::Source, rune::compile::CompileError> {
     let path = Self::search_path(root.to_owned(), item.clone());
 
     let path = match path {
@@ -115,7 +118,7 @@ impl SourceLoader {
 
   pub fn search_path(
     mut root: std::path::PathBuf,
-    base_item: runestick::Item,
+    base_item: rune::compile::Item,
   ) -> Result<std::path::PathBuf, CompileErrorKind> {
     if !root.pop() {
       return Err(CompileErrorKind::UnsupportedModuleRoot {
@@ -198,7 +201,7 @@ impl SourceLoader {
 #[cfg(test)]
 mod test {
   use super::SourceLoader;
-  use runestick::Item;
+  use rune::compile::Item;
   use tempfile::TempDir;
 
   pub fn create_environment(

@@ -21,12 +21,18 @@ use std::sync::Arc;
 
 #[tokio::main]
 pub async fn main() {
-  let module = mado_rune::WebsiteModuleBuilder::default();
   let mut modules = mado_rune::WebsiteModuleMap::default();
   for it in std::fs::read_dir("../rune/script").unwrap() {
     let it = it.unwrap();
     if it.path().is_file() {
-      for it in module.load_path(&it.path()).unwrap() {
+      let vec = mado_rune::Build::default()
+        .with_path(&it.path())
+        .unwrap()
+        .build_for_module()
+        .unwrap()
+        .build()
+        .unwrap();
+      for it in vec {
         modules.insert(it);
       }
     }

@@ -17,7 +17,10 @@
 
 use std::{collections::HashMap, ops::Range};
 
-use runestick::{Any, ContextError, Module, Value, VmError};
+use rune::{
+  runtime::{Value, VmError},
+  Any, ContextError, Module,
+};
 
 #[derive(Any, Clone, Debug)]
 pub struct Regex {

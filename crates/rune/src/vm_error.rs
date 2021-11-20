@@ -19,9 +19,9 @@ use std::fmt::Display;
 
 use thiserror::Error;
 
-use runestick::VmError as RuneVmError;
+use rune::runtime::VmError as RuneVmError;
 
-/// this is Error to make [runestick::VmError] more readable
+/// this is Error to make [rune::runtime::VmError] more readable
 #[derive(Error, Debug)]
 pub struct VmError {
   error: RuneVmError,

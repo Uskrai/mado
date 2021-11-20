@@ -15,17 +15,15 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
-use runestick::SyncFunction;
+use rune::{runtime::SyncFunction, FromValue};
 
 #[derive(Clone)]
 pub struct DebugSyncFunction {
-  inner: Arc<SyncFunction>,
+  inner: SyncFunction,
 }
 
 impl std::ops::Deref for DebugSyncFunction {
-  type Target = Arc<SyncFunction>;
+  type Target = SyncFunction;
   fn deref(&self) -> &Self::Target {
     &self.inner
   }
@@ -33,13 +31,25 @@ impl std::ops::Deref for DebugSyncFunction {
 
 impl std::fmt::Debug for DebugSyncFunction {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let ptr = &*self.inner as *const SyncFunction;
+    let ptr = &self.inner as *const SyncFunction;
     f.debug_struct("SyncFunction").field("inner", &ptr).finish()
   }
 }
 
-impl From<Arc<SyncFunction>> for DebugSyncFunction {
-  fn from(inner: Arc<SyncFunction>) -> Self {
+impl From<SyncFunction> for DebugSyncFunction {
+  fn from(inner: SyncFunction) -> Self {
     Self { inner }
+  }
+}
+
+impl DebugSyncFunction {
+  pub fn into_inner(self) -> SyncFunction {
+    self.inner
+  }
+}
+
+impl FromValue for DebugSyncFunction {
+  fn from_value(value: rune::Value) -> Result<Self, rune::runtime::VmError> {
+    Ok(value.into_function()?.take()?.into_sync()?.into())
   }
 }

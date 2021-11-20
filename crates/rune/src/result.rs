@@ -15,7 +15,10 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::{ContextError, Function, Module, Shared, Value, VmError};
+use rune::{
+  runtime::{Function, Shared, Value, VmError},
+  ContextError, Module,
+};
 
 pub fn load_module() -> Result<Module, ContextError> {
   let mut module = Module::with_crate_item("std", &["result"]);

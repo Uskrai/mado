@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::Value;
+use rune::runtime::Value;
 use serde::{
   de::{
     value::{MapDeserializer, SeqDeserializer},
@@ -33,7 +33,7 @@ pub enum Error {
   Custom(String),
 
   #[error("{0}")]
-  AccessError(#[from] runestick::AccessError),
+  AccessError(#[from] rune::runtime::AccessError),
   #[error("{0}")]
   DeserializeError(#[from] serde::de::value::Error),
 }

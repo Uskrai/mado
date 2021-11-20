@@ -53,7 +53,7 @@ impl MangaInfoModel {
   fn get_module(&self, link: &str) -> Result<(Url, Arc<WebsiteModule>), Error> {
     let url = mado_core::url::fill_host(link)?;
 
-    let module = self.modules.search_module(url.clone());
+    let module = self.modules.get(url.clone());
 
     match module {
       Some(module) => Ok((url, module)),
@@ -74,7 +74,7 @@ impl MangaInfoModel {
       return;
     }
 
-    let result = self.get_module(&url);
+    let result = self.get_module(url);
 
     let (url, module) = match result {
       Ok(item) => item,

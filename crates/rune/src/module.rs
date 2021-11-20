@@ -62,8 +62,7 @@ impl TryFrom<SendValue> for WebsiteModule {
       .get("get_info")
       .expect("get_info doesn't exist")
       .clone()
-      .into_function()?
-      .into();
+      .into_function()?;
 
     let data = obj.get("data").expect("cannot find data").clone();
 

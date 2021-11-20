@@ -17,13 +17,14 @@ serde_path_to_error = "0.1"
 
 # git dependency is temporary for workaround rust-analyzer bug
 # 
-rune = { git = "https://github.com/rune-rs/rune", rev = "25fe7acb68a0c38dcccbcde5588c7a646647a8a9" }
-rune-modules = { git = "https://github.com/rune-rs/rune", rev = "25fe7acb68a0c38dcccbcde5588c7a646647a8a9", features = ["full"] }
-runestick = { git = "https://github.com/rune-rs/rune", rev = "25fe7acb68a0c38dcccbcde5588c7a646647a8a9" }
+rune = { git = "https://github.com/rune-rs/rune", rev = "551a671" }
+rune-modules = { git = "https://github.com/rune-rs/rune", rev = "551a671", features = ["full"] }
 
 reqwest = { version = "0.11", features = ["json"] }
 
 thiserror = "1.0"
+
+lazy_static = "1.4"
 
 url = "2.2"
 

@@ -17,7 +17,7 @@
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
-use runestick::{
+use rune::runtime::{
   AnyObj, FromValue, Object, Shared, Struct, SyncFunction, ToValue, Value,
   VmError,
 };
@@ -72,7 +72,7 @@ pub enum SendValueKind {
   Option(Box<Option<SendValue>>),
   Regex(Arc<Regex>),
   HttpClient(Client),
-  Function(SendFunction),
+  Function(DebugSyncFunction),
 }
 
 impl SendValue {
@@ -117,9 +117,9 @@ impl SendValue {
     }
   }
 
-  pub fn into_function(self) -> Result<Arc<SyncFunction>, crate::Error> {
+  pub fn into_function(self) -> Result<DebugSyncFunction, crate::Error> {
     match self.value {
-      SendValueKind::Function(v) => Ok(v.inner),
+      SendValueKind::Function(v) => Ok(v),
       _ => Err(crate::Error::expected(
         "Function".to_string(),
         self.value.to_string_variant().to_string(),
@@ -129,6 +129,12 @@ impl SendValue {
 }
 
 impl SendValueKind {
+  /// Get Enum variant as String
+  /// ```
+  /// use mado_rune::SendValueKind;
+  /// let value = SendValueKind::Integer(5);
+  /// assert_eq!(value.to_string_variant(), "Integer");
+  /// ```
   pub fn to_string_variant(&self) -> &'static str {
     macro_rules! match_value {
       ($name:ident (..)) => {
@@ -172,7 +178,9 @@ impl SendValueKind {
 }
 
 impl FromValue for SendValueKind {
-  fn from_value(value: runestick::Value) -> Result<Self, runestick::VmError> {
+  fn from_value(
+    value: rune::runtime::Value,
+  ) -> Result<Self, rune::runtime::VmError> {
     let value = match value {
       Value::Unit => Self::Unit,
       Value::Integer(v) => Self::Integer(v),
@@ -191,13 +199,11 @@ impl FromValue for SendValueKind {
         Self::Vec(res)
       }
       Value::Object(v) => {
-        Self::Object(Self::to_send_value_map(v.take()?.iter())?)
+        Self::Object(Self::convert_object_to_map(v.take()?.iter())?)
       }
       Value::Struct(v) => Self::from_struct(v.take()?)?,
       Value::Any(v) => Self::from_any(v.take()?)?,
-      Value::Function(v) => {
-        Self::Function(Arc::new(v.take()?.into_sync()?).into())
-      }
+      Value::Function(v) => Self::Function(v.take()?.into_sync()?.into()),
       Value::Option(v) => {
         let v = v.take()?;
         let v = v.map(SendValue::from_value).transpose()?.into();
@@ -214,7 +220,7 @@ impl FromValue for SendValueKind {
 }
 
 impl ToValue for SendValueKind {
-  fn to_value(self) -> Result<Value, runestick::VmError> {
+  fn to_value(self) -> Result<Value, rune::runtime::VmError> {
     let value = match self {
       Self::Unit => Value::Unit,
       Self::Bool(v) => Value::Bool(v),
@@ -224,14 +230,14 @@ impl ToValue for SendValueKind {
       Self::Float(v) => Value::Float(v),
       Self::String(v) => Value::String(Shared::new(v)),
       Self::Vec(v) => {
-        let mut vec = runestick::Vec::new();
+        let mut vec = rune::runtime::Vec::new();
         for it in v {
           vec.push(it.to_value()?);
         }
         Value::Vec(Shared::new(vec))
       }
       Self::Object(v) => {
-        Value::Object(Shared::new(Self::from_send_value_map(v)?))
+        Value::Object(Shared::new(Self::convert_map_to_object(v)?))
       }
       Self::Struct { from_rust, data } => from_rust.call((data,))?,
       Self::Option(v) => ToValue::to_value(*v)?,
@@ -255,29 +261,40 @@ impl FromValue for SendValue {
 }
 
 impl ToValue for SendValue {
-  fn to_value(self) -> Result<Value, runestick::VmError> {
+  fn to_value(self) -> Result<Value, rune::runtime::VmError> {
     self.value.to_value()
   }
 }
 
 impl SendValueKind {
-  fn from_struct(mut data: Struct) -> Result<Self, runestick::VmError> {
-    let from_rust = data.get("from_rust").ok_or_else(|| {
-          let f = "Struct should have from_rust variable to be used to convert back to rune";
-          VmError::panic(format!("{} found: {:?}", f, data))
-        })?.clone().take()?.into_function()?.take()?.into_sync()?;
-    let from_rust = Arc::new(from_rust).into();
+  fn from_struct(mut data: Struct) -> Result<Self, rune::runtime::VmError> {
+    let from_rust = data
+      .get("from_rust")
+      .ok_or_else(|| {
+        let f = "Struct should have from_rust variable to \
+                 be used to convert back to rune";
+        VmError::panic(format!("{} found: {:?}", f, data))
+      })?
+      .clone()
+      .take()?
+      .into_function()?
+      .take()?
+      .into_sync()?;
+
+    let from_rust = from_rust.into();
 
     *data.get_mut("from_rust").unwrap() =
       ToValue::to_value(None::<String>).unwrap();
 
-    let data = Self::to_send_value_map(data.data().iter())?;
+    let data = Self::convert_object_to_map(data.data().iter())?;
 
     Ok(Self::Struct { from_rust, data })
   }
-  fn to_send_value_map<'a, T>(
+
+  // convert value to HashMap<String, SendValue>
+  fn convert_object_to_map<'a, T>(
     value: T,
-  ) -> Result<HashMap<String, SendValue>, runestick::VmError>
+  ) -> Result<HashMap<String, SendValue>, rune::runtime::VmError>
   where
     T: Iterator<Item = (&'a String, &'a Value)>,
   {
@@ -292,7 +309,8 @@ impl SendValueKind {
     Ok(res)
   }
 
-  pub fn from_send_value_map(
+  // convert HashMap<String,SendValue to Object>
+  pub fn convert_map_to_object(
     value: HashMap<String, SendValue>,
   ) -> Result<Object, VmError> {
     let mut obj = Object::new();
@@ -303,19 +321,102 @@ impl SendValueKind {
   }
 
   fn from_any(value: AnyObj) -> Result<SendValueKind, VmError> {
-    if value.is::<Regex>() {
-      let regex = value.downcast_borrow_ref::<Regex>().unwrap().clone();
-      Ok(Self::Regex(Arc::new(regex)))
-    } else if value.is::<Client>() {
-      let client = value.downcast_borrow_ref::<Client>().unwrap().clone();
-      Ok(Self::HttpClient(client))
-    } else {
-      Err(VmError::panic(format!(
-        "converting {:?} to send value is not supported, \
+    macro_rules! is {
+      ($type:ty, $variant:ident) => {
+        is!($type, $variant, |value| value)
+      };
+      ($type:ty, $variant:ident, $convert:expr) => {
+        if value.is::<$type>() {
+          let value = value.downcast_borrow_ref::<$type>().unwrap().clone();
+          return Ok(Self::$variant($convert(value)));
+        }
+      };
+    }
+    is!(Regex, Regex, |value| { Arc::new(value) });
+    is!(Client, HttpClient);
+
+    return Err(VmError::panic(format!(
+      "converting {:?} to send value is not supported, \
         consider adding them to SendValueKind if they implement \
         Send safely",
-        value
-      )))
-    }
+      value
+    )));
+  }
+}
+
+const _: () = {
+  fn assert_send<T: Send>() {}
+  fn assert_sync<T: Sync>() {}
+
+  fn assert_all() {
+    assert_send::<SendValue>();
+    assert_sync::<SendValue>();
+  }
+};
+
+#[cfg(test)]
+mod tests {
+  use rune::{runtime::Function, Vm};
+
+  use super::*;
+
+  #[test]
+  fn call_method_fail() -> Result<(), VmError> {
+    let sources = rune::sources! {
+      entry => {
+        pub fn main() {
+          Foo {}
+        }
+
+        struct Foo {};
+      }
+    };
+
+    let vm = crate::Build::default().build_vm(sources).unwrap();
+    SendValue::from_value(vm.complete().unwrap())
+      .expect_err("expecting error because from_rust not defined");
+
+    Ok(())
+  }
+
+  #[test]
+  fn call_method() -> Result<(), VmError> {
+    let mut sources = rune::sources! {
+      entry => {
+        pub fn main() {
+          (Foo::new(), call)
+        }
+
+        struct Foo { from_rust };
+        impl Foo {
+          pub fn new() {
+            Foo {
+              from_rust: Self::from_rust
+            }
+          }
+
+          pub fn from_rust(data) {
+            Foo {
+              from_rust: data.from_rust
+            }
+          }
+
+          pub fn test(self) {}
+        }
+
+        pub fn call(foo) {
+          foo.test();
+        }
+      }
+    };
+    let unit = rune::prepare(&mut sources).build().unwrap();
+    let vm = Vm::without_runtime(Arc::new(unit));
+
+    let (foo, call): (SendValue, Function) =
+      FromValue::from_value(vm.complete().unwrap()).unwrap();
+
+    call.call::<_, ()>((foo,)).unwrap();
+
+    Ok(())
   }
 }

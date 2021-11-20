@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::{FromValue, ToValue, Value};
+use rune::runtime::{FromValue, ToValue, Value};
 use serde::Deserialize;
 
 use crate::Error;
@@ -36,11 +36,11 @@ where
   }
 }
 
-impl<T> runestick::FromValue for DeserializeValue<T>
+impl<T> rune::runtime::FromValue for DeserializeValue<T>
 where
   T: Send + Deserialize<'static> + 'static,
 {
-  fn from_value(value: Value) -> Result<Self, runestick::VmError> {
+  fn from_value(value: Value) -> Result<Self, rune::runtime::VmError> {
     let deserializer = super::deserializer::Deserializer::new(value);
     Ok(Self {
       value: T::deserialize(deserializer),
@@ -68,7 +68,7 @@ impl<T> FromValue for DeserializeResult<T>
 where
   T: Send + Deserialize<'static> + 'static,
 {
-  fn from_value(value: Value) -> Result<Self, runestick::VmError> {
+  fn from_value(value: Value) -> Result<Self, rune::runtime::VmError> {
     let value = value.into_result()?.borrow_ref()?.clone();
 
     let value = match value {

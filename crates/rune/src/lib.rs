@@ -15,25 +15,22 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+mod builder;
 mod de;
 mod deserializer;
 mod error;
 mod error_impl;
-pub mod error_wrapper;
 mod function;
 pub mod http;
 pub mod json;
 mod module;
-mod module_builder;
 mod module_map;
 mod regex;
 mod selector;
 mod send_value;
 mod source_loader;
-mod sync;
 mod test;
 pub mod testing;
-mod vm_builder;
 mod vm_error;
 
 // rune std stuff
@@ -41,21 +38,20 @@ mod option;
 mod result;
 mod vec;
 
-pub use error::{Error, LoadSourcesError, RuneError};
+pub use error::{BuildError, Error, RuneError};
 pub use json::Json;
 pub use module::WebsiteModule;
-pub use module_builder::WebsiteModuleBuilder;
 pub use module_map::WebsiteModuleMap;
 pub use send_value::{SendValue, SendValueKind};
 
+pub use builder::{create_context, Build};
 pub use source_loader::SourceLoader;
-pub use vm_builder::{create_context, VmBuilder};
 
 pub use de::{DeserializeResult, DeserializeValue};
 
 pub fn load_modules(
-  context: &mut runestick::Context,
-) -> Result<(), runestick::ContextError> {
+  context: &mut rune::compile::Context,
+) -> Result<(), rune::compile::ContextError> {
   context.install(&http::load_module()?)?;
   context.install(&json::load_module()?)?;
   context.install(&regex::load_module()?)?;

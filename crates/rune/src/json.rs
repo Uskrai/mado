@@ -15,7 +15,10 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::{Any, AnyObj, Object, Shared, Value};
+use rune::{
+  runtime::{AnyObj, Object, Shared, Value},
+  Any,
+};
 use serde::Deserialize;
 use serde_json::Value as JValue;
 
@@ -165,7 +168,7 @@ trait JsonMethod {
       JValue::Array(v) => {
         let val = v.iter().map(|v| Self::convert_to_rune(v));
 
-        let mut vec = runestick::Vec::new();
+        let mut vec = rune::runtime::Vec::new();
         for it in val {
           vec.push(it);
         }
@@ -213,7 +216,7 @@ trait JsonMethodMut: JsonMethod {
       JValue::Array(v) => {
         let val = v.iter_mut();
 
-        let mut vec = runestick::Vec::new();
+        let mut vec = rune::runtime::Vec::new();
         for it in val {
           vec.push(Self::convert_to_rune_mut(it));
         }
@@ -227,8 +230,9 @@ trait JsonMethodMut: JsonMethod {
   }
 }
 
-pub fn load_module() -> Result<runestick::Module, runestick::ContextError> {
-  let module = runestick::Module::with_crate_item("mado", &["json"]);
+pub fn load_module(
+) -> Result<rune::compile::Module, rune::compile::ContextError> {
+  let module = rune::compile::Module::with_crate_item("mado", &["json"]);
 
   mado_rune_macros::register_module! {
     (Json,JsonRef,JsonRefMut) => {

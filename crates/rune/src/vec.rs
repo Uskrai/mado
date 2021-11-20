@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use runestick::{ContextError, Module};
+use rune::{ContextError, Module};
 
 pub fn load_module() -> Result<Module, ContextError> {
   let mut module = Module::with_crate_item("std", &["vec"]);
@@ -24,6 +24,6 @@ pub fn load_module() -> Result<Module, ContextError> {
   Ok(module)
 }
 
-pub fn reverse(vec: &mut runestick::Vec) {
+pub fn reverse(vec: &mut rune::runtime::Vec) {
   vec.reverse();
 }

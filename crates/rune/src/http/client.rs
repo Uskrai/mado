@@ -16,7 +16,7 @@
  */
 
 use super::*;
-use runestick::Any;
+use rune::Any;
 
 #[derive(Any, Clone, Debug)]
 pub struct Client {
