@@ -26,6 +26,7 @@ pub mod json;
 mod module;
 mod module_map;
 mod regex;
+mod rune;
 mod selector;
 mod send_value;
 mod source_loader;
@@ -38,6 +39,7 @@ mod option;
 mod result;
 mod vec;
 
+pub use self::rune::Rune;
 pub use error::{BuildError, Error, RuneError};
 pub use json::Json;
 pub use module::WebsiteModule;
@@ -50,8 +52,8 @@ pub use source_loader::SourceLoader;
 pub use de::{DeserializeResult, DeserializeValue};
 
 pub fn load_modules(
-  context: &mut rune::compile::Context,
-) -> Result<(), rune::compile::ContextError> {
+  context: &mut ::rune::compile::Context,
+) -> Result<(), ::rune::compile::ContextError> {
   context.install(&http::load_module()?)?;
   context.install(&json::load_module()?)?;
   context.install(&regex::load_module()?)?;

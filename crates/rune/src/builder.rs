@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{error::BuildError, RuneError, SendValue, SourceLoader};
+use crate::{error::BuildError, Rune, RuneError, SendValue, SourceLoader};
 use rune::{
   compile::{CompileVisitor, SourceLoader as RuneSourceLoader},
   Context, ContextError, Diagnostics, FromValue, Options, Source, Sources,
@@ -151,6 +151,21 @@ impl<'a> Build<'a> {
     ))
   }
 
+  pub fn build(self, mut sources: Sources) -> Result<Rune, BuildError> {
+    let context = self.get_context_or_default();
+
+    // make borrow checker happy
+    let unit = match self.build_unit_diagnostics(&mut sources) {
+      Ok(unit) => unit,
+      Err(d) => return Err(BuildError::new(d, sources)),
+    };
+
+    let unit = Arc::new(unit);
+    let sources = Arc::new(sources);
+
+    Ok(Rune::new(context, unit, sources))
+  }
+
   #[inline(always)]
   pub fn build_for_module(
     self,
@@ -203,6 +218,10 @@ impl<'a> SourceBuild<'a> {
   #[inline(always)]
   pub fn build_vm(self) -> Result<Vm, BuildError> {
     self.build.build_vm(self.sources)
+  }
+
+  pub fn build(self) -> Result<Rune, BuildError> {
+    self.build.build(self.sources)
   }
 
   #[inline(always)]
