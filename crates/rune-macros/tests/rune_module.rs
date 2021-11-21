@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#[derive(runestick::Any)]
+#[derive(rune::Any)]
 pub struct Foo {
   //
 }
