@@ -35,7 +35,10 @@ pub struct WebsiteModule {
   rune: Rune,
   name: String,
   domain: Url,
+
   get_info: RuneFunction,
+  get_chapter_images: RuneFunction,
+
   data: SendValue,
 }
 
@@ -84,9 +87,14 @@ impl WebsiteModule {
 
     let name = rune.from_value(obj["name"].clone())?;
     let domain = rune.from_value(obj["domain"].clone())?;
-    let get_info =
-      rune.convert_result(obj["get_info"].clone().into_function())?;
-    let get_info = RuneFunction::new(rune.clone(), get_info);
+
+    let get_function = |name| {
+      let fun = rune.convert_result(obj[name].clone().into_function())?;
+      Ok(RuneFunction::new(rune.clone(), fun))
+    };
+
+    let get_info = get_function("get_info")?;
+    let get_chapter_images = get_function("get_chapter_images")?;
 
     let data = obj.get("data").expect("cannot find data").clone();
 
@@ -95,6 +103,7 @@ impl WebsiteModule {
       name,
       domain,
       get_info,
+      get_chapter_images,
       data,
     })
   }
