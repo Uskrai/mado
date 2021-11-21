@@ -34,7 +34,7 @@ pub struct MangaInfo {
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct ChapterInfo {
-  id: String,
+  pub id: String,
   pub title: Option<String>,
   pub chapter: Option<String>,
   pub volume: Option<String>,
