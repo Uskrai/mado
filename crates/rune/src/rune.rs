@@ -21,21 +21,8 @@ use rune::{
   runtime::{
     Args, GuardedArgs, RuntimeContext, VmError as RuneVmError, VmSendExecution,
   },
-  Context, FromValue, IntoTypeHash, Sources, Unit, Vm,
+  Context, FromValue, IntoTypeHash, Sources, ToValue, Unit, Vm,
 };
-
-pub trait FromRuneValue: 'static + Sized {
-  fn from_rune_value(rune: Rune, value: rune::Value) -> Result<Self, VmError>;
-}
-
-impl<T> FromRuneValue for T
-where
-  T: FromValue,
-{
-  fn from_rune_value(rune: Rune, value: rune::Value) -> Result<Self, VmError> {
-    rune.convert_result(FromValue::from_value(value))
-  }
-}
 
 use crate::VmError;
 
@@ -71,10 +58,13 @@ impl Rune {
       sources,
     }
   }
+
+  /// create new [`rune::Vm`]
   pub fn vm(&self) -> Vm {
     Vm::new(self.runtime.clone(), self.unit.clone())
   }
 
+  /// call [`rune::Vm::send_execute`] then map error with [`Self::convert_result`]
   pub fn send_execute<N, A>(
     &self,
     name: N,
@@ -103,6 +93,7 @@ impl Rune {
     }
   }
 
+  /// convert `value` to R and map error with [`Self::convert_result`]
   pub fn from_value<R, V>(&self, value: V) -> Result<R, VmError>
   where
     R: FromValue,
@@ -112,6 +103,7 @@ impl Rune {
     self.convert_result(R::from_value(value))
   }
 
+  /// convert `value` to `rune::Value` and map error with [`Self::convert_result`]
   pub fn to_value<V>(&self, value: V) -> Result<rune::Value, VmError>
   where
     V: rune::ToValue,
@@ -119,6 +111,7 @@ impl Rune {
     self.convert_result(V::to_value(value))
   }
 
+  /// call [`rune::Vm::call`] and map error with [`Self::convert_result`]
   pub fn call<N, A>(&self, name: N, args: A) -> Result<rune::Value, VmError>
   where
     N: IntoTypeHash,
@@ -127,6 +120,7 @@ impl Rune {
     self.convert_result(self.vm().call(name, args))
   }
 
+  /// call [`rune::Vm::async_call`] and map error with [`Self::convert_result`]
   pub async fn async_call<R, N, A>(
     &self,
     name: N,
