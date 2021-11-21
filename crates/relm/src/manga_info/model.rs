@@ -146,8 +146,21 @@ where
   ) {
     match msg {
       Msg::Download => {
-        self.chapters.for_each_selected(|_| {
-          //
+        let module = match &components.get_cell_mut().current_info {
+          Some((module, _)) => module.clone(),
+          _ => {
+            return;
+          }
+        };
+
+        let mut ids = Vec::new();
+        self.chapters.for_each_selected(|it| {
+          ids.push(it.id.clone());
+        });
+
+        tokio::spawn(async move {
+          // module.ge
+          // module.get(ids).await;
         });
       }
       Msg::GetInfo(url) => {

@@ -18,7 +18,6 @@
 use std::cell::{RefCell, RefMut};
 
 use crate::manga_info::chapter_list::ChapterListMsg;
-use mado_core::ChapterInfo;
 use relm4::{send, Components, RelmComponent, Sender};
 
 use super::{chapter_list::ChapterListModel, model::MangaInfoCell, *};
