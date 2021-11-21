@@ -155,7 +155,7 @@ mod test {
   pub async fn get_info() {
     let module = create_module();
     let url = Url::parse("https://manganato.com/manga-yu976355").unwrap();
-    let info = WebsiteModule::r_get_info(module, url).await;
+    let info = module.get_info(url).await;
 
     info
   }
@@ -164,7 +164,7 @@ mod test {
   pub async fn get_info_404() {
     let module = create_module();
     let url = Url::parse("https://manganato.com/manga-yu176355").unwrap();
-    let info = WebsiteModule::r_get_info(module, url).await;
+    let info = module.get_info(url).await;
 
     match info {
       Ok(info) => {

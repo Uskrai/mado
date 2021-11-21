@@ -92,7 +92,7 @@ impl Rune {
     crate::error::VmError::new(self.sources.clone(), error)
   }
 
-  /// convert [`Result<T, rune::runtime::VmError`] to [`Result<T, crate::VmError`]
+  /// convert [`Result<T, rune::runtime::VmError>`] to [`Result<T, crate::VmError>`]
   pub fn convert_result<T>(
     &self,
     result: Result<T, RuneVmError>,
@@ -105,11 +105,11 @@ impl Rune {
 
   pub fn from_value<R, V>(&self, value: V) -> Result<R, VmError>
   where
-    R: FromRuneValue,
-    V: rune::ToValue,
+    R: FromValue,
+    V: ToValue,
   {
     let value = self.convert_result(V::to_value(value))?;
-    R::from_rune_value(self.clone(), value)
+    self.convert_result(R::from_value(value))
   }
 
   pub fn to_value<V>(&self, value: V) -> Result<rune::Value, VmError>

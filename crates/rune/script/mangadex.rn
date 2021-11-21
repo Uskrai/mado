@@ -257,7 +257,7 @@ mod test {
       ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f--a2e4-5634af489ce5")
       .unwrap();
 
-    let info = WebsiteModule::r_get_info(module, url).await;
+    let info = module.get_info(url).await;
     match info {
       Ok(v) => {
         panic(`${url.to_string()} should be invalid url`);
@@ -276,7 +276,7 @@ mod test {
       ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-5634af489ce5")
       .unwrap();
 
-    let info = WebsiteModule::r_get_info(module, url).await;
+    let info = module.get_info(url).await;
 
 
     info
@@ -292,7 +292,7 @@ mod test {
       ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-56c4af489ce5")
       .unwrap();
 
-    let info = WebsiteModule::r_get_info(module, url).await;
+    let info = module.get_info(url).await;
 
     match info {
       Ok(val) => {
