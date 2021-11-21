@@ -6,7 +6,7 @@ struct WebsiteModule {
   data,
 
   get_info,
-  get_chapter_image,
+  get_chapter_images,
 
   from_rust
 }
@@ -26,9 +26,9 @@ pub fn new(id, name, domain, data, method) {
       .get("get_info")
       .expect("get_info not found"),
 
-    get_chapter_image: method
-      .get("get_chapter_image")
-      .expect("get_chapter_image not found"),
+    get_chapter_images: method
+      .get("get_chapter_images")
+      .expect("get_chapter_images not found"),
 
     // this value wont be passed back to rune so 
     // we just make dummy function here

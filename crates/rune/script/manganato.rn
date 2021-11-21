@@ -36,7 +36,7 @@ impl WebsiteModule {
       id, name, domain, Self::new(),
       #{
          get_info: Self::get_info,
-         get_chapter_image: Self::get_chapter_image,
+         get_chapter_images: Self::get_chapter_images,
       }
     )
   }
@@ -132,7 +132,7 @@ impl WebsiteModule {
     info
   }
 
-  async fn get_chapter_image(self, id, task) {
+  async fn get_chapter_images(self, id, task) {
     use mado::http::Url;
 
     let response = self.client
@@ -226,7 +226,7 @@ mod test {
     let task = mock::ChapterTaskMock::new(info.chapters.iter().map(|v| v.id));
 
     let id = info.chapters.get(0).expect("expecting manga with chapter").id;
-    let result = module.get_chapter_image(id, task).await;
+    let result = module.get_chapter_images(id, task).await;
   }
 
 }
