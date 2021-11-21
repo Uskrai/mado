@@ -18,10 +18,9 @@
 use crate::{error::BuildError, Rune, RuneError, SendValue, SourceLoader};
 use rune::{
   compile::{CompileVisitor, SourceLoader as RuneSourceLoader},
-  Context, ContextError, Diagnostics, FromValue, Options, Source, Sources,
+  Context, ContextError, Diagnostics, Options, Source, Sources,
 };
 
-use super::Error;
 use rune::runtime::{RuntimeContext, Unit, Vm};
 
 use super::WebsiteModule;
@@ -171,8 +170,7 @@ impl<'a> Build<'a> {
     self,
     sources: Sources,
   ) -> Result<ModuleBuild, BuildError> {
-    let vm = self.build_vm(sources)?;
-    Ok(ModuleBuild::new(vm))
+    Ok(ModuleBuild::new(self.build(sources)?))
   }
 
   #[inline(always)]
@@ -232,15 +230,15 @@ impl<'a> SourceBuild<'a> {
 
 #[derive(Clone)]
 pub struct ModuleBuild {
-  vm: Vm,
+  rune: Rune,
   error_missing_load_module: bool,
 }
 
 impl ModuleBuild {
   #[inline(always)]
-  pub fn new(vm: Vm) -> Self {
+  pub fn new(rune: Rune) -> Self {
     Self {
-      vm,
+      rune,
       error_missing_load_module: true,
     }
   }
@@ -252,21 +250,24 @@ impl ModuleBuild {
   }
 
   #[inline(always)]
-  pub fn build(self) -> Result<Vec<WebsiteModule>, Error> {
-    let mut vm = self.vm;
+  pub fn build(self) -> Result<Vec<WebsiteModule>, crate::VmError> {
+    let rune = self.rune;
     let hash = rune::Hash::type_hash(&["load_module"]);
-    let fun = vm.unit().lookup(hash);
+    let fun = rune.unit.lookup(hash);
 
     if fun.is_none() {
       if self.error_missing_load_module {
-        return Err(RuneError::MissingLoadModuleFn.into());
+        let error = RuneError::MissingLoadModuleFn;
+        let error = rune::runtime::VmError::panic(error);
+        return Err(rune.convert_vm_error(error));
       } else {
         return Ok(Vec::new());
       }
     }
 
-    let result = vm.execute(hash, ())?.complete()?;
+    let value = rune.call(hash, ())?;
+    let value: SendValue = rune.from_value(value)?;
 
-    SendValue::from_value(result)?.try_into()
+    WebsiteModule::from_value_vec(rune, value)
   }
 }

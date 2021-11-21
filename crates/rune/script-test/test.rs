@@ -1,8 +1,8 @@
 use futures::Future;
-use mado_rune::DeserializeResult;
+use mado_rune::{DeserializeResult, Rune, VmError};
 use rune::{
   compile::{CompileVisitor, Meta, MetaKind},
-  runtime::{FromValue, VmError, VmErrorKind},
+  runtime::{FromValue, VmError as RuneVmError, VmErrorKind},
   Any, Hash,
 };
 
@@ -18,7 +18,7 @@ impl<T> FromValue for OkDeserilizeValue<T>
 where
   T: 'static + Send + serde::de::Deserialize<'static>,
 {
-  fn from_value(value: rune::runtime::Value) -> Result<Self, VmError> {
+  fn from_value(value: rune::runtime::Value) -> Result<Self, RuneVmError> {
     let deser = DeserializeResult::<T>::from_value(value)?;
 
     let inner = deser.get().map_err(|err| VmErrorKind::Panic {
@@ -38,7 +38,7 @@ impl<T> FromValue for OkAnyValue<T>
 where
   T: 'static + Any,
 {
-  fn from_value(value: rune::runtime::Value) -> Result<Self, VmError> {
+  fn from_value(value: rune::runtime::Value) -> Result<Self, RuneVmError> {
     let inner = T::from_value(value)?;
 
     Ok(Self { inner })
@@ -102,7 +102,7 @@ async fn main() {
         .options(&options)
         .with_path(&it.path())
         .unwrap()
-        .build_vm();
+        .build();
 
       match vm {
         Ok(vm) => {
@@ -148,7 +148,7 @@ async fn main() {
 }
 
 async fn call_test(
-  vm: rune::runtime::Vm,
+  rune: Rune,
   name: String,
   hash: rune::Hash,
 ) -> Result<(), (String, VmError)> {
@@ -156,7 +156,8 @@ async fn call_test(
 
   macro_rules! call {
     ($ex:ty) => {{
-      to_name_error(name.clone(), async_call::<$ex>(vm, hash)).await?;
+      to_name_error(name.clone(), async_call::<$ex>(rune, hash)).await?;
+
       println!("{} is ok", name);
       Ok(())
     }};
@@ -177,24 +178,22 @@ async fn call_test(
 }
 
 // call fut then add name if return fut error
-async fn to_name_error<R>(
+async fn to_name_error<R, F>(
   name: String,
-  fut: impl Future<Output = Result<R, VmError>>,
-) -> Result<R, (String, VmError)> {
+  fut: F,
+) -> Result<R, (String, VmError)>
+where
+  F: Future<Output = Result<R, VmError>>,
+{
   let val = fut.await;
 
   val.map_err(|err| (name, err))
 }
 
 // async call vm then cast to T with FromValue
-async fn async_call<T>(
-  mut vm: rune::runtime::Vm,
-  hash: rune::Hash,
-) -> Result<T, VmError>
+async fn async_call<T>(rune: Rune, hash: rune::Hash) -> Result<T, VmError>
 where
   T: rune::runtime::FromValue,
 {
-  let val = vm.async_call(hash, ()).await?;
-
-  T::from_value(val)
+  rune.async_call(hash, ()).await
 }

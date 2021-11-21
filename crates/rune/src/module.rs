@@ -15,22 +15,27 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::function::RuneFunction;
+use crate::DeserializeResult;
+use crate::Rune;
 use crate::SendValue;
+use crate::VmError;
 
-use super::function::DebugSyncFunction;
 use super::http::Url;
-use super::DeserializeResult;
+use super::Error;
+
 use async_trait::async_trait;
 use mado_core::MangaInfo;
 use mado_core::WebsiteModule as BaseWebsiteModule;
-
-use super::Error;
+use rune::runtime::VmError as RuneVmError;
+use rune::ToValue;
 
 #[derive(Clone, Debug)]
 pub struct WebsiteModule {
+  rune: Rune,
   name: String,
   domain: Url,
-  get_info: DebugSyncFunction,
+  get_info: RuneFunction,
   data: SendValue,
 }
 
@@ -40,73 +45,14 @@ impl WebsiteModule {
   }
 }
 
-impl TryFrom<SendValue> for WebsiteModule {
-  type Error = Error;
-  fn try_from(value: SendValue) -> Result<Self, Self::Error> {
-    let obj = value.into_object()?;
-
-    macro_rules! get_string {
-      ($name:literal) => {
-        obj
-          .get($name)
-          .expect(concat!($name, " doesn't exists"))
-          .clone()
-          .into_string()?
-      };
-    }
-
-    let name = get_string!("name");
-    let domain = get_string!("domain").parse()?;
-
-    let get_info = obj
-      .get("get_info")
-      .expect("get_info doesn't exist")
-      .clone()
-      .into_function()?;
-
-    let data = obj.get("data").expect("cannot find data").clone();
-
-    Ok(Self {
-      name,
-      domain,
-      get_info,
-      data,
-    })
-  }
-}
-
-impl TryFrom<SendValue> for Vec<WebsiteModule> {
-  type Error = Error;
-  fn try_from(value: SendValue) -> Result<Self, Self::Error> {
-    use super::SendValueKind as Kind;
-    match value.kind_ref() {
-      Kind::Vec(_) => {
-        let v = value.into_vec()?;
-        let mut vec = Vec::new();
-        for it in v {
-          vec.push(it.try_into()?)
-        }
-        Ok(vec)
-      }
-
-      Kind::Struct { .. } | Kind::Object(_) => Ok([value.try_into()?].to_vec()),
-      val => Err(Error::expected(
-        "Vector, Struct, or Object".to_string(),
-        val.to_string_variant().to_string(),
-      )),
-    }
-  }
-}
-
 impl WebsiteModule {
   async fn get_info(&self, url: Url) -> Result<MangaInfo, Error> {
     let fut = self
       .get_info
-      .async_send_call::<_, DeserializeResult<_>>((self.data.clone(), url));
+      .async_call::<_, DeserializeResult<_>>((self.data.clone(), url))
+      .await;
 
-    let res = fut.await;
-
-    res?.get()
+    fut?.get()
   }
 }
 
@@ -128,5 +74,55 @@ impl WebsiteModule {
 
   pub fn name(&self) -> String {
     self.name.clone()
+  }
+
+  pub fn from_value(
+    rune: crate::Rune,
+    value: SendValue,
+  ) -> Result<WebsiteModule, VmError> {
+    let obj = rune.convert_result(value.into_object())?;
+
+    let name = rune.from_value(obj["name"].clone())?;
+    let domain = rune.from_value(obj["domain"].clone())?;
+    let get_info =
+      rune.convert_result(obj["get_info"].clone().into_function())?;
+    let get_info = RuneFunction::new(rune.clone(), get_info);
+
+    let data = obj.get("data").expect("cannot find data").clone();
+
+    Ok(Self {
+      rune,
+      name,
+      domain,
+      get_info,
+      data,
+    })
+  }
+
+  pub fn from_value_vec(
+    rune: crate::Rune,
+    value: SendValue,
+  ) -> Result<Vec<WebsiteModule>, VmError> {
+    use super::SendValueKind as Kind;
+
+    match value.kind_ref() {
+      Kind::Vec(_) => {
+        let v = rune.convert_result(value.into_vec())?;
+        let mut vec = Vec::new();
+        for it in v {
+          vec.push(Self::from_value(rune.clone(), it)?);
+        }
+        Ok(vec)
+      }
+
+      Kind::Struct { .. } => Ok([Self::from_value(rune, value)?].to_vec()),
+      _ => {
+        let value = rune.convert_result(value.to_value())?;
+        let type_info = rune.convert_result(value.type_info())?;
+        let err = RuneVmError::expected::<rune::runtime::Vec>(type_info);
+
+        Err(rune.convert_vm_error(err))
+      }
+    }
   }
 }

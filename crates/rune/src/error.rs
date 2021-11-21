@@ -15,7 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use crate::deserializer;
 use rune::{ContextError, Module};
@@ -49,6 +49,35 @@ impl Display for BuildError {
   }
 }
 
+#[derive(Debug)]
+pub struct VmError {
+  sources: Arc<rune::Sources>,
+  error: rune::runtime::VmError,
+}
+
+impl VmError {
+  pub fn new(
+    sources: Arc<rune::Sources>,
+    error: rune::runtime::VmError,
+  ) -> Self {
+    Self { error, sources }
+  }
+}
+
+impl std::error::Error for VmError {}
+impl Display for VmError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let buffer = rune::termcolor::Buffer::no_color();
+    let mut writer = rune::termcolor::Ansi::new(buffer);
+    self.error.emit(&mut writer, &self.sources).unwrap();
+    write!(
+      f,
+      "{}",
+      String::from_utf8_lossy(writer.get_ref().as_slice())
+    )
+  }
+}
+
 /// Error from [`rune`]
 #[derive(Error, Debug)]
 pub enum RuneError {
@@ -56,7 +85,7 @@ pub enum RuneError {
   VmError(
     #[from]
     #[source]
-    rune::runtime::VmError,
+    VmError,
   ),
 
   #[error("{0}")]
@@ -166,12 +195,6 @@ where
 {
   fn from(v: T) -> Self {
     Self::RuneError(v.into())
-  }
-}
-
-impl From<rune::runtime::VmErrorKind> for Error {
-  fn from(v: rune::runtime::VmErrorKind) -> Self {
-    Self::RuneError(rune::runtime::VmError::from(v).into())
   }
 }
 

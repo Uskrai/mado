@@ -21,16 +21,21 @@ async fn test_load_module() {
 
   let mut errors = Vec::new();
 
+  let build_module =
+    |path: &std::path::PathBuf| -> Result<_, Box<dyn std::error::Error>> {
+      Ok(
+        mado_rune::Build::default()
+          .with_path(path)?
+          .build_for_module()?
+          .error_missing_load_module(false)
+          .build()?,
+      )
+    };
+
   for it in scripts.into_iter() {
     let it = it.unwrap();
     if it.path().is_file() {
-      let module = mado_rune::Build::default()
-        .with_path(&it.path())
-        .unwrap()
-        .build_for_module()
-        .unwrap()
-        .error_missing_load_module(false)
-        .build();
+      let module = build_module(&it.path());
 
       match module {
         Ok(_) => {}

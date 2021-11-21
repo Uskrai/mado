@@ -17,6 +17,7 @@ struct WebsiteModule {
 // the domain should always contain 'https://' or 'http://, not doing so 
 // will result in error. this is used to search which module should be used.
 pub fn new(id, name, domain, data, method) {
+  let domain = mado::http::Url::parse(domain).unwrap();
 
   WebsiteModule {
     id, name, domain,

@@ -18,16 +18,33 @@
 use std::sync::Arc;
 
 use rune::{
-  runtime::{Args, RuntimeContext, VmError, VmSendExecution},
-  Context, IntoTypeHash, Sources, Unit, Vm,
+  runtime::{
+    Args, GuardedArgs, RuntimeContext, VmError as RuneVmError, VmSendExecution,
+  },
+  Context, FromValue, IntoTypeHash, Sources, Unit, Vm,
 };
 
-#[derive(Clone)]
+pub trait FromRuneValue: 'static + Sized {
+  fn from_rune_value(rune: Rune, value: rune::Value) -> Result<Self, VmError>;
+}
+
+impl<T> FromRuneValue for T
+where
+  T: FromValue,
+{
+  fn from_rune_value(rune: Rune, value: rune::Value) -> Result<Self, VmError> {
+    rune.convert_result(FromValue::from_value(value))
+  }
+}
+
+use crate::VmError;
+
+#[derive(Clone, Debug)]
 pub struct Rune {
-  sources: Arc<Sources>,
-  unit: Arc<Unit>,
-  context: Arc<Context>,
-  runtime: Arc<RuntimeContext>,
+  pub sources: Arc<Sources>,
+  pub unit: Arc<Unit>,
+  pub context: Arc<Context>,
+  pub runtime: Arc<RuntimeContext>,
 }
 
 const _: () = {
@@ -59,7 +76,7 @@ impl Rune {
   }
 
   pub fn send_execute<N, A>(
-    self,
+    &self,
     name: N,
     args: A,
   ) -> Result<VmSendExecution, VmError>
@@ -67,6 +84,61 @@ impl Rune {
     N: IntoTypeHash,
     A: Send + Args,
   {
-    self.vm().send_execute(name, args)
+    self.convert_result(self.vm().send_execute(name, args))
+  }
+
+  /// convert [`rune::runtime::VmError`] to [`crate::VmError`]
+  pub fn convert_vm_error(&self, error: RuneVmError) -> VmError {
+    crate::error::VmError::new(self.sources.clone(), error)
+  }
+
+  /// convert [`Result<T, rune::runtime::VmError`] to [`Result<T, crate::VmError`]
+  pub fn convert_result<T>(
+    &self,
+    result: Result<T, RuneVmError>,
+  ) -> Result<T, VmError> {
+    match result {
+      Ok(value) => Ok(value),
+      Err(err) => Err(self.convert_vm_error(err)),
+    }
+  }
+
+  pub fn from_value<R, V>(&self, value: V) -> Result<R, VmError>
+  where
+    R: FromRuneValue,
+    V: rune::ToValue,
+  {
+    let value = self.convert_result(V::to_value(value))?;
+    R::from_rune_value(self.clone(), value)
+  }
+
+  pub fn to_value<V>(&self, value: V) -> Result<rune::Value, VmError>
+  where
+    V: rune::ToValue,
+  {
+    self.convert_result(V::to_value(value))
+  }
+
+  pub fn call<N, A>(&self, name: N, args: A) -> Result<rune::Value, VmError>
+  where
+    N: IntoTypeHash,
+    A: GuardedArgs,
+  {
+    self.convert_result(self.vm().call(name, args))
+  }
+
+  pub async fn async_call<R, N, A>(
+    &self,
+    name: N,
+    args: A,
+  ) -> Result<R, VmError>
+  where
+    N: IntoTypeHash,
+    A: GuardedArgs,
+    R: FromValue,
+  {
+    let result = self.vm().async_call(name, args).await;
+    let result = self.convert_result(result)?;
+    self.convert_result(FromValue::from_value(result))
   }
 }

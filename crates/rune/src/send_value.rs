@@ -70,6 +70,7 @@ pub enum SendValueKind {
   },
 
   Option(Box<Option<SendValue>>),
+  Url(crate::http::Url),
   Regex(Arc<Regex>),
   HttpClient(Client),
   Function(DebugSyncFunction),
@@ -84,45 +85,41 @@ impl SendValue {
     &self.value
   }
 
-  pub fn into_object(self) -> Result<HashMap<String, SendValue>, crate::Error> {
+  pub fn into_object(self) -> Result<HashMap<String, SendValue>, VmError> {
     use SendValueKind as This;
     match self.value {
       This::Object(v) => Ok(v),
       This::Struct { data, .. } => Ok(data),
-      _ => Err(crate::Error::expected(
-        "Object".to_string(),
-        self.value.to_string_variant().to_string(),
+      _ => Err(VmError::expected::<rune::runtime::Object>(
+        self.value.to_value()?.type_info()?,
       )),
     }
   }
 
-  pub fn into_vec(self) -> Result<Vec<SendValue>, crate::Error> {
+  pub fn into_vec(self) -> Result<Vec<SendValue>, VmError> {
     use SendValueKind as This;
     match self.value {
       This::Vec(v) => Ok(v),
-      _ => Err(crate::Error::expected(
-        "object".to_string(),
-        self.value.to_string_variant().to_string(),
+      _ => Err(VmError::expected::<rune::runtime::Vec>(
+        self.value.to_value()?.type_info()?,
       )),
     }
   }
 
-  pub fn into_string(self) -> Result<String, crate::Error> {
+  pub fn into_string(self) -> Result<String, VmError> {
     match self.value {
       SendValueKind::String(v) => Ok(v),
-      _ => Err(crate::Error::expected(
-        "String".to_string(),
-        self.value.to_string_variant().to_string(),
+      _ => Err(VmError::expected::<String>(
+        self.value.to_value()?.type_info()?,
       )),
     }
   }
 
-  pub fn into_function(self) -> Result<DebugSyncFunction, crate::Error> {
+  pub fn into_function(self) -> Result<DebugSyncFunction, VmError> {
     match self.value {
       SendValueKind::Function(v) => Ok(v),
-      _ => Err(crate::Error::expected(
-        "Function".to_string(),
-        self.value.to_string_variant().to_string(),
+      _ => Err(VmError::expected::<rune::runtime::Function>(
+        self.value.to_value()?.type_info()?,
       )),
     }
   }
@@ -170,6 +167,7 @@ impl SendValueKind {
       Object(..),
       Option(..),
       Struct { .. },
+      Url(..),
       Function(..),
       Regex(..),
       HttpClient(..)
@@ -243,8 +241,11 @@ impl ToValue for SendValueKind {
       Self::Option(v) => ToValue::to_value(*v)?,
       Self::Regex(v) => AnyObj::new(v.as_ref().clone()).to_value()?,
       Self::HttpClient(v) => AnyObj::new(v).to_value()?,
+      Self::Url(v) => AnyObj::new(v).to_value()?,
       Self::Function(_) => {
-        panic!("Cannot convert function to value");
+        // let v = v.into_inner();
+        // let v = Value::from(&v);
+        todo!();
       }
     };
 
@@ -334,6 +335,7 @@ impl SendValueKind {
     }
     is!(Regex, Regex, |value| { Arc::new(value) });
     is!(Client, HttpClient);
+    is!(crate::http::Url, Url);
 
     return Err(VmError::panic(format!(
       "converting {:?} to send value is not supported, \
