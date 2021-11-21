@@ -1,4 +1,3 @@
-
 mod module;
 
 pub fn load_module() {
@@ -36,7 +35,8 @@ impl WebsiteModule {
     module::new(
       id, name, domain, Self::new(),
       #{
-         get_info: Self::r_get_info
+         get_info: Self::get_info,
+         get_chapter_image: Self::get_chapter_image,
       }
     )
   }
@@ -47,11 +47,6 @@ impl WebsiteModule {
       name_regex: data.name_regex,
       from_rust: Self::from_rust
     }
-  }
-
-  pub async fn r_get_info(data, url) {
-    let this = Self::from_module(data);
-    this.get_info(url).await
   }
 
   pub async fn get_info(self, url) {
@@ -136,16 +131,58 @@ impl WebsiteModule {
 
     info
   }
+
+  async fn get_chapter_image(self, id, task) {
+    use mado::http::Url;
+
+    let response = self.client
+      .get(Url::parse(id).unwrap())
+      .send()
+      .await?;
+
+    let html = mado::html::Document::new(response.text().await);
+
+    let queries = [
+      #{ find: "div#vungdoc>img" },
+      #{ find: "div#vungdoc>img", src: "data-src" },
+      #{ find: "div.vung_doc>img" },
+      #{ find: "div.container-chapter-reader>img" },
+    ];
+    let src = "src";
+    let title = "title";
+
+    let images = [];
+
+    for query in queries {
+      images = html.find(query.find)
+        .iter()
+        .map(|img| self.parse_image(query, img))
+        .filter(|(k, v)| k.is_some() && v.is_some())
+        .map(|(k, v)| (k.unwrap(), v.unwrap()));
+    }
+
+    for (title, src) in images {
+      dbg(src);
+    }
+  }
+
+  fn parse_image(self, query, img) {
+    let get = |name| {
+      let attr = query.get(name).unwrap_or(name);
+      img.attr(attr).map(|v| v.to_string())
+    };
+
+    let title = get("title");
+    let src = get("src");
+    (title, src)
+  }
+
 }
 
 mod test {
   use mado::http::Url;
   use super::*;
-
-  #[test]
-  async fn owo() {
-    // println("owo");
-  }
+  mod mock;
 
   pub fn create_module() {
     super::load_module().data
@@ -177,6 +214,19 @@ mod test {
         panic("Expected Result");
       }
     }
+  }
+
+  #[test]
+  pub async fn get_chapter_image_test() {
+    let module = create_module();
+    let url = Url::parse("https://manganato.com/manga-yu976355").unwrap();
+    let info = module.get_info(url)
+      .await
+      .expect("expecting Ok");
+    let task = mock::ChapterTaskMock::new(info.chapters.iter().map(|v| v.id));
+
+    let id = info.chapters.get(0).expect("expecting manga with chapter").id;
+    let result = module.get_chapter_image(id, task).await;
   }
 
 }
