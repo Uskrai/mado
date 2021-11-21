@@ -5,18 +5,27 @@ struct WebsiteModule {
 
   data,
 
-  get_info
+  get_info,
+  get_chapters_info,
+
+  from_rust
 }
 
 // Name of the website, e.g MangaDex.
 // used to display website name
 // Domain of the website, e.g https://mangadex.org, https://mangakakalot.com
-// the domain should always contain 'https://' or 'http://, not doing so will result in error.
-// this is used to search which module is used when given url
+// the domain should always contain 'https://' or 'http://, not doing so 
+// will result in error. this is used to search which module should be used.
 pub fn new(id, name, domain, data, method) {
+
   WebsiteModule {
     id, name, domain,
     data,
-    get_info: method.get("get_info").expect("get_info not found")
+    get_info: method
+      .get("get_info")
+      .expect("get_info not found"),
+    // this value wont be passed back to rune so 
+    // we just make dummy function here
+    from_rust: || {}
   }
 }
