@@ -32,7 +32,6 @@ mod send_value;
 mod source_loader;
 mod test;
 pub mod testing;
-mod vm_error;
 
 // rune std stuff
 mod option;
@@ -40,7 +39,7 @@ mod result;
 mod vec;
 
 pub use self::rune::Rune;
-pub use error::{BuildError, Error, RuneError};
+pub use error::{BuildError, Error, RuneError, VmError};
 pub use json::Json;
 pub use module::WebsiteModule;
 pub use module_map::WebsiteModuleMap;
