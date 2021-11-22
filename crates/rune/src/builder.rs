@@ -239,7 +239,7 @@ impl ModuleBuild {
   pub fn new(rune: Rune) -> Self {
     Self {
       rune,
-      error_missing_load_module: true,
+      error_missing_load_module: false,
     }
   }
 
