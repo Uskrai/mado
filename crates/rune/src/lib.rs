@@ -16,8 +16,8 @@
  */
 
 mod builder;
+mod chapter_task;
 mod de;
-mod deserializer;
 mod error;
 mod error_impl;
 mod function;
@@ -32,6 +32,8 @@ mod send_value;
 mod source_loader;
 mod test;
 pub mod testing;
+
+mod deserializer;
 
 // rune std stuff
 mod option;
@@ -58,6 +60,7 @@ pub fn load_modules(
   context.install(&regex::load_module()?)?;
   context.install(&error::load_module()?)?;
   context.install(&selector::load_module()?)?;
+  context.install(&chapter_task::load_module()?)?;
   context.install(&test::load_module()?)?;
 
   // rune std stuff

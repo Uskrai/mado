@@ -15,6 +15,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::chapter_task::RuneChapterTask;
 use crate::function::RuneFunction;
 use crate::DeserializeResult;
 use crate::Rune;
@@ -25,6 +26,7 @@ use super::http::Url;
 use super::Error;
 
 use async_trait::async_trait;
+use mado_core::ChapterTask;
 use mado_core::MangaInfo;
 use mado_core::WebsiteModule as BaseWebsiteModule;
 use rune::runtime::VmError as RuneVmError;
@@ -35,7 +37,10 @@ pub struct WebsiteModule {
   rune: Rune,
   name: String,
   domain: Url,
+
   get_info: RuneFunction,
+  get_chapter_images: RuneFunction,
+
   data: SendValue,
 }
 
@@ -54,6 +59,18 @@ impl WebsiteModule {
 
     fut?.get()
   }
+
+  pub async fn get_chapter_images(
+    &self,
+    task: RuneChapterTask,
+  ) -> Result<(), Error> {
+    Ok(
+      self
+        .get_chapter_images
+        .async_call::<_, ()>((self.data.clone(), task))
+        .await?,
+    )
+  }
 }
 
 #[async_trait]
@@ -62,7 +79,17 @@ impl BaseWebsiteModule for WebsiteModule {
     &self,
     url: mado_core::url::Url,
   ) -> Result<MangaInfo, mado_core::Error> {
-    Ok(self.get_info(url.into()).await?)
+    self.get_info(Url::from(url)).await.map_err(Into::into)
+  }
+
+  async fn get_chapter_images(
+    &self,
+    task: Box<dyn ChapterTask>,
+  ) -> Result<(), mado_core::Error> {
+    self
+      .get_chapter_images(RuneChapterTask::new(task))
+      .await
+      .map_err(Into::into)
   }
 }
 
@@ -84,9 +111,14 @@ impl WebsiteModule {
 
     let name = rune.from_value(obj["name"].clone())?;
     let domain = rune.from_value(obj["domain"].clone())?;
-    let get_info =
-      rune.convert_result(obj["get_info"].clone().into_function())?;
-    let get_info = RuneFunction::new(rune.clone(), get_info);
+
+    let get_function = |name| {
+      let fun = rune.convert_result(obj[name].clone().into_function())?;
+      Ok(RuneFunction::new(rune.clone(), fun))
+    };
+
+    let get_info = get_function("get_info")?;
+    let get_chapter_images = get_function("get_chapter_images")?;
 
     let data = obj.get("data").expect("cannot find data").clone();
 
@@ -95,6 +127,7 @@ impl WebsiteModule {
       name,
       domain,
       get_info,
+      get_chapter_images,
       data,
     })
   }

@@ -20,7 +20,7 @@ use std::fmt::Display;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct MangaInfo {
   pub title: String,
   pub summary: Option<String>,
@@ -32,7 +32,7 @@ pub struct MangaInfo {
   pub chapters: Vec<ChapterInfo>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct ChapterInfo {
   pub id: String,
   pub title: Option<String>,
@@ -75,17 +75,4 @@ impl Default for MangaType {
   fn default() -> Self {
     Self::Series
   }
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type", content = "content")]
-pub enum Error<T> {
-  Ok(T),
-  Error(MangaError),
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type", content = "content")]
-pub enum MangaError {
-  // RequsetError(reqwest::Error),
 }
