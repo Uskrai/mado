@@ -1,7 +1,10 @@
 mod module;
 
 pub fn load_module() {
-  WebsiteModule::to_module(1, "manganato", "https://manganato.com")
+  [
+    WebsiteModule::to_module(1, "manganato", "https://manganato.com"),
+    WebsiteModule::to_module(2, "readmanganato", "https://readmanganato.com"),
+  ]
 }
 
 pub struct WebsiteModule {
@@ -192,7 +195,7 @@ mod test {
   mod mock;
 
   pub fn create_module() {
-    super::load_module().data
+    super::load_module()[0].data
   }
 
   #[test]
