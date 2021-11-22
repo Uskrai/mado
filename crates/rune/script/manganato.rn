@@ -132,11 +132,11 @@ impl WebsiteModule {
     info
   }
 
-  async fn get_chapter_images(self, id, task) {
+  async fn get_chapter_images(self, task) {
     use mado::http::Url;
 
     let response = self.client
-      .get(Url::parse(id).unwrap())
+      .get(Url::parse(task.get_chapter_id()).unwrap())
       .send()
       .await?;
 
@@ -145,11 +145,9 @@ impl WebsiteModule {
     let queries = [
       #{ find: "div#vungdoc>img" },
       #{ find: "div#vungdoc>img", src: "data-src" },
-      #{ find: "div.vung_doc>img" },
       #{ find: "div.container-chapter-reader>img" },
+      #{ find: "div.vung_doc>img" },
     ];
-    let src = "src";
-    let title = "title";
 
     let images = [];
 
@@ -157,12 +155,18 @@ impl WebsiteModule {
       images = html.find(query.find)
         .iter()
         .map(|img| self.parse_image(query, img))
-        .filter(|(k, v)| k.is_some() && v.is_some())
-        .map(|(k, v)| (k.unwrap(), v.unwrap()));
+        .filter(|v| v.is_some())
+        .map(|v| v.unwrap())
+        .collect_vec();
+
+      if images.len() != 0 {
+        break;
+      }
     }
 
-    for (title, src) in images {
-      dbg(src);
+
+    for it in images.iter() {
+      task.add(it.title, it.src);
     }
   }
 
@@ -172,9 +176,12 @@ impl WebsiteModule {
       img.attr(attr).map(|v| v.to_string())
     };
 
-    let title = get("title");
-    let src = get("src");
-    (title, src)
+    let result = #{
+      title: get("title"),
+      src: get("src")?
+    };
+
+    Some(result)
   }
 
 }
@@ -217,16 +224,15 @@ mod test {
   }
 
   #[test]
-  pub async fn get_chapter_image_test() {
+  pub async fn get_chapter_images() {
     let module = create_module();
     let url = Url::parse("https://manganato.com/manga-yu976355").unwrap();
     let info = module.get_info(url)
       .await
       .expect("expecting Ok");
-    let task = mock::ChapterTaskMock::new(info.chapters.iter().map(|v| v.id));
+    let chapter = info.chapters.get(0).expect("expecting manga with chapter");
 
-    let id = info.chapters.get(0).expect("expecting manga with chapter").id;
-    let result = module.get_chapter_images(id, task).await;
+    let task = mado::RuneChapterTask::mock(chapter);
+    let result = module.get_chapter_images(task).await;
   }
-
 }

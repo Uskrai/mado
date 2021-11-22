@@ -72,9 +72,28 @@ impl WebsiteModule {
     }
   }
 
-  // retrieve manga info of given url frrom website
-  // url is crate::runes::http::Url
-  // return Result<MangaInfo, crate::Error>
+  /// parse json response from mangadex api
+  /// will return Err if jsoin.pointer("/result") is "error"
+  pub fn parse_response(self, url, json) {
+    let pointer = create_pointer_function(url, json);
+    let result = pointer("/result")?;
+
+    if result == "error" {
+      let errors = "";
+      for it in pointer("/errors")? {
+        if let Some(it) = it.get("detail") {
+          errors = format!("{}{}\n", errors, it);
+        }
+      }
+      return Err(mado::error::Error::request_error(url, errors));
+    }
+
+    Ok(json)
+  }
+
+  /// retrieve manga info of given url frrom website
+  /// url is crate::runes::http::Url
+  /// return Result<MangaInfo, crate::Error>
   pub async fn get_info(self, url) {
     let id = self.id_regex.find(url.to_string()).get_match().ok_or_else(||{
         Err(mado::error::Error::invalid_url(url))
@@ -112,13 +131,8 @@ impl WebsiteModule {
     let response = self.client.get(url.clone()).send().await?;
     let json = response.json().await?;
 
+    let json = self.parse_response(url, json)?;
     let pointer = create_pointer_function(url.clone(), json);
-    let result = pointer("/result")?;
-
-    if result == "error" {
-      let detail = pointer("/errors/0/detail")?;
-      return Err(mado::error::Error::request_error(url, detail));
-    }
 
     let info = #{};
     info.title = pointer("/data/attributes/title/en")
@@ -232,8 +246,66 @@ impl WebsiteModule {
     Some(Ok(info))
   }
 
-  async fn get_chapter_images(self, id, task) {
-    //
+  async fn get_chapter_images(self, task) {
+    let id = task.get_chapter_id();
+
+    use mado::http::Url;
+    let url = Url::parse(`${API_URL}/chapter/${id}`).unwrap();
+
+    let id_request = self.get_chapter_images_id(id);
+    let server_request = self.get_chapter_image_server(id);
+
+    let json = [];
+    let server = "";
+    loop {
+      let val = select {
+        res = id_request => {
+          json = res?;
+          Ok(())
+        }
+        res = server_request => {
+          server = res?;
+          Ok(())
+        }
+      };
+
+      match val {
+        () => break,
+      }
+    }
+    
+
+    let pointer = create_pointer_function(url, json);
+    let hash = pointer("/data/attributes/hash")?;
+
+    for it in pointer("/data/attributes/data")? {
+      let images = `${server}/data/${hash}/${it}`;
+      task.add(None, images);
+    }
+  }
+
+  async fn get_chapter_images_id(self, id) {
+    use mado::http::Url;
+    let url = Url::parse(`${API_URL}/chapter/${id}`).unwrap();
+    let json = self.client.get(url.clone()).send().await?.json().await?;
+
+    let json = self.parse_response(url, json)?;
+
+    Ok(json)
+  }
+
+  async fn get_chapter_image_server(self, id) {
+    use mado::http::Url;
+    let url = Url::parse(`${API_URL}/at-home/server/${id}`).unwrap();
+
+    let json = self.client.get(url.clone()).send().await?.json().await?;
+
+    let json = self.parse_response(url, json)?;
+    let pointer = create_pointer_function(url, json);
+
+    let server = pointer("/baseUrl")?;
+
+    Ok(server)
   }
 }
 
@@ -300,5 +372,21 @@ mod test {
         assert_eq!(info.to_string_variant(), "RequestError");
       }
     }
+  }
+
+  #[test]
+  pub async fn get_chapter_images() {
+    use mado::http::Url;
+    let module = create_module();
+    let url = Url
+      ::parse("https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-5634af489ce5")
+      .unwrap();
+
+    let info = module.get_info(url).await.unwrap();
+    let chapter = info.chapters.get(0).unwrap();
+
+    let task = mado::RuneChapterTask::mock(chapter);
+
+    let result = module.get_chapter_images(task).await;
   }
 }
