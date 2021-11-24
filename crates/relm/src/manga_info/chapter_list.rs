@@ -202,12 +202,13 @@ impl VecChapters {
     self.views.append(&GChapterInfo::to_gobject(chapter));
   }
 
-  pub fn for_each_selected(&self, f: impl FnMut(&ChapterInfo)) {
+  pub fn for_each_selected(&self, f: impl FnMut(usize, &ChapterInfo)) {
     self
       .borrow()
       .iter()
-      .filter(|v| v.active.get())
-      .map(|v| &v.info)
+      .enumerate()
+      .filter(|(_, v)| v.active.get())
+      .map(|(_, v)| &v.info)
       .for_each(f)
   }
 

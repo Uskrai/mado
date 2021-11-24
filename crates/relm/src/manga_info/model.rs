@@ -154,7 +154,7 @@ where
         };
 
         let mut ids = Vec::new();
-        self.chapters.for_each_selected(|it| {
+        self.chapters.for_each_selected(|i, it| {
           ids.push(it.id.clone());
         });
 
