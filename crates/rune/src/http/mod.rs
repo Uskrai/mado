@@ -27,14 +27,13 @@ pub use self::url::Url;
 pub use client::Client;
 
 macro_rules! wrapper_fun {
-  ($name:ident, $( $param:ident : $type:ty ), *) => {
-    pub fn $name(self, $($param : $type), *) -> Self {
+  ($name:ident, $( $param:ident : $type:ty ),*) => {
+    pub fn $name(self, $($param : $type),*) -> Self {
       Self {
-        inner: self.inner.$name($($param), *)
+        inner: self.inner.$name($($param),*)
       }
     }
   };
-
 }
 
 #[derive(Any, Debug)]
