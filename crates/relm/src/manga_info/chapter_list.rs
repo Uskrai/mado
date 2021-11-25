@@ -17,6 +17,7 @@
 
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub use gtk::prelude::*;
 pub use gtk::subclass::prelude::*;
@@ -62,12 +63,12 @@ impl Model for ChapterListModel {
 
 #[derive(Default, Debug)]
 pub struct CheckChapterInfo {
-  info: ChapterInfo,
+  info: Arc<ChapterInfo>,
   active: Cell<bool>,
 }
 
-impl From<ChapterInfo> for CheckChapterInfo {
-  fn from(info: ChapterInfo) -> Self {
+impl From<Arc<ChapterInfo>> for CheckChapterInfo {
+  fn from(info: Arc<ChapterInfo>) -> Self {
     Self {
       info,
       active: Cell::default(),
@@ -196,20 +197,19 @@ impl VecChapters {
     self.inner.borrow()
   }
 
-  pub fn push(&self, chapter: ChapterInfo) {
+  pub fn push(&self, chapter: Arc<ChapterInfo>) {
     let chapter = Rc::new(CheckChapterInfo::from(chapter));
     self.borrow_mut().push(chapter.clone());
     self.views.append(&GChapterInfo::to_gobject(chapter));
   }
 
-  pub fn for_each_selected(&self, f: impl FnMut(usize, &ChapterInfo)) {
+  pub fn for_each_selected(&self, mut f: impl FnMut(usize, &Arc<ChapterInfo>)) {
     self
       .borrow()
       .iter()
       .enumerate()
       .filter(|(_, v)| v.active.get())
-      .map(|(_, v)| &v.info)
-      .for_each(f)
+      .for_each(|(i, v)| f(i, &v.info));
   }
 
   pub fn clear(&self) {

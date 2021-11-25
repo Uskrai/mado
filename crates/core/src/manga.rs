@@ -16,6 +16,7 @@
  */
 
 use std::fmt::Display;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -29,7 +30,7 @@ pub struct MangaInfo {
   pub cover_link: Option<String>,
   pub genres: Vec<String>,
   pub types: MangaType,
-  pub chapters: Vec<ChapterInfo>,
+  pub chapters: Vec<Arc<ChapterInfo>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
