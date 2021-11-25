@@ -27,6 +27,22 @@ use relm4::{send, ComponentUpdate, Model};
 
 use gtk::prelude::WidgetExt;
 
+#[derive(Debug)]
+pub struct AbortOnDropHandle<R>(JoinHandle<R>);
+
+impl<R> From<JoinHandle<R>> for AbortOnDropHandle<R> {
+  fn from(v: JoinHandle<R>) -> Self {
+    Self(v)
+  }
+}
+
+impl<R> Drop for AbortOnDropHandle<R> {
+  fn drop(&mut self) {
+    println!("Drop");
+    self.0.abort()
+  }
+}
+
 pub struct MangaInfoModel {
   modules: Arc<WebsiteModuleMap>,
   chapters: VecChapters,
@@ -40,7 +56,7 @@ impl HasVecChapters for MangaInfoModel {
 
 #[derive(Default, Debug)]
 pub struct MangaInfoCell {
-  current_info: Option<(Arc<WebsiteModule>, JoinHandle<()>)>,
+  current_info: Option<(Arc<WebsiteModule>, AbortOnDropHandle<()>)>,
 }
 
 impl Model for MangaInfoModel {
@@ -92,19 +108,13 @@ impl MangaInfoModel {
 
     let task = Self::get_info(module.clone(), url, sender);
 
-    cell.current_info = cell
-      .current_info
-      .as_ref()
-      // abort previous get info first if exist
-      .and_then(|(_, handle)| {
-        handle.abort();
-        None
-      })
-      // then get  handle
-      .or_else(|| {
-        let handle = tokio::spawn(task);
-        Some((module, handle))
-      });
+    // reset current handle.
+    // handle is automatically aborted when droped
+    // so we just need to make it out of scope
+    // by making it None first
+    cell.current_info = None;
+    // then we can spawn new task
+    cell.current_info = Some((module, tokio::spawn(task).into()));
   }
 
   pub async fn get_info(
