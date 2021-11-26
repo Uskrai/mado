@@ -21,7 +21,6 @@ impl<R> From<JoinHandle<R>> for AbortOnDropHandle<R> {
 
 impl<R> Drop for AbortOnDropHandle<R> {
   fn drop(&mut self) {
-    println!("Drop");
     self.0.abort()
   }
 }
