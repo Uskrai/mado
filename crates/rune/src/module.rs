@@ -3,7 +3,6 @@ use crate::function::RuneFunction;
 use crate::DeserializeResult;
 use crate::Rune;
 use crate::SendValue;
-use crate::VmError;
 
 use super::http::Url;
 use super::Error;
@@ -13,6 +12,7 @@ use mado_core::ChapterTask;
 use mado_core::MangaInfo;
 use mado_core::WebsiteModule as BaseWebsiteModule;
 use rune::runtime::VmError as RuneVmError;
+use rune::FromValue;
 use rune::ToValue;
 
 #[derive(Clone, Debug)]
@@ -89,14 +89,17 @@ impl WebsiteModule {
   pub fn from_value(
     rune: crate::Rune,
     value: SendValue,
-  ) -> Result<WebsiteModule, VmError> {
-    let obj = rune.convert_result(value.into_object())?;
+  ) -> Result<WebsiteModule, RuneVmError> {
+    fn from_value<R: FromValue>(value: impl ToValue) -> Result<R, RuneVmError> {
+      FromValue::from_value(value.to_value()?)
+    }
+    let obj = value.into_object()?;
 
-    let name = rune.from_value(obj["name"].clone())?;
-    let domain = rune.from_value(obj["domain"].clone())?;
+    let name = from_value(obj["name"].clone())?;
+    let domain = from_value(obj["domain"].clone())?;
 
-    let get_function = |name| {
-      let fun = rune.convert_result(obj[name].clone().into_function())?;
+    let get_function = |name| -> Result<_, RuneVmError> {
+      let fun = obj[name].clone().into_function()?;
       Ok(RuneFunction::new(rune.clone(), fun))
     };
 
@@ -118,12 +121,12 @@ impl WebsiteModule {
   pub fn from_value_vec(
     rune: crate::Rune,
     value: SendValue,
-  ) -> Result<Vec<WebsiteModule>, VmError> {
+  ) -> Result<Vec<WebsiteModule>, RuneVmError> {
     use super::SendValueKind as Kind;
 
     match value.kind_ref() {
       Kind::Vec(_) => {
-        let v = rune.convert_result(value.into_vec())?;
+        let v = value.into_vec()?;
         let mut vec = Vec::new();
         for it in v {
           vec.push(Self::from_value(rune.clone(), it)?);
@@ -133,11 +136,11 @@ impl WebsiteModule {
 
       Kind::Struct { .. } => Ok([Self::from_value(rune, value)?].to_vec()),
       _ => {
-        let value = rune.convert_result(value.to_value())?;
-        let type_info = rune.convert_result(value.type_info())?;
+        let value = value.to_value()?;
+        let type_info = value.type_info()?;
         let err = RuneVmError::expected::<rune::runtime::Vec>(type_info);
 
-        Err(rune.convert_vm_error(err))
+        Err(err)
       }
     }
   }

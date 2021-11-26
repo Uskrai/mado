@@ -251,6 +251,6 @@ impl ModuleBuild {
     let value = rune.call(hash, ())?;
     let value: SendValue = rune.from_value(value)?;
 
-    WebsiteModule::from_value_vec(rune, value)
+    rune.convert_result(WebsiteModule::from_value_vec(rune.clone(), value))
   }
 }
