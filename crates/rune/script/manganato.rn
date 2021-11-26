@@ -2,8 +2,16 @@ mod module;
 
 pub fn load_module() {
   [
-    WebsiteModule::to_module(1, "manganato", "https://manganato.com"),
-    WebsiteModule::to_module(2, "readmanganato", "https://readmanganato.com"),
+    WebsiteModule::to_module(
+      "36546c8c-3f9a-40c6-ab6f-d74adf9c72f8",
+      "manganato", 
+      "https://manganato.com"
+    ),
+    WebsiteModule::to_module(
+      "41b52ac9-bdc7-4a26-84ea-801ccbf111a2", 
+      "readmanganato", 
+      "https://readmanganato.com"
+    ),
   ]
 }
 

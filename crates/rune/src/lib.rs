@@ -14,6 +14,7 @@ mod selector;
 mod send_value;
 mod source_loader;
 mod test;
+mod uuid;
 
 mod deserializer;
 
@@ -41,6 +42,7 @@ pub fn load_modules(
   context.install(&json::load_module()?)?;
   context.install(&regex::load_module()?)?;
   context.install(&error::load_module()?)?;
+  context.install(&uuid::load_module()?)?;
   context.install(&selector::load_module()?)?;
   context.install(&chapter_task::load_module()?)?;
   context.install(&test::load_module()?)?;

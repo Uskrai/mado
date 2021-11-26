@@ -1,5 +1,6 @@
 use crate::chapter_task::RuneChapterTask;
 use crate::function::RuneFunction;
+use crate::uuid::Uuid as RuneUuid;
 use crate::DeserializeResult;
 use crate::Rune;
 use crate::SendValue;
@@ -10,6 +11,7 @@ use super::Error;
 use async_trait::async_trait;
 use mado_core::ChapterTask;
 use mado_core::MangaInfo;
+use mado_core::Uuid;
 use mado_core::WebsiteModule as BaseWebsiteModule;
 use rune::runtime::VmError as RuneVmError;
 use rune::FromValue;
@@ -18,6 +20,8 @@ use rune::ToValue;
 #[derive(Clone, Debug)]
 pub struct WebsiteModule {
   rune: Rune,
+
+  uuid: Uuid,
   name: String,
   domain: Url,
 
@@ -58,6 +62,10 @@ impl WebsiteModule {
 
 #[async_trait]
 impl BaseWebsiteModule for WebsiteModule {
+  fn get_uuid(&self) -> Uuid {
+    self.uuid
+  }
+
   async fn get_info(
     &self,
     url: mado_core::url::Url,
@@ -90,11 +98,14 @@ impl WebsiteModule {
     rune: crate::Rune,
     value: SendValue,
   ) -> Result<WebsiteModule, RuneVmError> {
-    fn from_value<R: FromValue>(value: impl ToValue) -> Result<R, RuneVmError> {
+    fn from_value<R: FromValue, T: ToValue>(
+      value: T,
+    ) -> Result<R, RuneVmError> {
       FromValue::from_value(value.to_value()?)
     }
     let obj = value.into_object()?;
 
+    let uuid = from_value::<RuneUuid, _>(obj["uuid"].clone())?.into();
     let name = from_value(obj["name"].clone())?;
     let domain = from_value(obj["domain"].clone())?;
 
@@ -110,6 +121,7 @@ impl WebsiteModule {
 
     Ok(Self {
       rune,
+      uuid,
       name,
       domain,
       get_info,

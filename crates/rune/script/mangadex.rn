@@ -10,7 +10,11 @@ const HEX = "[0-9a-fA-F]";
 // entry point
 // this function should return a WebsiteModule or array of WebsiteModule
 pub fn load_module() {
-  WebsiteModule::to_module(0, "MangaDex","https://mangadex.org")
+  WebsiteModule::to_module(
+    "07bd7f6b-12a1-48f1-9873-f175d4f76c9a", 
+    "MangaDex",
+    "https://mangadex.org"
+  )
 }
 
 pub fn create_pointer_function(url, json) {

@@ -13,8 +13,14 @@ pub trait ChapterTask: Send {
   fn get_chapter(&self) -> &ChapterInfo;
 }
 
+pub use uuid::Uuid;
+
 #[async_trait::async_trait]
 pub trait WebsiteModule: Send {
+  /// Get UUID of module. this value should be const
+  /// and should'nt be changed ever.
+  fn get_uuid(&self) -> Uuid;
+
   /// Get Manga information from `url`
   async fn get_info(&self, url: self::url::Url) -> Result<MangaInfo, Error>;
 

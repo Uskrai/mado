@@ -5,7 +5,9 @@ use rune::runtime::{
   VmError,
 };
 
-use crate::{function::DebugSyncFunction, http::Client, regex::Regex};
+use crate::{
+  function::DebugSyncFunction, http::Client, regex::Regex, uuid::Uuid,
+};
 
 #[derive(Clone, Debug)]
 pub struct SendValue {
@@ -57,6 +59,7 @@ pub enum SendValueKind {
   Regex(Arc<Regex>),
   HttpClient(Client),
   Function(DebugSyncFunction),
+  Uuid(Uuid),
 }
 
 impl SendValue {
@@ -153,7 +156,8 @@ impl SendValueKind {
       Url(..),
       Function(..),
       Regex(..),
-      HttpClient(..)
+      HttpClient(..),
+      Uuid(..)
     )
   }
 }
@@ -225,6 +229,7 @@ impl ToValue for SendValueKind {
       Self::Regex(v) => AnyObj::new(v.as_ref().clone()).to_value()?,
       Self::HttpClient(v) => AnyObj::new(v).to_value()?,
       Self::Url(v) => AnyObj::new(v).to_value()?,
+      Self::Uuid(v) => AnyObj::new(v).to_value()?,
       Self::Function(_) => {
         // let v = v.into_inner();
         // let v = Value::from(&v);
@@ -319,6 +324,7 @@ impl SendValueKind {
     is!(Regex, Regex, |value| { Arc::new(value) });
     is!(Client, HttpClient);
     is!(crate::http::Url, Url);
+    is!(Uuid, Uuid);
 
     return Err(VmError::panic(format!(
       "converting {:?} to send value is not supported, \

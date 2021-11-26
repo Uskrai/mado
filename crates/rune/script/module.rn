@@ -1,7 +1,7 @@
 
 
 struct WebsiteModule {
-  id, name, domain,
+  uuid, name, domain,
 
   data,
 
@@ -16,11 +16,12 @@ struct WebsiteModule {
 // Domain of the website, e.g https://mangadex.org, https://mangakakalot.com
 // the domain should always contain 'https://' or 'http://, not doing so 
 // will result in error. this is used to search which module should be used.
-pub fn new(id, name, domain, data, method) {
+pub fn new(uuid, name, domain, data, method) {
   let domain = mado::http::Url::parse(domain).unwrap();
+  let uuid = mado::Uuid::parse_str(uuid);
 
   WebsiteModule {
-    id, name, domain,
+    uuid, name, domain,
     data,
     get_info: method
       .get("get_info")
