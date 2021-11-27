@@ -4,7 +4,6 @@ use mado_core::{ArcWebsiteModule, ArcWebsiteModuleMap, WebsiteModuleMap};
 use relm4::{AppUpdate, Model};
 
 pub enum AppMsg {
-  Increment,
   Exit,
   PushModule(ArcWebsiteModule),
 }
@@ -43,9 +42,6 @@ impl AppUpdate for AppModel {
     match msg {
       AppMsg::Exit => {
         return false;
-      }
-      AppMsg::Increment => {
-        println!("Incremented");
       }
       AppMsg::PushModule(_) => {
         //
