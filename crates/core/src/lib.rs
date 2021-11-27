@@ -21,6 +21,8 @@ pub trait WebsiteModule: Send {
   /// and should'nt be changed ever.
   fn get_uuid(&self) -> Uuid;
 
+  fn get_domain(&self) -> self::url::Url;
+
   /// Get Manga information from `url`
   async fn get_info(&self, url: self::url::Url) -> Result<MangaInfo, Error>;
 

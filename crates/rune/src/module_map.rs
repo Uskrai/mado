@@ -1,4 +1,4 @@
-use mado_core::url::Url;
+use mado_core::{url::Url, WebsiteModule as _};
 use std::{collections::HashMap, sync::Arc};
 
 use crate::WebsiteModule;
@@ -12,9 +12,8 @@ pub struct WebsiteModuleMap {
 
 impl WebsiteModuleMap {
   pub fn insert(&mut self, module: WebsiteModule) {
-    self
-      .map
-      .insert(module.get_domain().clone().into(), Arc::new(module));
+    let module = Arc::new(module);
+    self.map.insert(module.get_domain(), module.clone());
   }
 
   pub fn get(&self, mut url: Url) -> Option<Arc<WebsiteModule>> {

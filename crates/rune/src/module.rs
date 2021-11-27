@@ -30,13 +30,6 @@ pub struct WebsiteModule {
 
   data: SendValue,
 }
-
-impl WebsiteModule {
-  pub fn get_domain(&self) -> &Url {
-    &self.domain
-  }
-}
-
 impl WebsiteModule {
   async fn get_info(&self, url: Url) -> Result<MangaInfo, Error> {
     let fut = self
@@ -64,6 +57,10 @@ impl WebsiteModule {
 impl BaseWebsiteModule for WebsiteModule {
   fn get_uuid(&self) -> Uuid {
     self.uuid
+  }
+
+  fn get_domain(&self) -> mado_core::url::Url {
+    self.domain.clone().into()
   }
 
   async fn get_info(
