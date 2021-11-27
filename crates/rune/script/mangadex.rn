@@ -139,6 +139,7 @@ impl WebsiteModule {
     let pointer = create_pointer_function(url.clone(), json);
 
     let info = #{};
+    info.id = id;
     info.title = pointer("/data/attributes/title/en")
       .or_else(|| {
         pointer("/data/attributes/title/ja")

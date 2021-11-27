@@ -83,6 +83,7 @@ impl WebsiteModule {
     }
 
     let info = #{};
+    info.id = url.to_string();
 
     let find = |key, attr| {
       doc.find(key).attr(attr).map(|v| v.to_string())
