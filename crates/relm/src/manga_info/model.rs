@@ -1,5 +1,6 @@
 use mado_core::{url::Url, ArcWebsiteModule, Error};
-use tokio::task::JoinHandle;
+
+use crate::AbortOnDropHandle;
 
 use super::{
   chapter_list::{HasVecChapters, VecChapters},
@@ -8,21 +9,6 @@ use super::{
 use relm4::{send, ComponentUpdate, Model};
 
 use gtk::prelude::WidgetExt;
-
-#[derive(Debug)]
-pub struct AbortOnDropHandle<R>(JoinHandle<R>);
-
-impl<R> From<JoinHandle<R>> for AbortOnDropHandle<R> {
-  fn from(v: JoinHandle<R>) -> Self {
-    Self(v)
-  }
-}
-
-impl<R> Drop for AbortOnDropHandle<R> {
-  fn drop(&mut self) {
-    self.0.abort()
-  }
-}
 
 pub struct MangaInfoModel {
   modules: ArcWebsiteModuleMap,
