@@ -1,5 +1,4 @@
-use mado_core::{url::Url, Error};
-use mado_rune::WebsiteModule;
+use mado_core::{url::Url, ArcWebsiteModule, Error};
 use tokio::task::JoinHandle;
 
 use super::{
@@ -26,7 +25,7 @@ impl<R> Drop for AbortOnDropHandle<R> {
 }
 
 pub struct MangaInfoModel {
-  modules: Arc<WebsiteModuleMap>,
+  modules: ArcWebsiteModuleMap,
   chapters: VecChapters,
 }
 
@@ -36,9 +35,9 @@ impl HasVecChapters for MangaInfoModel {
   }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct MangaInfoCell {
-  current_info: Option<(Arc<WebsiteModule>, AbortOnDropHandle<()>)>,
+  current_info: Option<(ArcWebsiteModule, AbortOnDropHandle<()>)>,
 }
 
 impl Model for MangaInfoModel {
@@ -48,10 +47,10 @@ impl Model for MangaInfoModel {
 }
 
 impl MangaInfoModel {
-  fn get_module(&self, link: &str) -> Result<(Url, Arc<WebsiteModule>), Error> {
+  fn get_module(&self, link: &str) -> Result<(Url, ArcWebsiteModule), Error> {
     let url = mado_core::url::fill_host(link)?;
 
-    let module = self.modules.get(url.clone());
+    let module = self.modules.get_by_url(url.clone());
 
     match module {
       Some(module) => Ok((url, module)),
@@ -100,11 +99,10 @@ impl MangaInfoModel {
   }
 
   pub async fn get_info(
-    module: Arc<WebsiteModule>,
+    module: ArcWebsiteModule,
     url: Url,
     sender: relm4::Sender<Msg>,
   ) {
-    use mado_core::WebsiteModule;
     let manga = module.get_info(url).await;
 
     match manga {

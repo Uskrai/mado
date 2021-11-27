@@ -1,10 +1,11 @@
+use mado_core::WebsiteModuleMap;
 use relm4::RelmApp;
 
 use std::sync::Arc;
 
 #[tokio::main]
 pub async fn main() {
-  let mut modules = mado_rune::WebsiteModuleMap::default();
+  let mut modules = mado_core::DefaultWebsiteModuleMap::default();
 
   let load_module = |path: &std::path::Path| -> Result<
     Vec<mado_rune::WebsiteModule>,
@@ -25,7 +26,7 @@ pub async fn main() {
       match vec {
         Ok(vec) => {
           for it in vec {
-            modules.insert(it);
+            modules.push(Arc::new(it));
           }
         }
 
@@ -36,9 +37,7 @@ pub async fn main() {
     }
   }
 
-  let model = mado_relm::AppModel {
-    modules: Arc::new(modules),
-  };
+  let model = mado_relm::AppModel::new(modules);
 
   let app = RelmApp::new(model);
   app.run()

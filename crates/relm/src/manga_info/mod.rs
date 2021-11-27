@@ -4,7 +4,7 @@ mod model;
 mod widgets;
 
 pub use components::MangaInfoComponents;
-use mado_rune::WebsiteModuleMap;
+use mado_core::ArcWebsiteModuleMap;
 pub use model::MangaInfoModel;
 pub use widgets::MangaInfoWidgets;
 
@@ -17,7 +17,7 @@ struct ChapterInfoWidget {
 }
 
 pub trait MangaInfoParentModel {
-  fn get_website_module_map(&self) -> Arc<WebsiteModuleMap>;
+  fn get_website_module_map(&self) -> ArcWebsiteModuleMap;
 }
 
 #[derive(Debug)]

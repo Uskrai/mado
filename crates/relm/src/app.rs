@@ -1,26 +1,57 @@
-use std::sync::Arc;
+use std::sync::Mutex;
 
 use gtk::prelude::*;
-use mado_rune::WebsiteModuleMap;
+use mado_core::{ArcWebsiteModule, ArcWebsiteModuleMap, WebsiteModuleMap};
 use relm4::{AppUpdate, Components, Model, RelmComponent, Widgets};
 
 use crate::manga_info::{self, MangaInfoParentModel};
 
-pub struct App {
-  pub modules: WebsiteModuleMap,
+pub struct MutexWebsiteModuleMap<Map: WebsiteModuleMap> {
+  map: Mutex<Map>,
+}
+
+impl<Map: WebsiteModuleMap> MutexWebsiteModuleMap<Map> {
+  pub fn new(map: Map) -> Self {
+    Self {
+      map: Mutex::new(map),
+    }
+  }
+}
+
+impl<Map: WebsiteModuleMap> WebsiteModuleMap for MutexWebsiteModuleMap<Map> {
+  fn get_by_uuid(&self, uuid: mado_core::Uuid) -> Option<ArcWebsiteModule> {
+    self.map.lock().unwrap().get_by_uuid(uuid)
+  }
+
+  fn get_by_url(&self, url: mado_core::url::Url) -> Option<ArcWebsiteModule> {
+    self.map.lock().unwrap().get_by_url(url)
+  }
+
+  fn push(&mut self, module: ArcWebsiteModule) {
+    self.map.lock().unwrap().push(module)
+  }
 }
 
 pub enum AppMsg {
   Increment,
   Exit,
+  PushModule(ArcWebsiteModule),
 }
 
 pub struct AppModel {
-  pub modules: Arc<WebsiteModuleMap>,
+  modules: ArcWebsiteModuleMap,
+}
+
+impl AppModel {
+  pub fn new<Map: WebsiteModuleMap>(map: Map) -> Self {
+    Self {
+      modules: std::sync::Arc::new(MutexWebsiteModuleMap::new(map)),
+    }
+  }
 }
 
 impl MangaInfoParentModel for AppModel {
-  fn get_website_module_map(&self) -> Arc<WebsiteModuleMap> {
+  fn get_website_module_map(&self) -> ArcWebsiteModuleMap {
     self.modules.clone()
   }
 }
@@ -44,6 +75,9 @@ impl AppUpdate for AppModel {
       }
       AppMsg::Increment => {
         println!("Incremented");
+      }
+      AppMsg::PushModule(_) => {
+        //
       }
     }
     true
