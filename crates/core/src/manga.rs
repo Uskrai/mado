@@ -6,6 +6,7 @@ use serde::Serialize;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct MangaInfo {
+  pub id: String,
   pub title: String,
   pub summary: Option<String>,
   pub authors: Vec<String>,
