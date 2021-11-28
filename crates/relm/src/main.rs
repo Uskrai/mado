@@ -26,7 +26,7 @@ pub async fn main() {
             match vec {
                 Ok(vec) => {
                     for it in vec {
-                        modules.push(Arc::new(it));
+                        modules.push(Arc::new(it.clone())).unwrap();
                     }
                 }
 

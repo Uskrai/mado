@@ -52,8 +52,8 @@ pub trait WebsiteModuleMap: Send + 'static {
 
     /// Push module to collection that can be retreived later.
     ///
-    /// this should preserve first element if there is duplicate.
-    fn push(&mut self, module: ArcWebsiteModule);
+    /// This operation should preserve old module if Error happen.
+    fn push(&mut self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError>;
 }
 
 pub fn remove_domain(url: &mut crate::url::Url) {
@@ -86,10 +86,75 @@ impl WebsiteModuleMap for DefaultWebsiteModuleMap {
         self.uuids.get(&uuid).cloned()
     }
 
-    fn push(&mut self, module: ArcWebsiteModule) {
-        let mut url = module.get_domain();
-        remove_domain(&mut url);
-        self.domains.insert(url, module.clone());
-        self.uuids.insert(module.get_uuid(), module);
+    fn push(&mut self, module: ArcWebsiteModule) -> std::result::Result<(), WebsiteModuleMapError> {
+        match self.uuids.insert(module.get_uuid(), module.clone()) {
+            Some(prev) => {
+                let error = DuplicateUUIDError::new(prev.get_uuid(), prev.clone(), module);
+                let uuid = prev.get_uuid();
+                // restore previous module first.
+                self.uuids.insert(uuid, prev.clone());
+                // then return err
+                Err(error.into())
+            }
+            None => {
+                let mut url = module.get_domain();
+                remove_domain(&mut url);
+                self.domains.insert(url, module.clone());
+                Ok(())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::Arc;
+
+    use crate::{DefaultWebsiteModuleMap, WebsiteModuleMap};
+
+    #[derive(Clone)]
+    pub struct MockWebsiteModule {
+        uuid: super::Uuid,
+        url: super::url::Url,
+    }
+
+    impl MockWebsiteModule {
+        pub fn new(uuid: super::Uuid, url: super::url::Url) -> Self {
+            Self { uuid, url }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl super::WebsiteModule for MockWebsiteModule {
+        fn get_uuid(&self) -> uuid::Uuid {
+            self.uuid
+        }
+
+        fn get_domain(&self) -> crate::url::Url {
+            self.url.clone()
+        }
+
+        async fn get_info(&self, _: crate::url::Url) -> Result<crate::MangaInfo, crate::Error> {
+            todo!()
+        }
+
+        async fn get_chapter_images(
+            &self,
+            _: Box<dyn crate::ChapterTask>,
+        ) -> Result<(), crate::Error> {
+            todo!()
+        }
+    }
+
+    #[test]
+    fn duplicate_insert() {
+        let mut map = DefaultWebsiteModuleMap::default();
+        let mock = Arc::new(MockWebsiteModule::new(
+            super::Uuid::from_u128(123),
+            super::url::Url::parse("https://google.com").unwrap(),
+        ));
+
+        map.push(mock.clone()).unwrap();
+        assert!(map.push(mock).is_err())
     }
 }

@@ -32,7 +32,7 @@ impl<Map: WebsiteModuleMap> WebsiteModuleMap for MutexWebsiteModuleMap<Map> {
         self.map.lock().unwrap().get_by_url(url)
     }
 
-    fn push(&mut self, module: ArcWebsiteModule) {
+    fn push(&mut self, module: ArcWebsiteModule) -> Result<(), mado_core::WebsiteModuleMapError> {
         self.map.lock().unwrap().push(module)
     }
 }
