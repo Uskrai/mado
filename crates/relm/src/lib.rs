@@ -5,13 +5,13 @@ pub mod manga_info;
 pub use app::*;
 
 pub fn get_toplevel(mut widget: gtk::Widget) -> gtk::Window {
-  use gtk::prelude::*;
+    use gtk::prelude::*;
 
-  while let Some(parent) = widget.parent() {
-    widget = parent;
-  }
+    while let Some(parent) = widget.parent() {
+        widget = parent;
+    }
 
-  widget.downcast::<gtk::Window>().unwrap()
+    widget.downcast::<gtk::Window>().unwrap()
 }
 
 // macros
@@ -29,13 +29,13 @@ use tokio::task::JoinHandle;
 pub struct AbortOnDropHandle<R>(JoinHandle<R>);
 
 impl<R> From<JoinHandle<R>> for AbortOnDropHandle<R> {
-  fn from(v: JoinHandle<R>) -> Self {
-    Self(v)
-  }
+    fn from(v: JoinHandle<R>) -> Self {
+        Self(v)
+    }
 }
 
 impl<R> Drop for AbortOnDropHandle<R> {
-  fn drop(&mut self) {
-    self.0.abort()
-  }
+    fn drop(&mut self) {
+        self.0.abort()
+    }
 }

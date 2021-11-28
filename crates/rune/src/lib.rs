@@ -36,24 +36,24 @@ pub use source_loader::SourceLoader;
 pub use de::{DeserializeResult, DeserializeValue};
 
 pub fn load_modules(
-  context: &mut ::rune::compile::Context,
+    context: &mut ::rune::compile::Context,
 ) -> Result<(), ::rune::compile::ContextError> {
-  context.install(&http::load_module()?)?;
-  context.install(&json::load_module()?)?;
-  context.install(&regex::load_module()?)?;
-  context.install(&error::load_module()?)?;
-  context.install(&uuid::load_module()?)?;
-  context.install(&selector::load_module()?)?;
-  context.install(&chapter_task::load_module()?)?;
-  context.install(&test::load_module()?)?;
+    context.install(&http::load_module()?)?;
+    context.install(&json::load_module()?)?;
+    context.install(&regex::load_module()?)?;
+    context.install(&error::load_module()?)?;
+    context.install(&uuid::load_module()?)?;
+    context.install(&selector::load_module()?)?;
+    context.install(&chapter_task::load_module()?)?;
+    context.install(&test::load_module()?)?;
 
-  // rune std stuff
-  context.install(&result::load_module()?)?;
-  context.install(&option::load_module()?)?;
-  context.install(&vec::load_module()?)?;
+    // rune std stuff
+    context.install(&result::load_module()?)?;
+    context.install(&option::load_module()?)?;
+    context.install(&vec::load_module()?)?;
 
-  context.install(&rune_modules::test::module(true)?)?;
-  context.install(&rune_modules::fmt::module(true)?)?;
+    context.install(&rune_modules::test::module(true)?)?;
+    context.install(&rune_modules::fmt::module(true)?)?;
 
-  Ok(())
+    Ok(())
 }

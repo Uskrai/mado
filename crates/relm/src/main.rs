@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 #[tokio::main]
 pub async fn main() {
-  let mut modules = mado_core::DefaultWebsiteModuleMap::default();
+    let mut modules = mado_core::DefaultWebsiteModuleMap::default();
 
-  let load_module = |path: &std::path::Path| -> Result<
+    let load_module = |path: &std::path::Path| -> Result<
     Vec<mado_rune::WebsiteModule>,
     Box<dyn std::error::Error>,
   > {
@@ -18,27 +18,27 @@ pub async fn main() {
       .build()
       .map_err(Into::into)
   };
-  for it in std::fs::read_dir("../rune/script").unwrap() {
-    let it = it.unwrap();
-    if it.path().is_file() {
-      let vec = load_module(&it.path());
+    for it in std::fs::read_dir("../rune/script").unwrap() {
+        let it = it.unwrap();
+        if it.path().is_file() {
+            let vec = load_module(&it.path());
 
-      match vec {
-        Ok(vec) => {
-          for it in vec {
-            modules.push(Arc::new(it));
-          }
-        }
+            match vec {
+                Ok(vec) => {
+                    for it in vec {
+                        modules.push(Arc::new(it));
+                    }
+                }
 
-        Err(err) => {
-          println!("{}", err);
+                Err(err) => {
+                    println!("{}", err);
+                }
+            }
         }
-      }
     }
-  }
 
-  let model = mado_relm::AppModel::new(modules);
+    let model = mado_relm::AppModel::new(modules);
 
-  let app = RelmApp::new(model);
-  app.run()
+    let app = RelmApp::new(model);
+    app.run()
 }

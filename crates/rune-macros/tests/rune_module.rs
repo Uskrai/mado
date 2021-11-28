@@ -1,12 +1,12 @@
 #[derive(rune::Any)]
 pub struct Foo {
-  //
+    //
 }
 
 impl Foo {
-  fn bar(self) {
-    //
-  }
+    fn bar(self) {
+        //
+    }
 }
 
 mado_rune_macros::register_module! {

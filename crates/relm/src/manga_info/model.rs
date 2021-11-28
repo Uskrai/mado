@@ -3,162 +3,158 @@ use mado_core::{url::Url, ArcWebsiteModule, Error};
 use crate::AbortOnDropHandle;
 
 use super::{
-  chapter_list::{ChapterListParentModel, VecChapters},
-  *,
+    chapter_list::{ChapterListParentModel, VecChapters},
+    *,
 };
 use relm4::{send, ComponentUpdate, Model};
 
 use gtk::prelude::WidgetExt;
 
 pub struct MangaInfoModel {
-  modules: ArcWebsiteModuleMap,
-  chapters: VecChapters,
+    modules: ArcWebsiteModuleMap,
+    chapters: VecChapters,
 }
 
 impl ChapterListParentModel for MangaInfoModel {
-  fn get_vec_chapter_info(&self) -> chapter_list::VecChapters {
-    self.chapters.clone()
-  }
+    fn get_vec_chapter_info(&self) -> chapter_list::VecChapters {
+        self.chapters.clone()
+    }
 }
 
 #[derive(Default)]
 pub struct MangaInfoCell {
-  current_info: Option<(ArcWebsiteModule, AbortOnDropHandle<()>)>,
+    current_info: Option<(ArcWebsiteModule, AbortOnDropHandle<()>)>,
 }
 
 impl Model for MangaInfoModel {
-  type Msg = MangaInfoMsg;
-  type Widgets = MangaInfoWidgets;
-  type Components = MangaInfoComponents;
+    type Msg = MangaInfoMsg;
+    type Widgets = MangaInfoWidgets;
+    type Components = MangaInfoComponents;
 }
 
 impl MangaInfoModel {
-  fn get_module(&self, link: &str) -> Result<(Url, ArcWebsiteModule), Error> {
-    let url = mado_core::url::fill_host(link)?;
+    fn get_module(&self, link: &str) -> Result<(Url, ArcWebsiteModule), Error> {
+        let url = mado_core::url::fill_host(link)?;
 
-    let module = self.modules.get_by_url(url.clone());
+        let module = self.modules.get_by_url(url.clone());
 
-    match module {
-      Some(module) => Ok((url, module)),
-      None => Err(Error::UnsupportedUrl(link.to_string())),
-    }
-  }
-
-  pub fn spawn_get_info(
-    &self,
-    components: &MangaInfoComponents,
-    sender: relm4::Sender<Msg>,
-    url: String,
-  ) {
-    let url = url.trim();
-
-    // don't do anything when empty
-    if url.is_empty() {
-      return;
+        match module {
+            Some(module) => Ok((url, module)),
+            None => Err(Error::UnsupportedUrl(link.to_string())),
+        }
     }
 
-    let result = self.get_module(url);
+    pub fn spawn_get_info(
+        &self,
+        components: &MangaInfoComponents,
+        sender: relm4::Sender<Msg>,
+        url: String,
+    ) {
+        let url = url.trim();
 
-    let (url, module) = match result {
-      Ok(item) => item,
-      Err(err) => {
-        return send!(sender, Msg::ShowError(err));
-      }
-    };
+        // don't do anything when empty
+        if url.is_empty() {
+            return;
+        }
 
-    components.set_url(url.as_str());
+        let result = self.get_module(url);
 
-    // clear previous info
-    send!(sender, Msg::Clear);
+        let (url, module) = match result {
+            Ok(item) => item,
+            Err(err) => {
+                return send!(sender, Msg::ShowError(err));
+            }
+        };
 
-    let mut cell = components.get_cell_mut();
+        components.set_url(url.as_str());
 
-    let task = Self::get_info(module.clone(), url, sender);
+        // clear previous info
+        send!(sender, Msg::Clear);
 
-    // reset current handle.
-    // handle is automatically aborted when droped
-    // so we just need to make it out of scope
-    // by making it None first
-    cell.current_info = None;
-    // then we can spawn new task
-    cell.current_info = Some((module, tokio::spawn(task).into()));
-  }
+        let mut cell = components.get_cell_mut();
 
-  pub async fn get_info(
-    module: ArcWebsiteModule,
-    url: Url,
-    sender: relm4::Sender<Msg>,
-  ) {
-    let manga = module.get_info(url).await;
+        let task = Self::get_info(module.clone(), url, sender);
 
-    match manga {
-      Ok(manga) => {
-        send!(sender, Msg::Update(manga));
-      }
-      Err(err) => {
-        send!(sender, Msg::ShowError(err));
-      }
+        // reset current handle.
+        // handle is automatically aborted when droped
+        // so we just need to make it out of scope
+        // by making it None first
+        cell.current_info = None;
+        // then we can spawn new task
+        cell.current_info = Some((module, tokio::spawn(task).into()));
     }
-  }
+
+    pub async fn get_info(module: ArcWebsiteModule, url: Url, sender: relm4::Sender<Msg>) {
+        let manga = module.get_info(url).await;
+
+        match manga {
+            Ok(manga) => {
+                send!(sender, Msg::Update(manga));
+            }
+            Err(err) => {
+                send!(sender, Msg::ShowError(err));
+            }
+        }
+    }
 }
 
 impl<T> ComponentUpdate<T> for MangaInfoModel
 where
-  T: Model + MangaInfoParentModel,
+    T: Model + MangaInfoParentModel,
 {
-  fn init_model(parent_model: &T) -> Self {
-    Self {
-      modules: parent_model.get_website_module_map(),
-      chapters: Default::default(),
-    }
-  }
-
-  fn update(
-    &mut self,
-    msg: Self::Msg,
-    components: &Self::Components,
-    sender: relm4::Sender<Self::Msg>,
-    _parent_sender: relm4::Sender<T::Msg>,
-  ) {
-    match msg {
-      Msg::Download => {
-        let module = match &components.get_cell_mut().current_info {
-          Some((module, _)) => module.clone(),
-          _ => {
-            return;
-          }
-        };
-
-        let mut ids = Vec::new();
-        self.chapters.for_each_selected(|i, it| {
-          ids.push(it.id.clone());
-        });
-
-        tokio::spawn(async move {
-          // module.ge
-          // module.get(ids).await;
-        });
-      }
-      Msg::GetInfo(url) => {
-        self.spawn_get_info(components, sender, url);
-      }
-      Msg::Update(manga) => {
-        for it in manga.chapters {
-          self.chapters.push(it);
+    fn init_model(parent_model: &T) -> Self {
+        Self {
+            modules: parent_model.get_website_module_map(),
+            chapters: Default::default(),
         }
-      }
-      Msg::Clear => {
-        self.chapters.clear();
-      }
-
-      Msg::ShowError(error) => {
-        gtk::MessageDialog::builder()
-          .message_type(gtk::MessageType::Error)
-          .text(&error.to_string())
-          .transient_for(&components.get_toplevel())
-          .build()
-          .show();
-      }
     }
-  }
+
+    fn update(
+        &mut self,
+        msg: Self::Msg,
+        components: &Self::Components,
+        sender: relm4::Sender<Self::Msg>,
+        _parent_sender: relm4::Sender<T::Msg>,
+    ) {
+        match msg {
+            Msg::Download => {
+                let module = match &components.get_cell_mut().current_info {
+                    Some((module, _)) => module.clone(),
+                    _ => {
+                        return;
+                    }
+                };
+
+                let mut ids = Vec::new();
+                self.chapters.for_each_selected(|i, it| {
+                    ids.push(it.id.clone());
+                });
+
+                tokio::spawn(async move {
+                    // module.ge
+                    // module.get(ids).await;
+                });
+            }
+            Msg::GetInfo(url) => {
+                self.spawn_get_info(components, sender, url);
+            }
+            Msg::Update(manga) => {
+                for it in manga.chapters {
+                    self.chapters.push(it);
+                }
+            }
+            Msg::Clear => {
+                self.chapters.clear();
+            }
+
+            Msg::ShowError(error) => {
+                gtk::MessageDialog::builder()
+                    .message_type(gtk::MessageType::Error)
+                    .text(&error.to_string())
+                    .transient_for(&components.get_toplevel())
+                    .build()
+                    .show();
+            }
+        }
+    }
 }

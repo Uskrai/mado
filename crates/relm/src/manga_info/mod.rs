@@ -13,20 +13,20 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 struct ChapterInfoWidget {
-  root: gtk::Label,
+    root: gtk::Label,
 }
 
 pub trait MangaInfoParentModel {
-  fn get_website_module_map(&self) -> ArcWebsiteModuleMap;
+    fn get_website_module_map(&self) -> ArcWebsiteModuleMap;
 }
 
 #[derive(Debug)]
 pub enum MangaInfoMsg {
-  Download,
-  ShowError(mado_core::Error),
-  /// Get info from string
-  /// string should be convertible to URL
-  GetInfo(String),
-  Update(mado_core::MangaInfo),
-  Clear,
+    Download,
+    ShowError(mado_core::Error),
+    /// Get info from string
+    /// string should be convertible to URL
+    GetInfo(String),
+    Update(mado_core::MangaInfo),
+    Clear,
 }
