@@ -34,7 +34,7 @@ impl std::ops::Deref for ListStore {
   }
 }
 
-pub trait HasVecChapters {
+pub trait ChapterListParentModel: Model {
   fn get_vec_chapter_info(&self) -> VecChapters;
 }
 
@@ -203,7 +203,7 @@ impl VecChapters {
 
 impl<ParentModel> ComponentUpdate<ParentModel> for ChapterListModel
 where
-  ParentModel: Model + HasVecChapters,
+  ParentModel: ChapterListParentModel,
 {
   fn init_model(parent: &ParentModel) -> Self {
     Self {

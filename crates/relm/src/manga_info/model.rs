@@ -3,7 +3,7 @@ use mado_core::{url::Url, ArcWebsiteModule, Error};
 use crate::AbortOnDropHandle;
 
 use super::{
-  chapter_list::{HasVecChapters, VecChapters},
+  chapter_list::{ChapterListParentModel, VecChapters},
   *,
 };
 use relm4::{send, ComponentUpdate, Model};
@@ -15,7 +15,7 @@ pub struct MangaInfoModel {
   chapters: VecChapters,
 }
 
-impl HasVecChapters for MangaInfoModel {
+impl ChapterListParentModel for MangaInfoModel {
   fn get_vec_chapter_info(&self) -> chapter_list::VecChapters {
     self.chapters.clone()
   }
