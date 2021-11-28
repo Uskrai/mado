@@ -10,6 +10,9 @@ pub use manga::*;
 
 pub mod url;
 
+mod map_error;
+pub use map_error::*;
+
 pub trait ChapterTask: Send {
     fn add(&mut self, name: Option<String>, id: String);
     fn get_chapter(&self) -> &ChapterInfo;
