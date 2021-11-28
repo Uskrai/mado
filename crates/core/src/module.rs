@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use crate::{ChapterInfo, DuplicateUUIDError, Error, MangaInfo, Uuid, WebsiteModuleMapError};
 
@@ -90,6 +93,35 @@ impl WebsiteModuleMap for DefaultWebsiteModuleMap {
                 Ok(())
             }
         }
+    }
+}
+
+pub struct RwLockWebsiteModuleMap<Map: WebsiteModuleMap> {
+    map: RwLock<Map>,
+}
+
+impl<Map: WebsiteModuleMap> WebsiteModuleMap for RwLockWebsiteModuleMap<Map> {
+    fn push(&mut self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError> {
+        self.push_mut(module)
+    }
+
+    fn get_by_url(&self, url: crate::url::Url) -> Option<ArcWebsiteModule> {
+        self.map.read().unwrap().get_by_url(url)
+    }
+
+    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcWebsiteModule> {
+        self.map.read().unwrap().get_by_uuid(uuid)
+    }
+}
+
+/// Interior Mutable [`WebsiteModuleMap`]
+pub trait MutWebsiteModuleMap: WebsiteModuleMap {
+    fn push_mut(&self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError>;
+}
+
+impl<Map: WebsiteModuleMap> MutWebsiteModuleMap for RwLockWebsiteModuleMap<Map> {
+    fn push_mut(&self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError> {
+        self.map.write().unwrap().push(module)
     }
 }
 
