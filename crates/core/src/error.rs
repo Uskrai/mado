@@ -18,5 +18,5 @@ pub enum Error {
     UnsupportedUrl(String),
 
     #[error(transparent)]
-    ExternalError(Box<dyn std::error::Error + Send + Sync>),
+    ExternalError(#[from] anyhow::Error),
 }

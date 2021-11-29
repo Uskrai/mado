@@ -969,9 +969,13 @@ checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 name = "mado-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
+ "futures",
  "serde",
  "thiserror",
+ "tokio",
+ "tracing 0.1.29",
  "url",
  "uuid",
 ]
@@ -995,6 +999,7 @@ dependencies = [
 name = "mado-rune"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "futures",
  "jsonpath_lib",
@@ -2281,6 +2286,7 @@ checksum = "375a639232caf30edfc78e8d89b2d4c375515393e7af7e16f01cd96917fb2105"
 dependencies = [
  "cfg-if",
  "pin-project-lite",
+ "tracing-attributes 0.1.18",
  "tracing-core 0.1.21",
 ]
 
@@ -2291,8 +2297,19 @@ source = "git+https://github.com/tokio-rs/tracing#8d4d5ac1a95770230046cc860e81d2
 dependencies = [
  "cfg-if",
  "pin-project-lite",
- "tracing-attributes",
+ "tracing-attributes 0.2.0",
  "tracing-core 0.2.0",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4f480b8f81512e825f337ad51e94c1eb5d3bbdf2b363dcd01e2b19a9ffe3f8e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

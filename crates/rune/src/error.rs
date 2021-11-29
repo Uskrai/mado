@@ -117,7 +117,11 @@ pub enum Error {
     },
 
     #[error("{0}")]
-    ExternalError(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
+    ExternalError(
+        #[source]
+        #[from]
+        anyhow::Error,
+    ),
 
     #[error("{0}")]
     JsonPathError(
@@ -144,7 +148,7 @@ pub enum Error {
 impl From<Error> for mado_core::Error {
     fn from(err: Error) -> Self {
         match err {
-            Error::RuneError(_) => Self::ExternalError(Box::new(err)),
+            Error::RuneError(_) => Self::ExternalError(err.into()),
             Error::UrlParseError { input, source } => Self::UrlParseError { input, source },
             Error::InvalidUrl { url } => Self::RequestError {
                 url: url.into(),
@@ -162,7 +166,7 @@ impl From<Error> for mado_core::Error {
             | Error::ExternalError(..)
             | Error::JsonPathError(..)
             | Error::SerdeJsonError(..)
-            | Error::ReqwestError(..) => Self::ExternalError(Box::new(err)),
+            | Error::ReqwestError(..) => Self::ExternalError(err.into()),
         }
     }
 }
