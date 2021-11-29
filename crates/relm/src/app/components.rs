@@ -1,15 +1,16 @@
 use crate::manga_info::MangaInfoModel;
 
 use super::{AppModel, AppWidgets};
+use mado_core::WebsiteModuleMap;
 use relm4::{Components, RelmComponent};
 
-pub struct AppComponents {
-    pub(super) manga_info: RelmComponent<MangaInfoModel, AppModel>,
+pub struct AppComponents<Map: WebsiteModuleMap> {
+    pub(super) manga_info: RelmComponent<MangaInfoModel, AppModel<Map>>,
 }
 
-impl Components<AppModel> for AppComponents {
+impl<Map: WebsiteModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
     fn init_components(
-        parent_model: &AppModel,
+        parent_model: &AppModel<Map>,
         parent_widget: &AppWidgets,
         parent_sender: relm4::Sender<super::AppMsg>,
     ) -> Self {

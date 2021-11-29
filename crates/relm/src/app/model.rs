@@ -1,6 +1,8 @@
-use super::{AppComponents, AppWidgets, MutexWebsiteModuleMap};
+use std::sync::Arc;
+
+use super::{AppComponents, AppWidgets};
 use crate::manga_info::MangaInfoParentModel;
-use mado_core::{ArcWebsiteModule, ArcWebsiteModuleMap, WebsiteModuleMap};
+use mado_core::{ArcWebsiteModule, ArcWebsiteModuleMap, MutexWebsiteModuleMap, WebsiteModuleMap};
 use relm4::{AppUpdate, Model};
 
 pub enum AppMsg {
@@ -8,31 +10,31 @@ pub enum AppMsg {
     PushModule(ArcWebsiteModule),
 }
 
-pub struct AppModel {
-    modules: ArcWebsiteModuleMap,
+pub struct AppModel<Map: WebsiteModuleMap> {
+    modules: Arc<MutexWebsiteModuleMap<Map>>,
 }
 
-impl AppModel {
-    pub fn new<Map: WebsiteModuleMap>(map: Map) -> Self {
+impl<Map: WebsiteModuleMap> AppModel<Map> {
+    pub fn new(map: Map) -> Self {
         Self {
-            modules: std::sync::Arc::new(MutexWebsiteModuleMap::new(map)),
+            modules: Arc::new(MutexWebsiteModuleMap::new(map)),
         }
     }
 }
 
-impl MangaInfoParentModel for AppModel {
+impl<Map: WebsiteModuleMap> MangaInfoParentModel for AppModel<Map> {
     fn get_website_module_map(&self) -> ArcWebsiteModuleMap {
         self.modules.clone()
     }
 }
 
-impl Model for AppModel {
+impl<Map: WebsiteModuleMap> Model for AppModel<Map> {
     type Msg = AppMsg;
     type Widgets = AppWidgets;
-    type Components = AppComponents;
+    type Components = AppComponents<Map>;
 }
 
-impl AppUpdate for AppModel {
+impl<Map: WebsiteModuleMap> AppUpdate for AppModel<Map> {
     fn update(
         &mut self,
         msg: Self::Msg,
