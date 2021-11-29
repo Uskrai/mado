@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex},
 };
 
 use crate::{ChapterInfo, DuplicateUUIDError, Error, MangaInfo, Uuid, WebsiteModuleMapError};
@@ -96,21 +96,29 @@ impl WebsiteModuleMap for DefaultWebsiteModuleMap {
     }
 }
 
-pub struct RwLockWebsiteModuleMap<Map: WebsiteModuleMap> {
-    map: RwLock<Map>,
+pub struct MutexWebsiteModuleMap<Map: WebsiteModuleMap> {
+    map: Mutex<Map>,
 }
 
-impl<Map: WebsiteModuleMap> WebsiteModuleMap for RwLockWebsiteModuleMap<Map> {
+impl<Map: WebsiteModuleMap> MutexWebsiteModuleMap<Map> {
+    pub fn new(map: Map) -> Self {
+        Self {
+            map: Mutex::new(map),
+        }
+    }
+}
+
+impl<Map: WebsiteModuleMap> WebsiteModuleMap for MutexWebsiteModuleMap<Map> {
     fn push(&mut self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError> {
         self.push_mut(module)
     }
 
     fn get_by_url(&self, url: crate::url::Url) -> Option<ArcWebsiteModule> {
-        self.map.read().unwrap().get_by_url(url)
+        self.map.lock().unwrap().get_by_url(url)
     }
 
     fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcWebsiteModule> {
-        self.map.read().unwrap().get_by_uuid(uuid)
+        self.map.lock().unwrap().get_by_uuid(uuid)
     }
 }
 
@@ -119,9 +127,9 @@ pub trait MutWebsiteModuleMap: WebsiteModuleMap {
     fn push_mut(&self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError>;
 }
 
-impl<Map: WebsiteModuleMap> MutWebsiteModuleMap for RwLockWebsiteModuleMap<Map> {
+impl<Map: WebsiteModuleMap> MutWebsiteModuleMap for MutexWebsiteModuleMap<Map> {
     fn push_mut(&self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError> {
-        self.map.write().unwrap().push(module)
+        self.map.lock().unwrap().push(module)
     }
 }
 
