@@ -7,7 +7,6 @@ mod function;
 pub mod http;
 pub mod json;
 mod module;
-mod module_map;
 mod regex;
 mod rune;
 mod selector;
@@ -27,7 +26,6 @@ pub use self::rune::Rune;
 pub use error::{BuildError, Error, RuneError, VmError};
 pub use json::Json;
 pub use module::WebsiteModule;
-pub use module_map::WebsiteModuleMap;
 pub use send_value::{SendValue, SendValueKind};
 
 pub use builder::{create_context, Build};
