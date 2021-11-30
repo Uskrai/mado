@@ -1,22 +1,13 @@
-use std::cell::{RefCell, RefMut};
-
 use crate::manga_info::chapter_list::ChapterListMsg;
 use relm4::{send, Components, RelmComponent, Sender};
 
-use super::{chapter_list::ChapterListModel, model::MangaInfoCell, *};
+use super::{chapter_list::ChapterListModel, *};
 
 use gtk::prelude::*;
 
 pub struct MangaInfoComponents {
     pub(super) chapters: RelmComponent<ChapterListModel, MangaInfoModel>,
     url_entry: gtk::Entry,
-    cell: RefCell<MangaInfoCell>,
-}
-
-impl MangaInfoComponents {
-    pub fn get_cell_mut(&self) -> RefMut<MangaInfoCell> {
-        self.cell.borrow_mut()
-    }
 }
 
 impl Components<MangaInfoModel> for MangaInfoComponents {
@@ -28,7 +19,6 @@ impl Components<MangaInfoModel> for MangaInfoComponents {
         Self {
             url_entry: widget.url_entry.clone(),
             chapters: RelmComponent::new(parent, widget, sender),
-            cell: RefCell::default(),
         }
     }
 }

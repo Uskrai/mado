@@ -1,4 +1,6 @@
-use mado_core::{url::Url, ArcWebsiteModule, Error};
+use std::sync::Arc;
+
+use mado_core::{url::Url, ArcWebsiteModule, Error, MangaInfo};
 
 use crate::AbortOnDropHandle;
 
@@ -10,20 +12,28 @@ use relm4::{send, ComponentUpdate, Model};
 
 use gtk::prelude::WidgetExt;
 
+#[derive(Debug)]
+pub enum MangaInfoMsg {
+    Download,
+    ShowError(mado_core::Error),
+    /// Get info from string
+    /// string should be convertible to URL
+    GetInfo(String),
+    Update(mado_core::MangaInfo),
+    Clear,
+}
+
 pub struct MangaInfoModel {
     modules: ArcWebsiteModuleMap,
     chapters: VecChapters,
+    current_handle: Option<(ArcWebsiteModule, AbortOnDropHandle<()>)>,
+    manga_info: Option<Arc<MangaInfo>>,
 }
 
 impl ChapterListParentModel for MangaInfoModel {
     fn get_vec_chapter_info(&self) -> chapter_list::VecChapters {
         self.chapters.clone()
     }
-}
-
-#[derive(Default)]
-pub struct MangaInfoCell {
-    current_info: Option<(ArcWebsiteModule, AbortOnDropHandle<()>)>,
 }
 
 impl Model for MangaInfoModel {
@@ -45,7 +55,7 @@ impl MangaInfoModel {
     }
 
     pub fn spawn_get_info(
-        &self,
+        &mut self,
         components: &MangaInfoComponents,
         sender: relm4::Sender<Msg>,
         url: String,
@@ -71,17 +81,15 @@ impl MangaInfoModel {
         // clear previous info
         send!(sender, Msg::Clear);
 
-        let mut cell = components.get_cell_mut();
-
         let task = Self::get_info(module.clone(), url, sender);
 
         // reset current handle.
         // handle is automatically aborted when droped
         // so we just need to make it out of scope
         // by making it None first
-        cell.current_info = None;
+        self.current_handle = None;
         // then we can spawn new task
-        cell.current_info = Some((module, tokio::spawn(task).into()));
+        self.current_handle = Some((module, tokio::spawn(task).into()));
     }
 
     pub async fn get_info(module: ArcWebsiteModule, url: Url, sender: relm4::Sender<Msg>) {
@@ -106,6 +114,8 @@ where
         Self {
             modules: parent_model.get_website_module_map(),
             chapters: Default::default(),
+            current_handle: None,
+            manga_info: None,
         }
     }
 
@@ -118,29 +128,33 @@ where
     ) {
         match msg {
             Msg::Download => {
-                let module = match &components.get_cell_mut().current_info {
+                let module = match &self.current_handle {
                     Some((module, _)) => module.clone(),
                     _ => {
                         return;
                     }
                 };
 
-                let mut ids = Vec::new();
-                self.chapters.for_each_selected(|i, it| {
-                    ids.push(it.id.clone());
+                let mut selected = Vec::new();
+                self.chapters.for_each_selected(|_, it| {
+                    selected.push(it.clone());
                 });
 
-                tokio::spawn(async move {
-                    // module.ge
-                    // module.get(ids).await;
-                });
+                if selected.is_empty() {
+                    return;
+                }
+
+                println!("{:#?}", selected);
             }
             Msg::GetInfo(url) => {
                 self.spawn_get_info(components, sender, url);
             }
             Msg::Update(manga) => {
-                for it in manga.chapters {
-                    self.chapters.push(it);
+                let manga = Arc::new(manga);
+                self.manga_info.replace(manga);
+                let chapters = &self.manga_info.as_ref().unwrap().chapters;
+                for it in chapters {
+                    self.chapters.push(it.clone());
                 }
             }
             Msg::Clear => {
