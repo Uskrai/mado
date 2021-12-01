@@ -62,13 +62,46 @@ pub struct Response {
     inner: reqwest::Response,
 }
 
+#[derive(Any, Debug)]
+pub struct StatusCode(reqwest::StatusCode);
+
+impl StatusCode {
+    pub fn as_string(&self) -> String {
+        self.0.as_str().to_string()
+    }
+
+    pub fn as_u16(&self) -> u16 {
+        self.0.as_u16()
+    }
+
+    pub fn is_client_error(&self) -> bool {
+        self.0.is_client_error()
+    }
+
+    pub fn is_server_error(&self) -> bool {
+        self.0.is_server_error()
+    }
+
+    pub fn is_informational(&self) -> bool {
+        self.0.is_informational()
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.0.is_success()
+    }
+
+    pub fn is_redirection(&self) -> bool {
+        self.0.is_redirection()
+    }
+}
+
 impl Response {
     pub fn url(&self) -> String {
         self.inner.url().to_string()
     }
 
-    pub fn status(&self) -> u16 {
-        self.inner.status().as_u16()
+    pub fn status(&self) -> StatusCode {
+        StatusCode(self.inner.status())
     }
     pub async fn text(self) -> String {
         self.inner.text().await.unwrap()
