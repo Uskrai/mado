@@ -169,7 +169,7 @@ async fn call_test(rune: Rune, name: String, hash: rune::Hash) -> Result<(), (St
       "get_info" => OkDeserilizeValue<mado_core::MangaInfo>,
       "get_chapter_images" => MockChapterTask,
       "download_image" => mado_rune::http::BytesStream,
-      _ => ()
+      _ => rune::Value
     }
 }
 
