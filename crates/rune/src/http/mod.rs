@@ -168,6 +168,12 @@ pub fn load_module() -> Result<Module, ContextError> {
         protocol => {
           to_string_debug: STRING_DEBUG
         }
+      },
+      (StatusCode) => {
+        inst => {
+          as_string, as_u16, is_success, is_redirection,
+          is_client_error, is_server_error
+        }
       }
     }
 
