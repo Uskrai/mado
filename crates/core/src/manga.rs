@@ -27,6 +27,12 @@ pub struct ChapterInfo {
     pub language: String,
 }
 
+#[derive(Debug, Deserialize, Serialize, Default, Clone)]
+pub struct ChapterImageInfo {
+    pub id: String,
+    pub name: Option<String>,
+}
+
 impl Display for ChapterInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         macro_rules! write_if {
