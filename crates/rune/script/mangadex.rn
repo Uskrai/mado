@@ -1,4 +1,5 @@
 
+use mado::http::Url;
 
 mod module;
 
@@ -60,8 +61,8 @@ impl MadoModule {
         let data = Self::new();
         let method = #{
             get_info: Self::get_info,
-            get_chapter_images: Self::get_chapter_images
-
+            get_chapter_images: Self::get_chapter_images,
+            download_image: Self::download_image,
         };
 
         module::new(id, name, domain, data, method)
@@ -319,6 +320,12 @@ impl MadoModule {
 
         Ok(server)
     }
+
+    async fn download_image(self, image) {
+        let url = Url::parse(image.id).unwrap();
+        let response = self.client.get(url).send().await?;
+        Ok(response.bytes_stream())
+    }
 }
 
 mod test {
@@ -400,5 +407,15 @@ mod test {
         let task = mado::MockChapterTask::new(chapter);
         let result = module.get_chapter_images(task).await?;
         task
+    }
+
+    #[test]
+    pub async fn download_image() {
+        use mado::http::Url;
+        let module = create_module();
+        let chapter = get_chapter_images().await;
+        let image = chapter.get_image_info_at(0);
+
+        module.download_image(image).await.unwrap()
     }
 }
