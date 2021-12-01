@@ -1,4 +1,5 @@
 mod module;
+use mado::http::{Url, Client};
 
 pub fn load_module() {
     [
@@ -16,6 +17,8 @@ pub fn load_module() {
 }
 
 pub struct MadoModule {
+    domain,
+
     client,
     name_regex,
 
@@ -23,8 +26,8 @@ pub struct MadoModule {
 }
 
 impl MadoModule {
-    pub fn new() {
-        let reg = mado::regex::Regex::compile("(?x)
+    pub fn new(id, name, domain) {
+        let name_regex = mado::regex::Regex::compile("(?x)
           # Get volume (optional)
           (Vol.(?P<vol>\\d+)\\s+?)?
           # Get Chapter
@@ -36,7 +39,8 @@ impl MadoModule {
         ");
 
         Self { 
-            name_regex: reg, 
+            domain,
+            name_regex, 
             client: mado::http::Client::default_(), 
             from_rust: Self::from_rust 
         }
@@ -44,16 +48,18 @@ impl MadoModule {
 
     pub fn to_module(id,name,domain) {
         module::new(
-            id, name, domain, Self::new(),
+            id, name, domain, Self::new(id, name, domain),
             #{
                 get_info: Self::get_info,
                 get_chapter_images: Self::get_chapter_images,
+                download_image: Self::download_image,
             }
         )
     }
 
     pub fn from_rust(data) {
         Self {
+            domain: data.domain,
             client: data.client,
             name_regex: data.name_regex,
             from_rust: Self::from_rust
@@ -194,6 +200,25 @@ impl MadoModule {
         Some(result)
     }
 
+    async fn download_image(self, image) {
+        let url = Url::parse(image.id).unwrap();
+        let response = self.client
+            .get(url.clone())
+            .header("Referer", self.domain)
+            .send()
+            .await?;
+
+        let status = response.status();
+        if status.is_client_error() || status.is_server_error() {
+            return Err(mado::error::Error::request_error(
+                url, 
+                response.text().await
+            ));
+        }
+
+        Ok(response.bytes_stream())
+    }
+
 }
 
 mod test {
@@ -244,5 +269,15 @@ mod test {
 
         let task = mado::MockChapterTask::new(chapter);
         let result = module.get_chapter_images(task).await;
+        task
+    }
+
+    #[test]
+    pub async fn download_image() {
+        let module = create_module();
+        let task = get_chapter_images().await;
+        let id = task.get_image_info_at(0);
+
+        module.download_image(id).await.unwrap()
     }
 }
