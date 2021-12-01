@@ -2,12 +2,12 @@ mod module;
 
 pub fn load_module() {
     [
-        WebsiteModule::to_module(
+        MadoModule::to_module(
             "36546c8c-3f9a-40c6-ab6f-d74adf9c72f8",
             "manganato", 
             "https://manganato.com"
         ),
-        WebsiteModule::to_module(
+        MadoModule::to_module(
             "41b52ac9-bdc7-4a26-84ea-801ccbf111a2", 
             "readmanganato", 
             "https://readmanganato.com"
@@ -15,14 +15,14 @@ pub fn load_module() {
     ]
 }
 
-pub struct WebsiteModule {
+pub struct MadoModule {
     client,
     name_regex,
 
     from_rust
 }
 
-impl WebsiteModule {
+impl MadoModule {
     pub fn new() {
         let reg = mado::regex::Regex::compile("(?x)
           # Get volume (optional)

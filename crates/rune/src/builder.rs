@@ -6,7 +6,7 @@ use rune::{
 
 use rune::runtime::{RuntimeContext, Unit, Vm};
 
-use super::WebsiteModule;
+use super::RuneMadoModule;
 use std::{path::Path, sync::Arc};
 
 pub struct NoopCompileVisitor;
@@ -220,7 +220,7 @@ impl ModuleBuild {
     }
 
     #[inline(always)]
-    pub fn build(self) -> Result<Vec<WebsiteModule>, crate::VmError> {
+    pub fn build(self) -> Result<Vec<RuneMadoModule>, crate::VmError> {
         let rune = self.rune;
         let hash = rune::Hash::type_hash(&["load_module"]);
         let fun = rune.unit.lookup(hash);
@@ -238,6 +238,6 @@ impl ModuleBuild {
         let value = rune.call(hash, ())?;
         let value: SendValue = rune.from_value(value)?;
 
-        rune.convert_result(WebsiteModule::from_value_vec(rune.clone(), value))
+        rune.convert_result(RuneMadoModule::from_value_vec(rune.clone(), value))
     }
 }

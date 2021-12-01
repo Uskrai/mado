@@ -1,6 +1,6 @@
 
 
-struct WebsiteModule {
+struct MadoModule {
   uuid, name, domain,
 
   data,
@@ -20,7 +20,7 @@ pub fn new(uuid, name, domain, data, method) {
   let domain = mado::http::Url::parse(domain).unwrap();
   let uuid = mado::Uuid::parse_str(uuid);
 
-  WebsiteModule {
+  MadoModule {
     uuid, name, domain,
     data,
     get_info: method

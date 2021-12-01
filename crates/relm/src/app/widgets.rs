@@ -1,11 +1,11 @@
 use gtk::prelude::*;
-use mado_core::WebsiteModuleMap;
+use mado_core::MadoModuleMap;
 use relm4::Widgets;
 
 use super::AppModel;
 
 #[relm4_macros::widget(pub)]
-impl<Map: WebsiteModuleMap> Widgets<AppModel<Map>, ()> for AppWidgets {
+impl<Map: MadoModuleMap> Widgets<AppModel<Map>, ()> for AppWidgets {
     view! {
       gtk::ApplicationWindow {
         set_title: Some("Mado"),

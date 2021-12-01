@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{ChapterInfo, DuplicateUUIDError, Error, MangaInfo, Uuid, WebsiteModuleMapError};
+use crate::{ChapterInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid};
 
 pub trait ChapterTask: Send {
     fn add(&mut self, name: Option<String>, id: String);
@@ -11,7 +11,7 @@ pub trait ChapterTask: Send {
 }
 
 #[async_trait::async_trait]
-pub trait WebsiteModule: Send + Send + 'static {
+pub trait MadoModule: Send + Send + 'static {
     /// Get UUID of module. this value should be const
     /// and should'nt be changed ever.
     fn get_uuid(&self) -> Uuid;
@@ -26,24 +26,24 @@ pub trait WebsiteModule: Send + Send + 'static {
     async fn get_chapter_images(&self, task: Box<dyn ChapterTask>) -> Result<(), Error>;
 }
 
-pub type ArcWebsiteModule = Arc<dyn WebsiteModule + Sync>;
-pub type ArcWebsiteModuleMap = Arc<dyn WebsiteModuleMap + Sync>;
+pub type ArcMadoModule = Arc<dyn MadoModule + Sync>;
+pub type ArcMadoModuleMap = Arc<dyn MadoModuleMap + Sync>;
 
-/// Collection of [`WebsiteModule`]
-pub trait WebsiteModuleMap: Send + 'static {
-    /// Get module corresponding to the [`WebsiteModule::get_domain`]
+/// Collection of [`MadoModule`]
+pub trait MadoModuleMap: Send + 'static {
+    /// Get module corresponding to the [`MadoModule::get_domain`]
     ///
     /// `url` doesn't need to be domain. implementor should remove non-domain part from
     /// url first with [`remove_domain`] before attempting to search Module.
-    fn get_by_url(&self, url: crate::url::Url) -> Option<ArcWebsiteModule>;
+    fn get_by_url(&self, url: crate::url::Url) -> Option<ArcMadoModule>;
 
-    /// Get module corresponsing to the [`WebsiteModule::get_uuid`]
-    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcWebsiteModule>;
+    /// Get module corresponsing to the [`MadoModule::get_uuid`]
+    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcMadoModule>;
 
     /// Push module to collection that can be retreived later.
     ///
     /// This operation should preserve old module if Error happen.
-    fn push(&mut self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError>;
+    fn push(&mut self, module: ArcMadoModule) -> Result<(), MadoModuleMapError>;
 }
 
 pub fn remove_domain(url: &mut crate::url::Url) {
@@ -55,28 +55,28 @@ pub fn remove_domain(url: &mut crate::url::Url) {
 }
 
 #[derive(Default)]
-pub struct DefaultWebsiteModuleMap {
-    domains: HashMap<crate::url::Url, ArcWebsiteModule>,
-    uuids: HashMap<Uuid, ArcWebsiteModule>,
+pub struct DefaultMadoModuleMap {
+    domains: HashMap<crate::url::Url, ArcMadoModule>,
+    uuids: HashMap<Uuid, ArcMadoModule>,
 }
 
-impl DefaultWebsiteModuleMap {
+impl DefaultMadoModuleMap {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl WebsiteModuleMap for DefaultWebsiteModuleMap {
-    fn get_by_url(&self, mut url: crate::url::Url) -> Option<ArcWebsiteModule> {
+impl MadoModuleMap for DefaultMadoModuleMap {
+    fn get_by_url(&self, mut url: crate::url::Url) -> Option<ArcMadoModule> {
         remove_domain(&mut url);
         self.domains.get(&url).cloned()
     }
 
-    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcWebsiteModule> {
+    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcMadoModule> {
         self.uuids.get(&uuid).cloned()
     }
 
-    fn push(&mut self, module: ArcWebsiteModule) -> std::result::Result<(), WebsiteModuleMapError> {
+    fn push(&mut self, module: ArcMadoModule) -> std::result::Result<(), MadoModuleMapError> {
         match self.uuids.insert(module.get_uuid(), module.clone()) {
             Some(prev) => {
                 let error = DuplicateUUIDError::new(prev.get_uuid(), prev.clone(), module);
@@ -96,11 +96,11 @@ impl WebsiteModuleMap for DefaultWebsiteModuleMap {
     }
 }
 
-pub struct MutexWebsiteModuleMap<Map: WebsiteModuleMap> {
+pub struct MutexMadoModuleMap<Map: MadoModuleMap> {
     map: Mutex<Map>,
 }
 
-impl<Map: WebsiteModuleMap> MutexWebsiteModuleMap<Map> {
+impl<Map: MadoModuleMap> MutexMadoModuleMap<Map> {
     pub fn new(map: Map) -> Self {
         Self {
             map: Mutex::new(map),
@@ -108,27 +108,27 @@ impl<Map: WebsiteModuleMap> MutexWebsiteModuleMap<Map> {
     }
 }
 
-impl<Map: WebsiteModuleMap> WebsiteModuleMap for MutexWebsiteModuleMap<Map> {
-    fn push(&mut self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError> {
+impl<Map: MadoModuleMap> MadoModuleMap for MutexMadoModuleMap<Map> {
+    fn push(&mut self, module: ArcMadoModule) -> Result<(), MadoModuleMapError> {
         self.push_mut(module)
     }
 
-    fn get_by_url(&self, url: crate::url::Url) -> Option<ArcWebsiteModule> {
+    fn get_by_url(&self, url: crate::url::Url) -> Option<ArcMadoModule> {
         self.map.lock().unwrap().get_by_url(url)
     }
 
-    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcWebsiteModule> {
+    fn get_by_uuid(&self, uuid: Uuid) -> Option<ArcMadoModule> {
         self.map.lock().unwrap().get_by_uuid(uuid)
     }
 }
 
-/// Interior Mutable [`WebsiteModuleMap`]
-pub trait MutWebsiteModuleMap: WebsiteModuleMap {
-    fn push_mut(&self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError>;
+/// Interior Mutable [`MadoModuleMap`]
+pub trait MutMadoModuleMap: MadoModuleMap {
+    fn push_mut(&self, module: ArcMadoModule) -> Result<(), MadoModuleMapError>;
 }
 
-impl<Map: WebsiteModuleMap> MutWebsiteModuleMap for MutexWebsiteModuleMap<Map> {
-    fn push_mut(&self, module: ArcWebsiteModule) -> Result<(), WebsiteModuleMapError> {
+impl<Map: MadoModuleMap> MutMadoModuleMap for MutexMadoModuleMap<Map> {
+    fn push_mut(&self, module: ArcMadoModule) -> Result<(), MadoModuleMapError> {
         self.map.lock().unwrap().push(module)
     }
 }
@@ -137,22 +137,22 @@ impl<Map: WebsiteModuleMap> MutWebsiteModuleMap for MutexWebsiteModuleMap<Map> {
 mod test {
     use std::sync::Arc;
 
-    use crate::{DefaultWebsiteModuleMap, WebsiteModuleMap};
+    use crate::{DefaultMadoModuleMap, MadoModuleMap};
 
     #[derive(Clone)]
-    pub struct MockWebsiteModule {
+    pub struct MockMadoModule {
         uuid: crate::Uuid,
         url: crate::url::Url,
     }
 
-    impl MockWebsiteModule {
+    impl MockMadoModule {
         pub fn new(uuid: super::Uuid, url: crate::url::Url) -> Self {
             Self { uuid, url }
         }
     }
 
     #[async_trait::async_trait]
-    impl super::WebsiteModule for MockWebsiteModule {
+    impl super::MadoModule for MockMadoModule {
         fn get_uuid(&self) -> uuid::Uuid {
             self.uuid
         }
@@ -175,8 +175,8 @@ mod test {
 
     #[test]
     fn duplicate_insert() {
-        let mut map = DefaultWebsiteModuleMap::default();
-        let mock = Arc::new(MockWebsiteModule::new(
+        let mut map = DefaultMadoModuleMap::default();
+        let mock = Arc::new(MockMadoModule::new(
             super::Uuid::from_u128(123),
             crate::url::Url::parse("https://google.com").unwrap(),
         ));

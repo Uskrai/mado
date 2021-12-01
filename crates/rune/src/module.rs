@@ -4,6 +4,7 @@ use crate::uuid::Uuid as RuneUuid;
 use crate::DeserializeResult;
 use crate::Rune;
 use crate::SendValue;
+use mado_core::MadoModule;
 
 use super::http::Url;
 use super::Error;
@@ -12,13 +13,12 @@ use async_trait::async_trait;
 use mado_core::ChapterTask;
 use mado_core::MangaInfo;
 use mado_core::Uuid;
-use mado_core::WebsiteModule as BaseWebsiteModule;
 use rune::runtime::VmError as RuneVmError;
 use rune::FromValue;
 use rune::ToValue;
 
 #[derive(Clone, Debug)]
-pub struct WebsiteModule {
+pub struct RuneMadoModule {
     rune: Rune,
 
     uuid: Uuid,
@@ -30,7 +30,7 @@ pub struct WebsiteModule {
 
     data: SendValue,
 }
-impl WebsiteModule {
+impl RuneMadoModule {
     async fn get_info(&self, url: Url) -> Result<MangaInfo, Error> {
         let fut = self
             .get_info
@@ -49,7 +49,7 @@ impl WebsiteModule {
 }
 
 #[async_trait]
-impl BaseWebsiteModule for WebsiteModule {
+impl MadoModule for RuneMadoModule {
     fn get_uuid(&self) -> Uuid {
         self.uuid
     }
@@ -69,7 +69,7 @@ impl BaseWebsiteModule for WebsiteModule {
     }
 }
 
-impl WebsiteModule {
+impl RuneMadoModule {
     /// Retreive data
     pub fn data(&self) -> SendValue {
         self.data.clone()
@@ -79,7 +79,7 @@ impl WebsiteModule {
         self.name.clone()
     }
 
-    pub fn from_value(rune: crate::Rune, value: SendValue) -> Result<WebsiteModule, RuneVmError> {
+    pub fn from_value(rune: crate::Rune, value: SendValue) -> Result<RuneMadoModule, RuneVmError> {
         fn from_value<R: FromValue, T: ToValue>(value: T) -> Result<R, RuneVmError> {
             FromValue::from_value(value.to_value()?)
         }
@@ -113,7 +113,7 @@ impl WebsiteModule {
     pub fn from_value_vec(
         rune: crate::Rune,
         value: SendValue,
-    ) -> Result<Vec<WebsiteModule>, RuneVmError> {
+    ) -> Result<Vec<RuneMadoModule>, RuneVmError> {
         use super::SendValueKind as Kind;
 
         match value.kind_ref() {

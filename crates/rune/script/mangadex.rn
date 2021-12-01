@@ -8,9 +8,9 @@ const COVER_URL = "https://uploads.mangadex.org/covers";
 const HEX = "[0-9a-fA-F]";
 
 // entry point
-// this function should return a WebsiteModule or array of WebsiteModule
+// this function should return a MadoModule or array of MadoModule
 pub fn load_module() {
-    WebsiteModule::to_module(
+    MadoModule::to_module(
         "07bd7f6b-12a1-48f1-9873-f175d4f76c9a", 
         "MangaDex",
         "https://mangadex.org"
@@ -27,7 +27,7 @@ pub fn create_pointer_function(url, json) {
     }
 }
 
-struct WebsiteModule {
+struct MadoModule {
     // Name of the website, e.g MangaDex.
     // used to display website name
     // name,
@@ -36,8 +36,8 @@ struct WebsiteModule {
     // // this is used to search which module is used when given url
     // domain,
 
-    // local data you can get from calling data() in WebsiteModule passed from rust
-    // data that rust doesnt use should be placed here because the struct will be converted Any(WebsiteModule)
+    // local data you can get from calling data() in MadoModule passed from rust
+    // data that rust doesnt use should be placed here because the struct will be converted Any(MadoModule)
     // and doesnt retain unused data.
     id_regex,
     client,
@@ -45,9 +45,9 @@ struct WebsiteModule {
     from_rust,
 }
 
-impl WebsiteModule {
+impl MadoModule {
     pub fn new() {
-        return WebsiteModule {
+        return MadoModule {
             id_regex:
                 mado::regex::Regex
                 ::compile(`${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}`),

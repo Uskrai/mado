@@ -25,7 +25,7 @@ mod vec;
 pub use self::rune::Rune;
 pub use error::{BuildError, Error, RuneError, VmError};
 pub use json::Json;
-pub use module::WebsiteModule;
+pub use module::RuneMadoModule;
 pub use send_value::{SendValue, SendValueKind};
 
 pub use builder::{create_context, Build};

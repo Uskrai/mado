@@ -1,13 +1,13 @@
 use anyhow::Context;
-use mado_core::ArcWebsiteModule;
-use mado_engine::{MadoEngine, ModuleLoadError, WebsiteModuleLoader};
+use mado_core::ArcMadoModule;
+use mado_engine::{MadoEngine, MadoModuleLoader, ModuleLoadError};
 use relm4::RelmApp;
 
 use std::sync::Arc;
 
 pub struct Loader;
 #[async_trait::async_trait]
-impl WebsiteModuleLoader for Loader {
+impl MadoModuleLoader for Loader {
     async fn get_paths(&self) -> Vec<std::path::PathBuf> {
         let mut dir = tokio::fs::read_dir("../rune/script").await.unwrap();
 
@@ -36,7 +36,7 @@ impl WebsiteModuleLoader for Loader {
     async fn load(
         &self,
         path: std::path::PathBuf,
-    ) -> Result<Vec<mado_core::ArcWebsiteModule>, ModuleLoadError> {
+    ) -> Result<Vec<mado_core::ArcMadoModule>, ModuleLoadError> {
         let result = tokio::task::spawn_blocking(move || load_module(&path))
             .await
             .unwrap();
@@ -45,7 +45,7 @@ impl WebsiteModuleLoader for Loader {
     }
 }
 
-pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcWebsiteModule>, ModuleLoadError> {
+pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcMadoModule>, ModuleLoadError> {
     let build = mado_rune::Build::default().with_path(path)?;
 
     let vec = build
@@ -55,7 +55,7 @@ pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcWebsiteModule>, Modu
         .build()
         .map_err(anyhow::Error::from)?;
 
-    let mut result = Vec::<ArcWebsiteModule>::with_capacity(vec.len());
+    let mut result = Vec::<ArcMadoModule>::with_capacity(vec.len());
     for it in vec {
         result.push(Arc::new(it));
     }
@@ -65,7 +65,7 @@ pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcWebsiteModule>, Modu
 
 #[tokio::main]
 pub async fn main() {
-    let modules = mado_core::DefaultWebsiteModuleMap::default();
+    let modules = mado_core::DefaultMadoModuleMap::default();
     let mado = MadoEngine::new(Loader);
     let model = mado_relm::AppModel::new(modules, mado.state());
 

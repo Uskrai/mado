@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mado_core::{url::Url, ArcWebsiteModule, Error, MangaInfo};
+use mado_core::{url::Url, ArcMadoModule, Error, MangaInfo};
 
 use crate::AbortOnDropHandle;
 
@@ -24,9 +24,9 @@ pub enum MangaInfoMsg {
 }
 
 pub struct MangaInfoModel {
-    modules: ArcWebsiteModuleMap,
+    modules: ArcMadoModuleMap,
     chapters: VecChapters,
-    current_handle: Option<(ArcWebsiteModule, AbortOnDropHandle<()>)>,
+    current_handle: Option<(ArcMadoModule, AbortOnDropHandle<()>)>,
     manga_info: Option<Arc<MangaInfo>>,
 }
 
@@ -43,7 +43,7 @@ impl Model for MangaInfoModel {
 }
 
 impl MangaInfoModel {
-    fn get_module(&self, link: &str) -> Result<(Url, ArcWebsiteModule), Error> {
+    fn get_module(&self, link: &str) -> Result<(Url, ArcMadoModule), Error> {
         let url = mado_core::url::fill_host(link)?;
 
         let module = self.modules.get_by_url(url.clone());
@@ -92,7 +92,7 @@ impl MangaInfoModel {
         self.current_handle = Some((module, tokio::spawn(task).into()));
     }
 
-    pub async fn get_info(module: ArcWebsiteModule, url: Url, sender: relm4::Sender<Msg>) {
+    pub async fn get_info(module: ArcMadoModule, url: Url, sender: relm4::Sender<Msg>) {
         let manga = module.get_info(url).await;
 
         match manga {

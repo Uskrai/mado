@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::ArcWebsiteModule;
+use crate::ArcMadoModule;
 
 pub struct DuplicateUUIDError {
     uuid: Uuid,
@@ -43,7 +43,7 @@ impl std::fmt::Debug for DuplicateUUIDError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum WebsiteModuleMapError {
+pub enum MadoModuleMapError {
     /// TODO: Change Url to Name
     #[error(transparent)]
     DuplicateUUID(#[from] DuplicateUUIDError),

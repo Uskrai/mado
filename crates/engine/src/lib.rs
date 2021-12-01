@@ -7,7 +7,7 @@ use std::sync::Arc;
 use futures::FutureExt;
 use tokio::sync::Mutex;
 
-use mado_core::ArcWebsiteModule;
+use mado_core::ArcMadoModule;
 
 mod state;
 pub use state::MadoEngineState;
@@ -21,18 +21,18 @@ pub enum ModuleLoadError {
     ExternalError(#[from] anyhow::Error),
 }
 
-/// Traits to Load [`crate::WebsiteModule`]
+/// Traits to Load [`crate::MadoModule`]
 #[async_trait::async_trait]
-pub trait WebsiteModuleLoader: Send + Sync {
+pub trait MadoModuleLoader: Send + Sync {
     async fn get_paths(&self) -> Vec<std::path::PathBuf>;
     async fn load(
         &self,
         path: std::path::PathBuf,
-    ) -> Result<Vec<ArcWebsiteModule>, crate::ModuleLoadError>;
+    ) -> Result<Vec<ArcMadoModule>, crate::ModuleLoadError>;
 }
 
 pub trait MadoSender: Send + Sync + std::fmt::Debug {
-    fn push_module(&self, module: ArcWebsiteModule);
+    fn push_module(&self, module: ArcMadoModule);
 }
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ pub enum MadoMsg {
 
 pub struct MadoEngine {
     run: Mutex<()>,
-    loader: Mutex<Box<dyn WebsiteModuleLoader + Send>>,
+    loader: Mutex<Box<dyn MadoModuleLoader + Send>>,
 
     state: Arc<MadoEngineState>,
     recv: Mutex<Receiver>,
@@ -64,7 +64,7 @@ pub struct DownloadInfo;
 impl MadoEngine {
     pub fn new<Loader>(loader: Loader) -> Self
     where
-        Loader: WebsiteModuleLoader + 'static,
+        Loader: MadoModuleLoader + 'static,
     {
         let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
         let state = Arc::new(MadoEngineState::new(sender));

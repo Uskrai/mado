@@ -3,15 +3,15 @@ use std::sync::Arc;
 use crate::{manga_info::MangaInfoModel, RelmMadoSender};
 
 use super::{AppModel, AppWidgets};
-use mado_core::WebsiteModuleMap;
+use mado_core::MadoModuleMap;
 use mado_engine::MadoMsg;
 use relm4::{Components, RelmComponent};
 
-pub struct AppComponents<Map: WebsiteModuleMap> {
+pub struct AppComponents<Map: MadoModuleMap> {
     pub(super) manga_info: RelmComponent<MangaInfoModel, AppModel<Map>>,
 }
 
-impl<Map: WebsiteModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
+impl<Map: MadoModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
     fn init_components(
         parent_model: &AppModel<Map>,
         parent_widget: &AppWidgets,
