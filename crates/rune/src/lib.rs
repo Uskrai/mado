@@ -16,6 +16,7 @@ mod test;
 mod uuid;
 
 mod deserializer;
+mod serializer;
 
 // rune std stuff
 mod option;
