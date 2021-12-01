@@ -173,7 +173,10 @@ impl MadoModule {
 
 
         for it in images.iter() {
-            task.add(it.title, it.src);
+            task.add(#{
+                id: it.title,
+                name: it.src
+            });
         }
     }
 

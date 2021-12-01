@@ -4,10 +4,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{ChapterInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid};
+use crate::{
+    ChapterImageInfo, ChapterInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid,
+};
 
 pub trait ChapterTask: Send {
-    fn add(&mut self, name: Option<String>, id: String);
+    fn add(&mut self, image: ChapterImageInfo);
     fn get_chapter(&self) -> &ChapterInfo;
 }
 

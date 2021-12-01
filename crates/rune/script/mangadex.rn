@@ -290,7 +290,9 @@ impl MadoModule {
 
         for it in pointer("/data/attributes/data")? {
             let images = `${server}/data/${hash}/${it}`;
-            task.add(None, images);
+            task.add(#{
+                id: images
+            });
         }
     }
 

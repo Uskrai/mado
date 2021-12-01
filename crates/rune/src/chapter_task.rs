@@ -1,4 +1,4 @@
-use mado_core::{ChapterInfo, ChapterTask};
+use mado_core::{ChapterImageInfo, ChapterInfo, ChapterTask};
 
 use crate::DeserializeValue;
 
@@ -24,7 +24,7 @@ impl RuneChapterTask {
         #[derive(Default)]
         pub struct TaskMock(ChapterInfo);
         impl ChapterTask for TaskMock {
-            fn add(&mut self, _: Option<String>, _: String) {}
+            fn add(&mut self, _: ChapterImageInfo) {}
             fn get_chapter(&self) -> &ChapterInfo {
                 &self.0
             }
@@ -35,8 +35,10 @@ impl RuneChapterTask {
         Ok(Self::new(Box::new(TaskMock(value))))
     }
 
-    pub fn add(&mut self, name: Option<String>, id: String) {
-        self.inner.add(name, id)
+    pub fn add(&mut self, value: DeserializeValue<ChapterImageInfo>) -> Result<(), RuneVmError> {
+        let value = value.get().map_err(RuneVmError::panic)?;
+        self.inner.add(value);
+        Ok(())
     }
 
     pub fn get_chapter_id(&self) -> String {
