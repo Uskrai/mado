@@ -295,6 +295,7 @@ impl MadoModule {
                 id: images
             });
         }
+        Ok(())
     }
 
     async fn get_chapter_images_id(self, id) {
