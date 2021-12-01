@@ -29,6 +29,8 @@ pub use json::Json;
 pub use module::RuneMadoModule;
 pub use send_value::{SendValue, SendValueKind};
 
+pub use chapter_task::*;
+
 pub use builder::{create_context, Build};
 pub use source_loader::SourceLoader;
 

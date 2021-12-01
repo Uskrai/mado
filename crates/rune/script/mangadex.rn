@@ -397,8 +397,8 @@ mod test {
         let info = module.get_info(url).await.unwrap();
         let chapter = info.chapters.get(0).unwrap();
 
-        let task = mado::RuneChapterTask::mock(chapter);
-
-        let result = module.get_chapter_images(task).await;
+        let task = mado::MockChapterTask::new(chapter);
+        let result = module.get_chapter_images(task).await?;
+        task
     }
 }
