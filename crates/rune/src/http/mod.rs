@@ -110,6 +110,24 @@ impl Response {
     pub async fn json(self) -> Result<super::Json, crate::Error> {
         Ok(self.inner.json::<serde_json::Value>().await?.into())
     }
+
+    pub fn bytes_stream(self) -> BytesStream {
+        BytesStream(Box::pin(self.inner.bytes_stream()))
+    }
+}
+
+#[derive(Any)]
+pub struct BytesStream(futures_core::stream::BoxStream<'static, reqwest::Result<bytes::Bytes>>);
+
+impl futures_core::stream::Stream for BytesStream {
+    type Item = Result<bytes::Bytes, mado_core::Error>;
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        let poll = self.0.as_mut().poll_next(cx);
+        poll.map(|option| option.map(|result| result.map_err(|err| crate::Error::from(err).into())))
+    }
 }
 
 pub fn load_module() -> Result<Module, ContextError> {
@@ -134,7 +152,7 @@ pub fn load_module() -> Result<Module, ContextError> {
       },
       (Response) => {
         inst => {
-          url, status
+          url, status, bytes_stream
         },
         async_inst => {
           text, json
