@@ -4,6 +4,7 @@ use crate::uuid::Uuid as RuneUuid;
 use crate::DeserializeResult;
 use crate::Rune;
 use crate::SendValue;
+use mado_core::ChapterImageInfo;
 use mado_core::MadoModule;
 
 use super::http::Url;
@@ -27,6 +28,7 @@ pub struct RuneMadoModule {
 
     get_info: RuneFunction,
     get_chapter_images: RuneFunction,
+    download_image: RuneFunction,
 
     data: SendValue,
 }
@@ -45,6 +47,21 @@ impl RuneMadoModule {
             .get_chapter_images
             .async_call::<_, ()>((self.data.clone(), task))
             .await?)
+    }
+
+    pub async fn download_image(
+        &self,
+        image: ChapterImageInfo,
+    ) -> Result<crate::http::BytesStream, Error> {
+        let value = crate::serializer::for_async_call(image);
+        let fut = self
+            .download_image
+            .async_call::<_, Result<crate::http::BytesStream, Error>>((self.data.clone(), value))
+            .await?;
+
+        let stream = fut?;
+
+        Ok(stream)
     }
 }
 
@@ -93,13 +110,15 @@ impl RuneMadoModule {
         let name = from_value(obj["name"].clone())?;
         let domain = from_value(obj["domain"].clone())?;
 
-        let get_function = |name| -> Result<_, RuneVmError> {
-            let fun = obj[name].clone().into_function()?;
-            Ok(RuneFunction::new(rune.clone(), fun))
-        };
+        macro_rules! get_function {
+            ($name:literal) => {
+                RuneFunction::new(rune.clone(), obj[$name].clone().into_function()?)
+            };
+        }
 
-        let get_info = get_function("get_info")?;
-        let get_chapter_images = get_function("get_chapter_images")?;
+        let get_info = get_function!("get_info");
+        let get_chapter_images = get_function!("get_chapter_images");
+        let download_image = get_function!("download_image");
 
         let data = obj.get("data").expect("cannot find data").clone();
 
@@ -110,6 +129,7 @@ impl RuneMadoModule {
             domain,
             get_info,
             get_chapter_images,
+            download_image,
             data,
         })
     }
