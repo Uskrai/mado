@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Debug,
     sync::{Arc, Mutex},
 };
 
@@ -11,10 +12,13 @@ pub trait ChapterTask: Send {
 }
 
 #[async_trait::async_trait]
-pub trait MadoModule: Send + Send + 'static {
+pub trait MadoModule: Send + Sync + Debug + 'static {
     /// Get UUID of module. this value should be const
     /// and should'nt be changed ever.
     fn get_uuid(&self) -> Uuid;
+
+    /// Get module's user readable name.
+    fn get_name(&self) -> &str;
 
     fn get_domain(&self) -> crate::url::Url;
 
@@ -139,7 +143,7 @@ mod test {
 
     use crate::{DefaultMadoModuleMap, MadoModuleMap};
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct MockMadoModule {
         uuid: crate::Uuid,
         url: crate::url::Url,
@@ -170,6 +174,10 @@ mod test {
             _: Box<dyn crate::ChapterTask>,
         ) -> Result<(), crate::Error> {
             todo!()
+        }
+
+        fn get_name(&self) -> &str {
+            "test"
         }
     }
 

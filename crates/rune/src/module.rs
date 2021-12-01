@@ -54,6 +54,10 @@ impl MadoModule for RuneMadoModule {
         self.uuid
     }
 
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
     fn get_domain(&self) -> mado_core::url::Url {
         self.domain.clone().into()
     }
