@@ -1,5 +1,5 @@
 use futures::Future;
-use mado_rune::{DeserializeResult, Rune, VmError};
+use mado_rune::{DeserializeResult, MockChapterTask, Rune, VmError};
 use rune::{
     compile::{CompileVisitor, Meta, MetaKind},
     runtime::{FromValue, VmError as RuneVmError, VmErrorKind},
@@ -167,6 +167,8 @@ async fn call_test(rune: Rune, name: String, hash: rune::Hash) -> Result<(), (St
 
     match_last! {
       "get_info" => OkDeserilizeValue<mado_core::MangaInfo>,
+      "get_chapter_images" => MockChapterTask,
+      "download_image" => mado_rune::http::BytesStream,
       _ => ()
     }
 }
