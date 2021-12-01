@@ -1,43 +1,75 @@
-use mado_core::WebsiteModuleMap;
+use anyhow::Context;
+use mado_core::ArcWebsiteModule;
+use mado_engine::{MadoEngine, ModuleLoadError, WebsiteModuleLoader};
 use relm4::RelmApp;
 
 use std::sync::Arc;
 
-#[tokio::main]
-pub async fn main() {
-    let mut modules = mado_core::DefaultWebsiteModuleMap::default();
+pub struct Loader;
+#[async_trait::async_trait]
+impl WebsiteModuleLoader for Loader {
+    async fn get_paths(&self) -> Vec<std::path::PathBuf> {
+        let mut dir = tokio::fs::read_dir("../rune/script").await.unwrap();
 
-    let load_module = |path: &std::path::Path| -> Result<
-    Vec<mado_rune::WebsiteModule>,
-    Box<dyn std::error::Error>,
-  > {
-    mado_rune::Build::default()
-      .with_path(path)?
-      .build_for_module()?
-      .error_missing_load_module(false)
-      .build()
-      .map_err(Into::into)
-  };
-    for it in std::fs::read_dir("../rune/script").unwrap() {
-        let it = it.unwrap();
-        if it.path().is_file() {
-            let vec = load_module(&it.path());
-
-            match vec {
-                Ok(vec) => {
-                    for it in vec {
-                        modules.push(Arc::new(it.clone())).unwrap();
+        let mut paths = Vec::new();
+        loop {
+            let it = dir.next_entry().await;
+            match it {
+                Ok(Some(it)) => {
+                    if it.path().is_file() {
+                        paths.push(it.path());
+                    } else {
+                        continue;
                     }
                 }
-
+                Ok(None) => break,
                 Err(err) => {
-                    println!("{}", err);
+                    tracing::error!("error loading: {}", err);
+                    continue;
                 }
-            }
+            };
         }
+
+        paths
     }
 
-    let model = mado_relm::AppModel::new(modules);
+    async fn load(
+        &self,
+        path: std::path::PathBuf,
+    ) -> Result<Vec<mado_core::ArcWebsiteModule>, ModuleLoadError> {
+        let result = tokio::task::spawn_blocking(move || load_module(&path))
+            .await
+            .unwrap();
+
+        result.map_err(Into::into)
+    }
+}
+
+pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcWebsiteModule>, ModuleLoadError> {
+    let build = mado_rune::Build::default().with_path(path)?;
+
+    let vec = build
+        .build_for_module()
+        .with_context(|| format!("Error builiding {}", path.display()))?
+        .error_missing_load_module(false)
+        .build()
+        .map_err(anyhow::Error::from)?;
+
+    let mut result = Vec::<ArcWebsiteModule>::with_capacity(vec.len());
+    for it in vec {
+        result.push(Arc::new(it));
+    }
+
+    Ok(result)
+}
+
+#[tokio::main]
+pub async fn main() {
+    let modules = mado_core::DefaultWebsiteModuleMap::default();
+    let mado = MadoEngine::new(Loader);
+    let model = mado_relm::AppModel::new(modules, mado.state());
+
+    tokio::spawn(async { mado.run().await });
 
     let app = RelmApp::new(model);
     app.run()
