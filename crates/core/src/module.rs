@@ -4,6 +4,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use bytes::Bytes;
+
 use crate::{
     ChapterImageInfo, ChapterInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid,
 };
@@ -12,6 +14,9 @@ pub trait ChapterTask: Send {
     fn add(&mut self, image: ChapterImageInfo);
     fn get_chapter(&self) -> &ChapterInfo;
 }
+
+pub trait BytesStream: futures_core::stream::Stream<Item = Result<Bytes, Error>> + Send {}
+impl<T> BytesStream for T where T: futures_core::stream::Stream<Item = Result<Bytes, Error>> + Send {}
 
 #[async_trait::async_trait]
 pub trait MadoModule: Send + Sync + Debug + 'static {
@@ -30,6 +35,11 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
     /// Get Image of Chapter from `task::get_chapter`
     /// for each image `task::add` should be called
     async fn get_chapter_images(&self, task: Box<dyn ChapterTask>) -> Result<(), Error>;
+
+    async fn download_image(
+        &self,
+        image: ChapterImageInfo,
+    ) -> Result<Box<dyn BytesStream>, crate::Error>;
 }
 
 pub type ArcMadoModule = Arc<dyn MadoModule + Sync>;
@@ -143,7 +153,7 @@ impl<Map: MadoModuleMap> MutMadoModuleMap for MutexMadoModuleMap<Map> {
 mod test {
     use std::sync::Arc;
 
-    use crate::{DefaultMadoModuleMap, MadoModuleMap};
+    use crate::{BytesStream, DefaultMadoModuleMap, MadoModuleMap};
 
     #[derive(Clone, Debug)]
     pub struct MockMadoModule {
@@ -180,6 +190,13 @@ mod test {
 
         fn get_name(&self) -> &str {
             "test"
+        }
+
+        async fn download_image(
+            &self,
+            _: crate::ChapterImageInfo,
+        ) -> Result<Box<dyn BytesStream>, crate::Error> {
+            todo!()
         }
     }
 

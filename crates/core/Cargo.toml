@@ -17,8 +17,9 @@ thiserror = "1.0"
 
 url = "2.2.2"
 
-futures = { version = "0.3", optional = true }
-tokio = { version = "1", optional = true }
+bytes = "1.1"
+
+futures-core = { version = "0.3" }
 tracing = "0.1"
 
 [features]

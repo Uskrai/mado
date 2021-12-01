@@ -88,6 +88,15 @@ impl MadoModule for RuneMadoModule {
             .await
             .map_err(Into::into)
     }
+
+    async fn download_image(
+        &self,
+        image: mado_core::ChapterImageInfo,
+    ) -> Result<Box<dyn mado_core::BytesStream>, mado_core::Error> {
+        let stream = self.download_image(image).await?;
+
+        Ok(Box::new(stream))
+    }
 }
 
 impl RuneMadoModule {
