@@ -2,33 +2,23 @@ use uuid::Uuid;
 
 use crate::ArcMadoModule;
 
+#[derive(thiserror::Error)]
+#[error(
+    "{} and {} have conflicting uuid: {}", previous.get_domain(), current.get_domain(), uuid
+)]
 pub struct DuplicateUUIDError {
     uuid: Uuid,
-    previous: ArcWebsiteModule,
-    current: ArcWebsiteModule,
+    previous: ArcMadoModule,
+    current: ArcMadoModule,
 }
 
 impl DuplicateUUIDError {
-    pub fn new(uuid: Uuid, previous: ArcWebsiteModule, current: ArcWebsiteModule) -> Self {
+    pub fn new(uuid: Uuid, previous: ArcMadoModule, current: ArcMadoModule) -> Self {
         Self {
             uuid,
             previous,
             current,
         }
-    }
-}
-
-impl std::error::Error for DuplicateUUIDError {}
-
-impl std::fmt::Display for DuplicateUUIDError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(
-            f,
-            "{} and {} have conflicting uuid: {}",
-            self.previous.get_domain(),
-            self.current.get_domain(),
-            self.uuid
-        )
     }
 }
 
