@@ -180,10 +180,12 @@ impl MadoModule {
 
         for it in images.iter() {
             task.add(#{
-                id: it.title,
-                name: it.src
+                id: it.src,
+                name: it.title
             });
         }
+
+        Ok(())
     }
 
     fn parse_image(self, query, img) {
