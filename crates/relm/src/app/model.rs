@@ -3,7 +3,7 @@ use crate::manga_info::MangaInfoParentModel;
 use mado_core::{
     ArcMadoModule, ArcMadoModuleMap, MadoModuleMap, MutMadoModuleMap, MutexMadoModuleMap,
 };
-use mado_engine::{MadoEngineState, MadoSender};
+use mado_engine::{DownloadInfo, MadoEngineState, MadoMsg, MadoSender};
 use relm4::{AppUpdate, Model};
 use std::sync::Arc;
 
@@ -74,5 +74,9 @@ impl RelmMadoSender {
 impl MadoSender for RelmMadoSender {
     fn push_module(&self, module: ArcMadoModule) {
         self.sender.send(AppMsg::PushModule(module)).unwrap();
+    }
+
+    fn create_download_view(&self, _: Arc<DownloadInfo>, _: mado_engine::DownloadController) {
+        //
     }
 }
