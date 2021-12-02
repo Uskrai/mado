@@ -1,5 +1,8 @@
 use super::{AppComponents, AppWidgets};
-use crate::manga_info::MangaInfoParentModel;
+use crate::{
+    download::DownloadMsg,
+    manga_info::{MangaInfoParentModel, MangaInfoParentMsg},
+};
 use mado_core::{
     ArcMadoModule, ArcMadoModuleMap, MadoModuleMap, MutMadoModuleMap, MutexMadoModuleMap,
 };
@@ -9,6 +12,23 @@ use std::sync::Arc;
 
 pub enum AppMsg {
     PushModule(ArcMadoModule),
+    Download(DownloadInfo),
+}
+
+impl MangaInfoParentMsg for AppMsg {
+    fn download(
+        module: ArcMadoModule,
+        manga: Arc<mado_core::MangaInfo>,
+        chapters: Vec<Arc<mado_core::ChapterInfo>>,
+        path: std::path::PathBuf,
+    ) -> Self {
+        Self::Download(DownloadInfo {
+            module,
+            manga,
+            chapters,
+            path,
+        })
+    }
 }
 
 pub struct AppModel<Map: MadoModuleMap> {

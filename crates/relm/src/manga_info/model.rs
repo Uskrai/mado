@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mado_core::{url::Url, ArcMadoModule, Error, MangaInfo};
+use mado_core::{url::Url, ArcMadoModule, ChapterInfo, Error, MangaInfo};
 
 use crate::AbortOnDropHandle;
 
@@ -23,7 +23,20 @@ pub enum MangaInfoMsg {
     Clear,
 }
 
-pub trait MangaInfoParentModel {
+pub trait MangaInfoParentMsg {
+    fn download(
+        module: ArcMadoModule,
+        manga: Arc<MangaInfo>,
+        selected: Vec<Arc<ChapterInfo>>,
+        path: std::path::PathBuf,
+    ) -> Self;
+}
+
+pub trait MangaInfoParentModel
+where
+    Self: Model,
+    Self::Msg: MangaInfoParentMsg,
+{
     fn get_website_module_map(&self) -> ArcMadoModuleMap;
 }
 
@@ -112,7 +125,8 @@ impl MangaInfoModel {
 
 impl<T> ComponentUpdate<T> for MangaInfoModel
 where
-    T: Model + MangaInfoParentModel,
+    T: MangaInfoParentModel,
+    T::Msg: MangaInfoParentMsg,
 {
     fn init_model(parent_model: &T) -> Self {
         Self {
@@ -128,13 +142,20 @@ where
         msg: Self::Msg,
         components: &Self::Components,
         sender: relm4::Sender<Self::Msg>,
-        _parent_sender: relm4::Sender<T::Msg>,
+        parent_sender: relm4::Sender<T::Msg>,
     ) {
         match msg {
             Msg::Download => {
                 let module = match &self.current_handle {
                     Some((module, _)) => module.clone(),
                     _ => {
+                        return;
+                    }
+                };
+
+                let manga_info = match &self.manga_info {
+                    Some(info) => info.clone(),
+                    None => {
                         return;
                     }
                 };
@@ -148,7 +169,10 @@ where
                     return;
                 }
 
-                println!("{:#?}", selected);
+                let path = std::path::PathBuf::new();
+                let msg = T::Msg::download(module, manga_info, selected, path);
+
+                parent_sender.send(msg).unwrap();
             }
             Msg::GetInfo(url) => {
                 self.spawn_get_info(components, sender, url);
@@ -163,6 +187,7 @@ where
             }
             Msg::Clear => {
                 self.chapters.clear();
+                self.manga_info = None;
             }
 
             Msg::ShowError(error) => {

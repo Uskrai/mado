@@ -5,7 +5,7 @@ mod widgets;
 
 pub use components::MangaInfoComponents;
 use mado_core::ArcMadoModuleMap;
-pub use model::{MangaInfoModel, MangaInfoMsg, MangaInfoParentModel};
+pub use model::{MangaInfoModel, MangaInfoMsg, MangaInfoParentModel, MangaInfoParentMsg};
 pub use widgets::MangaInfoWidgets;
 
 type Msg = MangaInfoMsg;
