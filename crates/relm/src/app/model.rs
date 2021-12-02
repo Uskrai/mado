@@ -83,11 +83,15 @@ impl<Map: MadoModuleMap> AppUpdate for AppModel<Map> {
 #[derive(Debug)]
 pub struct RelmMadoSender {
     sender: relm4::Sender<AppMsg>,
+    download_sender: relm4::Sender<DownloadMsg>,
 }
 
 impl RelmMadoSender {
-    pub fn new(sender: relm4::Sender<AppMsg>) -> Self {
-        Self { sender }
+    pub fn new(sender: relm4::Sender<AppMsg>, download_sender: relm4::Sender<DownloadMsg>) -> Self {
+        Self {
+            sender,
+            download_sender,
+        }
     }
 }
 
@@ -96,7 +100,13 @@ impl MadoSender for RelmMadoSender {
         self.sender.send(AppMsg::PushModule(module)).unwrap();
     }
 
-    fn create_download_view(&self, _: Arc<DownloadInfo>, _: mado_engine::DownloadController) {
-        //
+    fn create_download_view(
+        &self,
+        download: Arc<DownloadInfo>,
+        controller: mado_engine::DownloadController,
+    ) {
+        self.download_sender
+            .send(DownloadMsg::CreateDownloadView(download, controller))
+            .unwrap();
     }
 }

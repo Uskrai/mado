@@ -16,22 +16,18 @@ impl<Map: MadoModuleMap> Widgets<AppModel<Map>, ()> for AppWidgets {
             set_stack: Some(&stack)
           },
 
-          // Download tab
           append: stack = &gtk::Stack {
-            add_titled(Some("Download"), "Download") = &gtk::Frame {
-              set_child = Some(&gtk::Box) {
-                set_orientation: gtk::Orientation::Vertical,
-                append = &gtk::Button {
-                  set_label: "Yer download"
-                }
-              }
+            // Download tab
+            add_titled(Some("Download"), "Download") = &gtk::Box {
+              set_orientation: gtk::Orientation::Vertical,
+              append: component!(components.download.root_widget())
             },
             // Manga Info tab
             add_titled(Some("Manga Info"), "Manga Info") = &gtk::Box {
               set_orientation: gtk::Orientation::Vertical,
               append: component!(components.manga_info.root_widget())
             },
-            set_visible_child_name: component!("Manga Info"),
+            set_visible_child_name: component!("Download"),
           },
 
         }
