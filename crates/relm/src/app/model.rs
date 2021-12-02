@@ -75,6 +75,9 @@ impl<Map: MadoModuleMap> AppUpdate for AppModel<Map> {
                 );
                 self.modules.push_mut(module).unwrap();
             }
+            AppMsg::Download(download) => {
+                self.state.send(MadoMsg::Download(download)).unwrap();
+            }
         }
         true
     }

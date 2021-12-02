@@ -78,6 +78,7 @@ pub struct DownloadInfo {
 #[derive(Debug)]
 pub enum MadoMsg {
     Start(Arc<dyn MadoSender>),
+    Download(DownloadInfo),
 }
 
 #[cfg(test)]
