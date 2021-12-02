@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use rune::{runtime::SyncFunction, FromValue};
 
 use crate::{Rune, VmError};
@@ -40,10 +41,12 @@ impl FromValue for DebugSyncFunction {
 }
 
 /// Rune Function that is send and return human readable error
-#[derive(Debug, Clone)]
+#[derive(Derivative, Clone)]
+#[derivative(Debug)]
 pub struct RuneFunction {
-    rune: Rune,
     fun: DebugSyncFunction,
+    #[derivative(Debug = "ignore")]
+    rune: Rune,
 }
 
 impl RuneFunction {

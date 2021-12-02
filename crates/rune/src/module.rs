@@ -11,6 +11,7 @@ use super::http::Url;
 use super::Error;
 
 use async_trait::async_trait;
+use derivative::Derivative;
 use mado_core::ChapterTask;
 use mado_core::MangaInfo;
 use mado_core::Uuid;
@@ -18,8 +19,10 @@ use rune::runtime::VmError as RuneVmError;
 use rune::FromValue;
 use rune::ToValue;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct RuneMadoModule {
+    #[derivative(Debug = "ignore")]
     rune: Rune,
 
     uuid: Uuid,

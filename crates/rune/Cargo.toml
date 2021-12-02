@@ -38,6 +38,8 @@ jsonpath_lib = "0.3"
 nipper = "0.1"
 tendril = "0.4"
 
+derivative = "2.2"
+
 [dependencies.mado-core]
 path = "../core"
 
