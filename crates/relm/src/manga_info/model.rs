@@ -23,6 +23,10 @@ pub enum MangaInfoMsg {
     Clear,
 }
 
+pub trait MangaInfoParentModel {
+    fn get_website_module_map(&self) -> ArcMadoModuleMap;
+}
+
 pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
     chapters: VecChapters,
