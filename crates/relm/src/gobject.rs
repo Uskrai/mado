@@ -10,7 +10,7 @@ macro_rules! struct_wrapper {
                 use std::cell::RefCell;
                 #[derive(Default, Debug)]
                 pub struct $name {
-                    pub inner: RefCell<Option<$dest>>,
+                    pub inner: RefCell<$dest>,
                 }
 
                 #[glib::object_subclass]
@@ -31,21 +31,21 @@ macro_rules! struct_wrapper {
                 pub fn to_gobject(dest: $dest) -> Self {
                     let this = glib::Object::new(&[]).unwrap();
                     let r = imp::$name::from_instance(&this);
-                    r.inner.replace(Some(dest));
+                    *r.inner.borrow_mut() = dest;
                     this
                 }
 
-                pub fn to_inner(self) -> Option<$dest> {
-                    let r = imp::$name::from_instance(&self);
-                    r.inner.replace(None)
-                }
+                // pub fn to_inner(self) -> $dest {
+                //     let r = imp::$name::from_instance(&self);
+                //     r.inner.borrow().into_inner()
+                // }
 
-                pub fn borrow(&self) -> std::cell::Ref<'_, Option<$dest>> {
+                pub fn borrow(&self) -> std::cell::Ref<'_, $dest> {
                     let r = imp::$name::from_instance(&self);
                     r.inner.borrow()
                 }
 
-                pub fn borrow_mut(&self) -> std::cell::RefMut<'_, Option<$dest>> {
+                pub fn borrow_mut(&self) -> std::cell::RefMut<'_, $dest> {
                     let r = imp::$name::from_instance(&self);
                     r.inner.borrow_mut()
                 }
