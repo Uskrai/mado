@@ -4,10 +4,8 @@ use mado_core::{url::Url, ArcMadoModule, ChapterInfo, Error, MangaInfo};
 
 use crate::AbortOnDropHandle;
 
-use super::{
-    chapter_list::{ChapterListParentModel, VecChapters},
-    *,
-};
+use super::*;
+use crate::chapter_list::{ChapterListParentModel, VecChapters};
 use relm4::{send, ComponentUpdate, Model};
 
 use gtk::prelude::WidgetExt;
@@ -48,7 +46,7 @@ pub struct MangaInfoModel {
 }
 
 impl ChapterListParentModel for MangaInfoModel {
-    fn get_vec_chapter_info(&self) -> chapter_list::VecChapters {
+    fn get_vec_chapter_info(&self) -> VecChapters {
         self.chapters.clone()
     }
 }

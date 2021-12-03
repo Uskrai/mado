@@ -1,4 +1,3 @@
-mod chapter_list;
 mod components;
 mod model;
 mod widgets;

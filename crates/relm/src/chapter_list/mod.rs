@@ -49,7 +49,7 @@ impl From<Arc<ChapterInfo>> for CheckChapterInfo {
 
 crate::gobject::struct_wrapper!(
     GChapterInfo,
-    std::rc::Rc<crate::manga_info::chapter_list::CheckChapterInfo>,
+    std::rc::Rc<crate::chapter_list::CheckChapterInfo>,
     "MadoRelmChapterInfo",
     info_wrapper
 );

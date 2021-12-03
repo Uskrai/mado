@@ -1,9 +1,10 @@
-use crate::manga_info::chapter_list::ChapterListMsg;
 use relm4::{send, Components, RelmComponent, Sender};
 
-use super::{chapter_list::ChapterListModel, *};
+use crate::chapter_list::{ChapterListModel, ChapterListMsg};
 
 use gtk::prelude::*;
+
+use super::{MangaInfoModel, MangaInfoMsg, MangaInfoWidgets};
 
 pub struct MangaInfoComponents {
     pub(super) chapters: RelmComponent<ChapterListModel, MangaInfoModel>,
@@ -14,7 +15,7 @@ impl Components<MangaInfoModel> for MangaInfoComponents {
     fn init_components(
         parent: &MangaInfoModel,
         widget: &MangaInfoWidgets,
-        sender: relm4::Sender<Msg>,
+        sender: relm4::Sender<MangaInfoMsg>,
     ) -> Self {
         Self {
             url_entry: widget.url_entry.clone(),

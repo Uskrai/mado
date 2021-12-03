@@ -1,4 +1,5 @@
 mod app;
+pub mod chapter_list;
 mod download;
 pub mod manga_info;
 
