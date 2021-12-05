@@ -80,17 +80,6 @@ impl GChapterInfoItem {
             .downcast::<GChapterInfo>()
             .expect("Expecting GChapterInfo")
     }
-
-    pub fn with_data(&self, cb: impl Fn(Ref<Rc<CheckChapterInfo>>)) {
-        let gchapter = self
-            .item
-            .item()
-            .unwrap()
-            .downcast::<GChapterInfo>()
-            .expect("Expecting GChapterInfo");
-
-        cb(gchapter.borrow())
-    }
 }
 
 impl From<gtk::ListItem> for GChapterInfoItem {
