@@ -20,7 +20,7 @@ macro_rules! struct_wrapper {
                     type Type = super::$name;
                 }
 
-                impl ObjectImpl for GChapterInfo {}
+                impl ObjectImpl for $name {}
             }
 
             glib::wrapper! {
