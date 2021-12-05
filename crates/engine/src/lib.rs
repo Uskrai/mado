@@ -45,6 +45,7 @@ pub enum MadoDownloadMsg {
     Start(Box<dyn DownloadView>),
 }
 
+#[derive(Debug)]
 pub struct DownloadController {
     sender: UnboundedSender<MadoDownloadMsg>,
 }
