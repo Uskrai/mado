@@ -168,12 +168,12 @@ macro_rules! struct_wrapper {
                     this
                 }
 
-                pub fn borrow<'a>(&'a self) -> impl std::ops::Deref<Target = $dest> + 'a {
+                pub fn borrow(&self) -> $crate::gobject::Ref<$dest> {
                     let r = imp::$name::from_instance(self);
                     $crate::gobject::Ref::new(r.inner.borrow())
                 }
 
-                pub fn borrow_mut<'a>(&'a self) -> impl std::ops::Deref<Target = $dest> + 'a {
+                pub fn borrow_mut<'a>(&'a self) -> $crate::gobject::RefMut<$dest> {
                     let r = imp::$name::from_instance(self);
                     $crate::gobject::RefMut::new(r.inner.borrow_mut())
                 }
