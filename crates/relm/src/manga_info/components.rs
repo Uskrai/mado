@@ -8,19 +8,19 @@ use super::{MangaInfoModel, MangaInfoMsg, MangaInfoWidgets};
 
 pub struct MangaInfoComponents {
     pub(super) chapters: RelmComponent<ChapterListModel, MangaInfoModel>,
-    url_entry: gtk::Entry,
+    pub(super) url_entry: gtk::Entry,
 }
 
 impl Components<MangaInfoModel> for MangaInfoComponents {
-    fn init_components(
-        parent: &MangaInfoModel,
-        widget: &MangaInfoWidgets,
-        sender: relm4::Sender<MangaInfoMsg>,
-    ) -> Self {
+    fn init_components(parent: &MangaInfoModel, sender: relm4::Sender<MangaInfoMsg>) -> Self {
         Self {
-            url_entry: widget.url_entry.clone(),
-            chapters: RelmComponent::new(parent, widget, sender),
+            url_entry: gtk::Entry::new(),
+            chapters: RelmComponent::new(parent, sender),
         }
+    }
+
+    fn connect_parent(&mut self, parent_widgets: &MangaInfoWidgets) {
+        self.url_entry = parent_widgets.url_entry.clone();
     }
 }
 

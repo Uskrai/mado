@@ -13,6 +13,7 @@ impl<ParentModel: Model> Widgets<ChapterListModel, ParentModel> for ChapterListW
     view! {
         gtk::ScrolledWindow {
             set_vexpand : true,
+            set_hexpand: true,
             set_child = Some(&gtk::ListView) {
                 set_factory = Some(&gtk::SignalListItemFactory) {
                     connect_setup(sender) => move |_, item| {

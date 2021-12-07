@@ -15,12 +15,11 @@ pub struct AppComponents<Map: MadoModuleMap> {
 impl<Map: MadoModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
     fn init_components(
         parent_model: &AppModel<Map>,
-        parent_widget: &AppWidgets,
         parent_sender: relm4::Sender<super::AppMsg>,
     ) -> Self {
         let this = Self {
-            manga_info: RelmComponent::new(parent_model, parent_widget, parent_sender.clone()),
-            download: RelmComponent::new(parent_model, parent_widget, parent_sender.clone()),
+            manga_info: RelmComponent::new(parent_model, parent_sender.clone()),
+            download: RelmComponent::new(parent_model, parent_sender.clone()),
         };
 
         let sender = Arc::new(RelmMadoSender::new(parent_sender, this.download.sender()));
@@ -28,5 +27,10 @@ impl<Map: MadoModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
         parent_model.state.send(msg).expect("can't send msesage");
 
         this
+    }
+
+    fn connect_parent(&mut self, parent_widgets: &<AppModel<Map> as relm4::Model>::Widgets) {
+        self.manga_info.connect_parent(parent_widgets);
+        self.download.connect_parent(parent_widgets);
     }
 }

@@ -23,13 +23,18 @@ impl<T: Model> Widgets<MangaInfoModel, T> for MangaInfoWidgets {
           // enter button
           append : enter_button = &gtk::Button {
             set_label: "⏎",
-            connect_clicked(sender, url_entry) => move |_| {
+            connect_clicked(sender,url_entry) => move |_| {
               send!(sender, Msg::GetInfo(url_entry.text().to_string()))
             }
           }
         },
 
-        append: component!(components.chapters.root_widget()),
+        append = &gtk::Box {
+            set_vexpand: true,
+            set_hexpand: true,
+            append: components.chapters.root_widget(),
+        },
+
         append = &gtk::Box {
           set_orientation: gtk::Orientation::Horizontal,
 
