@@ -1,5 +1,4 @@
 use std::cell::{Cell, Ref, RefCell, RefMut};
-use std::rc::Rc;
 use std::sync::Arc;
 
 pub use gtk::prelude::*;
@@ -49,7 +48,7 @@ impl From<Arc<ChapterInfo>> for CheckChapterInfo {
 
 crate::gobject::struct_wrapper!(
     GChapterInfo,
-    std::rc::Rc<crate::chapter_list::CheckChapterInfo>,
+    crate::chapter_list::CheckChapterInfo,
     "MadoRelmChapterInfo",
     info_wrapper
 );
@@ -90,31 +89,31 @@ impl From<gtk::ListItem> for GChapterInfoItem {
 
 #[derive(Default, Clone, Debug)]
 pub struct VecChapters {
-    inner: RefCell<Vec<Rc<CheckChapterInfo>>>,
+    inner: RefCell<Vec<GChapterInfo>>,
     views: ListStore,
 }
 
 impl VecChapters {
-    fn borrow_mut(&self) -> RefMut<Vec<Rc<CheckChapterInfo>>> {
+    fn borrow_mut(&self) -> RefMut<Vec<GChapterInfo>> {
         self.inner.borrow_mut()
     }
 
-    fn borrow(&self) -> Ref<Vec<Rc<CheckChapterInfo>>> {
+    fn borrow(&self) -> Ref<Vec<GChapterInfo>> {
         self.inner.borrow()
     }
 
     pub fn push(&self, chapter: Arc<ChapterInfo>) {
-        let chapter = Rc::new(CheckChapterInfo::from(chapter));
+        let chapter = GChapterInfo::to_gobject(CheckChapterInfo::from(chapter));
         self.borrow_mut().push(chapter.clone());
-        self.views.append(&GChapterInfo::to_gobject(chapter));
+        self.views.append(&chapter);
     }
 
     pub fn for_each_selected(&self, mut f: impl FnMut(usize, &Arc<ChapterInfo>)) {
         self.borrow()
             .iter()
             .enumerate()
-            .filter(|(_, v)| v.active.get())
-            .for_each(|(i, v)| f(i, &v.info));
+            .filter(|(_, v)| v.borrow().active.get())
+            .for_each(|(i, v)| f(i, &v.borrow().info));
     }
 
     pub fn clear(&self) {
