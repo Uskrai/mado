@@ -47,8 +47,29 @@ impl MadoEngine {
         self.state.clone()
     }
 
-    pub fn download(download: DownloadInfo) {
-        //
+    fn create_download(
+        &self,
+        download: DownloadInfo,
+        sender: Arc<dyn MadoSender>,
+    ) -> impl std::future::Future<Output = ()> {
+        let state = self.state();
+
+        async move {
+            let (download_sender, mut recv) = crate::download_channel();
+
+            let download = Arc::new(download);
+            sender.create_download_view(download.clone(), download_sender);
+
+            let task = recv.await_start().await;
+
+            for chapter in &download.chapters {
+                //
+            }
+
+            while let Some(msg) = recv.recv().await {
+                //
+            }
+        }
     }
 
     /// Run Event lopo.

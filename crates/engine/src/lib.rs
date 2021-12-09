@@ -7,7 +7,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use futures::FutureExt;
 use tokio::sync::{
-    mpsc::{error::SendError, UnboundedSender},
+    mpsc::{error::SendError, UnboundedReceiver, UnboundedSender},
     Mutex,
 };
 
@@ -49,6 +49,28 @@ pub enum MadoDownloadMsg {
 #[derive(Debug, Clone)]
 pub struct DownloadSender {
     sender: UnboundedSender<MadoDownloadMsg>,
+    start: UnboundedSender<Box<dyn DownloadViewController>>,
+}
+
+pub struct DownloadReceiver {
+    recv: UnboundedReceiver<MadoDownloadMsg>,
+    start: UnboundedReceiver<Box<dyn DownloadViewController>>,
+}
+
+fn download_channel() -> (DownloadSender, DownloadReceiver) {
+    let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
+    let (start_sender, start_recv) = tokio::sync::mpsc::unbounded_channel();
+    let sender = DownloadSender {
+        sender,
+        start: start_sender,
+    };
+
+    let recv = DownloadReceiver {
+        recv,
+        start: start_recv,
+    };
+
+    (sender, recv)
 }
 
 pub trait DownloadViewController: Send + Sync + Debug + 'static {
@@ -59,8 +81,8 @@ impl DownloadSender {
     pub fn start(
         &self,
         view: impl DownloadViewController,
-    ) -> Result<(), SendError<MadoDownloadMsg>> {
-        self.sender.send(MadoDownloadMsg::Start(Box::new(view)))
+    ) -> Result<(), SendError<Box<dyn DownloadViewController>>> {
+        self.start.send(Box::new(view))
     }
 
     pub fn resume(&self) {
@@ -69,6 +91,18 @@ impl DownloadSender {
 
     pub fn pause(&self) {
         //
+    }
+}
+
+impl DownloadReceiver {
+    pub async fn await_start(&mut self) -> Box<dyn DownloadViewController> {
+        let controller = self.start.recv().await.unwrap();
+        self.start.close();
+        controller
+    }
+
+    pub async fn recv(&mut self) -> Option<MadoDownloadMsg> {
+        self.recv.recv().await
     }
 }
 
