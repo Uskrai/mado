@@ -106,7 +106,7 @@ impl MadoSender for RelmMadoSender {
     fn create_download_view(
         &self,
         download: Arc<DownloadInfo>,
-        controller: mado_engine::DownloadController,
+        controller: mado_engine::DownloadSender,
     ) {
         self.download_sender
             .send(DownloadMsg::CreateDownloadView(download, controller))

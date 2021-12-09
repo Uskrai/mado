@@ -38,7 +38,7 @@ pub trait MadoModuleLoader: Send + Sync {
 pub trait MadoSender: Send + Sync + Debug {
     fn push_module(&self, module: ArcMadoModule);
 
-    fn create_download_view(&self, download: Arc<DownloadInfo>, controller: DownloadController);
+    fn create_download_view(&self, download: Arc<DownloadInfo>, controller: DownloadSender);
 }
 
 #[derive(Debug)]
@@ -47,7 +47,7 @@ pub enum MadoDownloadMsg {
 }
 
 #[derive(Debug, Clone)]
-pub struct DownloadController {
+pub struct DownloadSender {
     sender: UnboundedSender<MadoDownloadMsg>,
 }
 
@@ -55,7 +55,7 @@ pub trait DownloadViewController: Send + Sync + Debug + 'static {
     //
 }
 
-impl DownloadController {
+impl DownloadSender {
     pub fn start(
         &self,
         view: impl DownloadViewController,

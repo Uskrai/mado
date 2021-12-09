@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use mado_engine::{DownloadController, DownloadInfo};
+use mado_engine::{DownloadInfo, DownloadSender};
 use relm4::{ComponentUpdate, Model, Widgets};
 
 pub enum DownloadMsg {
-    CreateDownloadView(Arc<DownloadInfo>, DownloadController),
+    CreateDownloadView(Arc<DownloadInfo>, DownloadSender),
 }
 
 pub struct DownloadModel {
