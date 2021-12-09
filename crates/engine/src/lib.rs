@@ -3,7 +3,7 @@
 mod engine;
 pub use engine::*;
 
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use futures::FutureExt;
 use tokio::sync::{
@@ -35,27 +35,31 @@ pub trait MadoModuleLoader: Send + Sync {
     ) -> Result<Vec<ArcMadoModule>, crate::ModuleLoadError>;
 }
 
-pub trait MadoSender: Send + Sync + std::fmt::Debug {
+pub trait MadoSender: Send + Sync + Debug {
     fn push_module(&self, module: ArcMadoModule);
 
     fn create_download_view(&self, download: Arc<DownloadInfo>, controller: DownloadController);
 }
 
+#[derive(Debug)]
 pub enum MadoDownloadMsg {
-    Start(Box<dyn DownloadView>),
+    Start(Box<dyn DownloadViewController>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DownloadController {
     sender: UnboundedSender<MadoDownloadMsg>,
 }
 
-pub trait DownloadView: Send + Sync + 'static {
+pub trait DownloadViewController: Send + Sync + Debug + 'static {
     //
 }
 
 impl DownloadController {
-    pub fn start(&self, view: impl DownloadView) -> Result<(), SendError<MadoDownloadMsg>> {
+    pub fn start(
+        &self,
+        view: impl DownloadViewController,
+    ) -> Result<(), SendError<MadoDownloadMsg>> {
         self.sender.send(MadoDownloadMsg::Start(Box::new(view)))
     }
 
