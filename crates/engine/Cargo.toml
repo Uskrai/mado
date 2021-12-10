@@ -15,7 +15,8 @@ tracing = "0.1"
 [dependencies.tokio]
 version = "1"
 features = [
-  "sync"
+  "sync",
+  "rt"
 ]
 
 [dependencies.mado-core]

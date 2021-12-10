@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use futures::FutureExt;
 use tokio::sync::Mutex;
 
-use crate::{MadoEngineState, MadoModuleLoader, MadoMsg, MadoSender};
+use crate::{DownloadInfo, MadoEngineState, MadoModuleLoader, MadoMsg, MadoSender};
 
 pub struct MadoEngine {
     run: Mutex<()>,
@@ -23,8 +22,6 @@ const _: () = {
         assert::<MadoEngine>();
     }
 };
-
-pub struct DownloadInfo;
 
 impl MadoEngine {
     pub fn new<Loader>(loader: Loader) -> Self
@@ -52,22 +49,22 @@ impl MadoEngine {
         download: DownloadInfo,
         sender: Arc<dyn MadoSender>,
     ) -> impl std::future::Future<Output = ()> {
-        let state = self.state();
-
         async move {
             let (download_sender, mut recv) = crate::download_channel();
 
             let download = Arc::new(download);
             sender.create_download_view(download.clone(), download_sender);
 
-            let task = recv.await_start().await;
+            let _ = recv.await_start().await;
 
-            for chapter in &download.chapters {
+            for _ in &download.chapters {
                 //
             }
 
             while let Some(msg) = recv.recv().await {
-                //
+                match msg {
+                    crate::MadoDownloadMsg::Start(_) => {}
+                }
             }
         }
     }
@@ -75,20 +72,31 @@ impl MadoEngine {
     /// Run Event lopo.
     pub async fn run(self) {
         let sender = self.await_sender().await.unwrap();
-        let guard = self.run.lock().await;
-        let mut loader_fut = self.load_module(sender.clone()).boxed().fuse();
+        let _guard = self.run.lock().await;
 
-        futures::select! {
-            loader = loader_fut => {
-                println!("");
-            }
-        };
-
-        while let Some(msg) = self.recv().await {}
+        self.load_module(sender.clone()).await;
+        self.event_loop(sender).await;
     }
 
     async fn recv(&self) -> Option<MadoMsg> {
         self.recv.lock().await.recv().await
+    }
+
+    async fn event_loop(&self, sender: Arc<dyn MadoSender>) {
+        let mut recv = self.recv.lock().await;
+        while let Some(msg) = recv.recv().await {
+            match msg {
+                MadoMsg::Start(_) => {
+                    tracing::warn!("Multiple MadoMsg::Start will be ignored");
+                }
+
+                MadoMsg::Download(download) => {
+                    let sender = sender.clone();
+                    let downloader = self.create_download(download, sender.clone());
+                    tokio::task::spawn(downloader);
+                }
+            }
+        }
     }
 
     async fn await_sender(&self) -> Option<Arc<dyn MadoSender + 'static>> {
