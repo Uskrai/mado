@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use mado_core::{url::Url, ArcMadoModule, ChapterInfo, Error, MangaInfo};
+use mado_core::{url::Url, ArcMadoModule, Error, MangaInfo};
+use mado_engine::{DownloadInfo, DownloadStatus};
 
 use crate::AbortOnDropHandle;
 
@@ -22,12 +23,7 @@ pub enum MangaInfoMsg {
 }
 
 pub trait MangaInfoParentMsg {
-    fn download(
-        module: ArcMadoModule,
-        manga: Arc<MangaInfo>,
-        selected: Vec<Arc<ChapterInfo>>,
-        path: std::path::PathBuf,
-    ) -> Self;
+    fn download(info: DownloadInfo) -> Self;
 }
 
 pub trait MangaInfoParentModel
@@ -168,7 +164,9 @@ where
                 }
 
                 let path = std::path::PathBuf::new();
-                let msg = T::Msg::download(module, manga_info, selected, path);
+                let info =
+                    DownloadInfo::new(module, manga_info, selected, path, DownloadStatus::Resumed);
+                let msg = T::Msg::download(info);
 
                 parent_sender.send(msg).unwrap();
             }

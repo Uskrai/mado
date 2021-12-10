@@ -104,12 +104,46 @@ impl DownloadReceiver {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum DownloadStatus {
+    Resumed,
+    Paused,
+}
+
 #[derive(Debug)]
 pub struct DownloadInfo {
     pub module: ArcMadoModule,
     pub manga: Arc<MangaInfo>,
     pub chapters: Vec<Arc<ChapterInfo>>,
     pub path: std::path::PathBuf,
+    status: Mutex<DownloadStatus>,
+}
+
+impl DownloadInfo {
+    pub fn new(
+        module: ArcMadoModule,
+        manga: Arc<MangaInfo>,
+        chapters: Vec<Arc<ChapterInfo>>,
+        path: std::path::PathBuf,
+        status: DownloadStatus,
+    ) -> Self {
+        Self {
+            module,
+            manga,
+            chapters,
+            path,
+            status: Mutex::new(status),
+        }
+    }
+
+    pub fn status(&self) -> DownloadStatus {
+        let status = self.status.blocking_lock();
+        *status
+    }
+
+    async fn set_status(&self, status: DownloadStatus) {
+        *self.status.lock().await = status;
+    }
 }
 
 #[derive(Debug)]

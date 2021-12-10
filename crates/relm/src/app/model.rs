@@ -16,18 +16,8 @@ pub enum AppMsg {
 }
 
 impl MangaInfoParentMsg for AppMsg {
-    fn download(
-        module: ArcMadoModule,
-        manga: Arc<mado_core::MangaInfo>,
-        chapters: Vec<Arc<mado_core::ChapterInfo>>,
-        path: std::path::PathBuf,
-    ) -> Self {
-        Self::Download(DownloadInfo {
-            module,
-            manga,
-            chapters,
-            path,
-        })
+    fn download(info: DownloadInfo) -> Self {
+        AppMsg::Download(info)
     }
 }
 
