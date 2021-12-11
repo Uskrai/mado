@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use gtk::prelude::WidgetExt;
-use mado_engine::{DownloadInfo, DownloadSender};
+use mado_engine::DownloadInfo;
 use relm4::{ComponentUpdate, Components, Model, RelmComponent, Widgets};
 use relm4_macros::widget;
 
 use super::task_list::TaskListParentModel;
 
 pub enum DownloadMsg {
-    CreateDownloadView(Arc<DownloadInfo>, DownloadSender),
+    CreateDownloadView(Arc<DownloadInfo>),
 }
 
 pub struct DownloadModel {
@@ -42,8 +42,8 @@ impl<ParentModel: Model> ComponentUpdate<ParentModel> for DownloadModel {
         _: relm4::Sender<ParentModel::Msg>,
     ) {
         match msg {
-            DownloadMsg::CreateDownloadView(info, controller) => {
-                let object = super::task_list::DownloadItem { info, controller };
+            DownloadMsg::CreateDownloadView(info) => {
+                let object = super::task_list::DownloadItem { info };
                 let object = super::task_list::GDownloadItem::to_gobject(object);
                 self.list.append(&object);
             }

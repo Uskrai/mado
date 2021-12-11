@@ -65,9 +65,8 @@ pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcMadoModule>, ModuleL
 
 #[tokio::main]
 pub async fn main() {
-    let modules = mado_core::DefaultMadoModuleMap::default();
     let mado = MadoEngine::new(Loader);
-    let model = mado_relm::AppModel::new(modules, mado.state());
+    let model = mado_relm::AppModel::new(mado.state());
 
     tokio::spawn(async { mado.run().await });
 

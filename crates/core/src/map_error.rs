@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 use crate::ArcMadoModule;
 
-#[derive(thiserror::Error)]
+#[derive(thiserror::Error, Clone)]
 #[error(
     "{} and {} have conflicting uuid: {}", previous.get_domain(), current.get_domain(), uuid
 )]
@@ -32,7 +32,7 @@ impl std::fmt::Debug for DuplicateUUIDError {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum MadoModuleMapError {
     /// TODO: Change Url to Name
     #[error(transparent)]

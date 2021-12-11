@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use bytes::Bytes;
@@ -70,15 +70,21 @@ pub fn remove_domain(url: &mut crate::url::Url) {
     url.set_username("").ok();
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DefaultMadoModuleMap {
     domains: HashMap<crate::url::Url, ArcMadoModule>,
     uuids: HashMap<Uuid, ArcMadoModule>,
+    vec: Vec<ArcMadoModule>,
 }
 
 impl DefaultMadoModuleMap {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Get a reference to the default mado module map's vec.
+    pub fn vec(&self) -> &[Arc<dyn MadoModule + Sync>] {
+        self.vec.as_ref()
     }
 }
 
@@ -106,12 +112,14 @@ impl MadoModuleMap for DefaultMadoModuleMap {
                 let mut url = module.get_domain();
                 remove_domain(&mut url);
                 self.domains.insert(url, module.clone());
+                self.vec.push(module);
                 Ok(())
             }
         }
     }
 }
 
+#[derive(Default, Debug)]
 pub struct MutexMadoModuleMap<Map: MadoModuleMap> {
     map: Mutex<Map>,
 }
@@ -121,6 +129,10 @@ impl<Map: MadoModuleMap> MutexMadoModuleMap<Map> {
         Self {
             map: Mutex::new(map),
         }
+    }
+
+    pub fn lock(&self) -> Result<MutexGuard<Map>, std::sync::PoisonError<MutexGuard<Map>>> {
+        self.map.lock()
     }
 }
 

@@ -3,10 +3,8 @@ use crate::{
     download::DownloadMsg,
     manga_info::{MangaInfoParentModel, MangaInfoParentMsg},
 };
-use mado_core::{
-    ArcMadoModule, ArcMadoModuleMap, MadoModuleMap, MutMadoModuleMap, MutexMadoModuleMap,
-};
-use mado_engine::{DownloadInfo, MadoEngineState, MadoMsg, MadoSender};
+use mado_core::{ArcMadoModule, ArcMadoModuleMap};
+use mado_engine::{DownloadInfo, MadoEngineState, MadoEngineStateObserver};
 use relm4::{AppUpdate, Model};
 use std::sync::Arc;
 
@@ -21,34 +19,30 @@ impl MangaInfoParentMsg for AppMsg {
     }
 }
 
-pub struct AppModel<Map: MadoModuleMap> {
-    modules: Arc<MutexMadoModuleMap<Map>>,
+pub struct AppModel {
     /// state.send will be called on [`AppComponents::init_components`]
     pub(super) state: Arc<MadoEngineState>,
 }
 
-impl<Map: MadoModuleMap> AppModel<Map> {
-    pub fn new(map: Map, state: Arc<MadoEngineState>) -> Self {
-        Self {
-            modules: std::sync::Arc::new(MutexMadoModuleMap::new(map)),
-            state,
-        }
+impl AppModel {
+    pub fn new(state: Arc<MadoEngineState>) -> Self {
+        Self { state }
     }
 }
 
-impl<Map: MadoModuleMap> MangaInfoParentModel for AppModel<Map> {
+impl MangaInfoParentModel for AppModel {
     fn get_website_module_map(&self) -> ArcMadoModuleMap {
-        self.modules.clone()
+        self.state.modules()
     }
 }
 
-impl<Map: MadoModuleMap> Model for AppModel<Map> {
+impl Model for AppModel {
     type Msg = AppMsg;
     type Widgets = AppWidgets;
-    type Components = AppComponents<Map>;
+    type Components = AppComponents;
 }
 
-impl<Map: MadoModuleMap> AppUpdate for AppModel<Map> {
+impl AppUpdate for AppModel {
     #[tracing::instrument(skip_all)]
     fn update(
         &mut self,
@@ -63,10 +57,9 @@ impl<Map: MadoModuleMap> AppUpdate for AppModel<Map> {
                     module.get_domain(),
                     module.get_uuid()
                 );
-                self.modules.push_mut(module).unwrap();
             }
-            AppMsg::Download(download) => {
-                self.state.send(MadoMsg::Download(download)).unwrap();
+            AppMsg::Download(info) => {
+                self.state.download(info);
             }
         }
         true
@@ -74,32 +67,39 @@ impl<Map: MadoModuleMap> AppUpdate for AppModel<Map> {
 }
 
 #[derive(Debug)]
-pub struct RelmMadoSender {
+pub struct RelmMadoEngineStateObserver {
+    #[allow(dead_code)]
+    state: Arc<MadoEngineState>,
     sender: relm4::Sender<AppMsg>,
     download_sender: relm4::Sender<DownloadMsg>,
 }
 
-impl RelmMadoSender {
-    pub fn new(sender: relm4::Sender<AppMsg>, download_sender: relm4::Sender<DownloadMsg>) -> Self {
+impl RelmMadoEngineStateObserver {
+    pub fn new(
+        state: Arc<MadoEngineState>,
+        sender: relm4::Sender<AppMsg>,
+        download_sender: relm4::Sender<DownloadMsg>,
+    ) -> Self {
         Self {
+            state,
             sender,
             download_sender,
         }
     }
 }
 
-impl MadoSender for RelmMadoSender {
-    fn push_module(&self, module: ArcMadoModule) {
-        self.sender.send(AppMsg::PushModule(module)).unwrap();
+impl MadoEngineStateObserver for RelmMadoEngineStateObserver {
+    fn on_push_module(&self, module: mado_core::ArcMadoModule) {
+        self.sender.send(crate::AppMsg::PushModule(module)).unwrap();
     }
 
-    fn create_download_view(
-        &self,
-        download: Arc<DownloadInfo>,
-        controller: mado_engine::DownloadSender,
-    ) {
+    fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {
+        todo!();
+    }
+
+    fn on_download(&self, info: Arc<mado_engine::DownloadInfo>) {
         self.download_sender
-            .send(DownloadMsg::CreateDownloadView(download, controller))
+            .send(DownloadMsg::CreateDownloadView(info))
             .unwrap();
     }
 }

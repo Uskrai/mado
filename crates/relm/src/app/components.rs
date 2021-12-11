@@ -1,20 +1,16 @@
-use std::sync::Arc;
+use crate::{download::DownloadModel, manga_info::MangaInfoModel};
 
-use crate::{download::DownloadModel, manga_info::MangaInfoModel, RelmMadoSender};
-
-use super::{AppModel, AppWidgets};
-use mado_core::MadoModuleMap;
-use mado_engine::MadoMsg;
+use super::AppModel;
 use relm4::{Components, RelmComponent};
 
-pub struct AppComponents<Map: MadoModuleMap> {
-    pub(super) manga_info: RelmComponent<MangaInfoModel, AppModel<Map>>,
-    pub(super) download: RelmComponent<DownloadModel, AppModel<Map>>,
+pub struct AppComponents {
+    pub(super) manga_info: RelmComponent<MangaInfoModel, AppModel>,
+    pub(super) download: RelmComponent<DownloadModel, AppModel>,
 }
 
-impl<Map: MadoModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
+impl Components<AppModel> for AppComponents {
     fn init_components(
-        parent_model: &AppModel<Map>,
+        parent_model: &AppModel,
         parent_sender: relm4::Sender<super::AppMsg>,
     ) -> Self {
         let this = Self {
@@ -22,14 +18,18 @@ impl<Map: MadoModuleMap> Components<AppModel<Map>> for AppComponents<Map> {
             download: RelmComponent::new(parent_model, parent_sender.clone()),
         };
 
-        let sender = Arc::new(RelmMadoSender::new(parent_sender, this.download.sender()));
-        let msg = MadoMsg::Start(sender);
-        parent_model.state.send(msg).expect("can't send msesage");
+        let observer = crate::RelmMadoEngineStateObserver::new(
+            parent_model.state.clone(),
+            parent_sender,
+            this.download.sender(),
+        );
+
+        parent_model.state.connect(observer);
 
         this
     }
 
-    fn connect_parent(&mut self, parent_widgets: &<AppModel<Map> as relm4::Model>::Widgets) {
+    fn connect_parent(&mut self, parent_widgets: &<AppModel as relm4::Model>::Widgets) {
         self.manga_info.connect_parent(parent_widgets);
         self.download.connect_parent(parent_widgets);
     }

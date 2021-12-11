@@ -2,14 +2,11 @@
 use std::sync::Arc;
 
 use gtk::prelude::*;
-#[allow(unused_imports)]
 use mado_engine::DownloadInfo;
-use mado_engine::DownloadSender;
 
 #[derive(Debug)]
 pub struct DownloadItem {
     pub info: Arc<DownloadInfo>,
-    pub controller: DownloadSender,
 }
 
 crate::gobject::struct_wrapper!(
@@ -105,7 +102,7 @@ struct DownloadView {
 
 impl From<&DownloadInfo> for DownloadView {
     fn from(info: &DownloadInfo) -> Self {
-        let label = gtk::Label::new(Some(&info.manga.title));
+        let label = gtk::Label::new(Some(&info.manga().title));
 
         let widget = gtk::Box::new(gtk::Orientation::Vertical, 5);
         widget.append(&label);
@@ -131,12 +128,7 @@ impl DownloadViewController {
 
             gtk::glib::Continue(true)
         });
-        download.controller.start(this.clone()).unwrap();
 
         this
     }
-}
-
-impl mado_engine::DownloadViewController for DownloadViewController {
-    //
 }
