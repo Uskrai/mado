@@ -59,6 +59,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b88d82667eca772c4aa12f0f1348b3ae643424c8876448f3f7bd5787032e234c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -212,6 +221,17 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfae75de57f2b2e85e8768c3ea840fd159c8f33e2b6522c7835b7abac81be16e"
 dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]
@@ -971,28 +991,48 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "futures",
+ "bytes",
+ "futures-core",
  "serde",
+ "thiserror",
+ "tracing 0.1.29",
+ "url",
+ "uuid 0.8.2",
+]
+
+[[package]]
+name = "mado-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "atomic",
+ "futures",
+ "mado-core",
+ "parking_lot",
  "thiserror",
  "tokio",
  "tracing 0.1.29",
- "url",
- "uuid",
 ]
 
 [[package]]
 name = "mado-relm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
  "gio",
  "gtk4",
  "mado-core",
+ "mado-engine",
  "mado-rune",
  "relm4",
  "relm4-components",
  "relm4-macros",
  "thiserror",
  "tokio",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -1001,7 +1041,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes",
+ "derivative",
  "futures",
+ "futures-core",
  "jsonpath_lib",
  "lazy_static",
  "mado-core",
@@ -1643,9 +1686,8 @@ checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 
 [[package]]
 name = "relm4"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c00f0e7141d4d36e5e0e039381d102e02cc18c3ab4f88b808f271c4cdcb52fe"
+version = "0.4.0-beta.2"
+source = "git+https://github.com/AaronErhardt/relm4?rev=01212ccd9e6e246e622e0492734ad4b302e1f1ee#01212ccd9e6e246e622e0492734ad4b302e1f1ee"
 dependencies = [
  "fragile",
  "futures-core",
@@ -1656,9 +1698,8 @@ dependencies = [
 
 [[package]]
 name = "relm4-components"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "851943792df7512b7732a53b25595b3f1b0fcc45aabd67890f0666de1e8e4c99"
+version = "0.4.0-beta.2"
+source = "git+https://github.com/AaronErhardt/relm4?rev=01212ccd9e6e246e622e0492734ad4b302e1f1ee#01212ccd9e6e246e622e0492734ad4b302e1f1ee"
 dependencies = [
  "gtk4",
  "log",
@@ -1670,9 +1711,8 @@ dependencies = [
 
 [[package]]
 name = "relm4-macros"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c38727a7bb4dd8bc48b2c86a2d920c223a83af6180b182eabd16abd5818312da"
+version = "0.4.0-beta.2"
+source = "git+https://github.com/AaronErhardt/relm4?rev=01212ccd9e6e246e622e0492734ad4b302e1f1ee#01212ccd9e6e246e622e0492734ad4b302e1f1ee"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2437,6 +2477,13 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
+
+[[package]]
+name = "uuid"
+version = "0.0.0"
+dependencies = [
+ "uuid 0.8.2",
+]
 
 [[package]]
 name = "uuid"
