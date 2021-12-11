@@ -1,4 +1,5 @@
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 use atomic::Atomic;
 use mado_core::{ArcMadoModule, ChapterInfo, MangaInfo};
@@ -52,11 +53,12 @@ impl DownloadInfo {
         &self.module
     }
 
-    /// Get a reference to the download info's chapters.
+    /// Get a reference to the downloaded chapters.
     pub fn chapters(&self) -> &[Arc<ChapterInfo>] {
         &self.chapters
     }
 
+    /// Change download's status, then emit [`DownloadInfoObserver::on_status_changed`]
     pub fn set_status(&self, status: DownloadStatus) {
         self.status.store(status, atomic::Ordering::SeqCst);
         self.emit(|it| it.on_status_changed(status));
@@ -68,11 +70,11 @@ impl DownloadInfo {
     }
 
     pub fn connect(&self, observer: ArcDownloadInfoObserver) {
-        self.observers.lock().unwrap().push(observer);
+        self.observers.lock().push(observer);
     }
 
     fn emit(&self, fun: impl Fn(ArcDownloadInfoObserver)) {
-        for it in self.observers.lock().unwrap().iter() {
+        for it in self.observers.lock().iter() {
             fun(it.clone());
         }
     }
