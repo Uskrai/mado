@@ -19,6 +19,7 @@ impl From<SendValueKind> for SendValue {
 
 #[derive(Clone)]
 pub struct SendFunction {
+    #[allow(dead_code)]
     inner: Arc<SyncFunction>,
 }
 

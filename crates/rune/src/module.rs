@@ -23,6 +23,7 @@ use rune::ToValue;
 #[derivative(Debug)]
 pub struct RuneMadoModule {
     #[derivative(Debug = "ignore")]
+    #[allow(dead_code)]
     rune: Rune,
 
     uuid: Uuid,
