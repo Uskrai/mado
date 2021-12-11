@@ -3,11 +3,11 @@ use std::sync::Arc;
 use mado_core::{
     ArcMadoModule, ArcMadoModuleMap, DefaultMadoModuleMap, MutMadoModuleMap, MutexMadoModuleMap,
 };
-use parking_lot::{Mutex, RwLock};
+use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 
-use crate::DownloadInfo;
+use crate::{DownloadInfo, DownloadRequest};
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct MadoEngineState {
     modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
     tasks: RwLock<Vec<Arc<DownloadInfo>>>,
@@ -28,8 +28,8 @@ impl MadoEngineState {
         }
     }
 
-    pub fn download(&self, info: DownloadInfo) {
-        let info = Arc::new(info);
+    pub fn download_request(&self, request: DownloadRequest) {
+        let info = Arc::new(DownloadInfo::new(request));
         self.tasks.write().push(info.clone());
         self.emit(move |it| it.on_download(info.clone()));
     }
@@ -55,7 +55,7 @@ impl MadoEngineState {
     }
 }
 
-pub trait MadoEngineStateObserver: std::fmt::Debug + Send + Sync + 'static {
+pub trait MadoEngineStateObserver: Send + Sync + 'static {
     fn on_push_module(&self, module: ArcMadoModule);
 
     fn on_push_module_fail(&self, error: mado_core::MadoModuleMapError);

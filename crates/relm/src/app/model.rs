@@ -4,18 +4,18 @@ use crate::{
     manga_info::{MangaInfoParentModel, MangaInfoParentMsg},
 };
 use mado_core::{ArcMadoModule, ArcMadoModuleMap};
-use mado_engine::{DownloadInfo, MadoEngineState, MadoEngineStateObserver};
+use mado_engine::{DownloadRequest, MadoEngineState, MadoEngineStateObserver};
 use relm4::{AppUpdate, Model};
 use std::sync::Arc;
 
 pub enum AppMsg {
     PushModule(ArcMadoModule),
-    Download(DownloadInfo),
+    DownloadRequest(DownloadRequest),
 }
 
 impl MangaInfoParentMsg for AppMsg {
-    fn download(info: DownloadInfo) -> Self {
-        AppMsg::Download(info)
+    fn download_request(request: mado_engine::DownloadRequest) -> Self {
+        AppMsg::DownloadRequest(request)
     }
 }
 
@@ -58,15 +58,14 @@ impl AppUpdate for AppModel {
                     module.get_uuid()
                 );
             }
-            AppMsg::Download(info) => {
-                self.state.download(info);
+            AppMsg::DownloadRequest(info) => {
+                self.state.download_request(info);
             }
         }
         true
     }
 }
 
-#[derive(Debug)]
 pub struct RelmMadoEngineStateObserver {
     #[allow(dead_code)]
     state: Arc<MadoEngineState>,

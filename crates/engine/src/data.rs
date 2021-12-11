@@ -21,13 +21,15 @@ pub struct DownloadInfo {
 }
 
 impl DownloadInfo {
-    pub fn new(
-        module: ArcMadoModule,
-        manga: Arc<MangaInfo>,
-        chapters: Vec<Arc<ChapterInfo>>,
-        path: std::path::PathBuf,
-        status: DownloadStatus,
-    ) -> Self {
+    pub fn new(request: DownloadRequest) -> Self {
+        let DownloadRequest {
+            module,
+            manga,
+            chapters,
+            path,
+            status,
+        } = request;
+
         Self {
             module,
             manga,
@@ -76,6 +78,32 @@ impl DownloadInfo {
     fn emit(&self, fun: impl Fn(ArcDownloadInfoObserver)) {
         for it in self.observers.lock().iter() {
             fun(it.clone());
+        }
+    }
+}
+
+pub struct DownloadRequest {
+    module: ArcMadoModule,
+    manga: Arc<MangaInfo>,
+    chapters: Vec<Arc<ChapterInfo>>,
+    path: std::path::PathBuf,
+    status: DownloadStatus,
+}
+
+impl DownloadRequest {
+    pub fn new(
+        module: ArcMadoModule,
+        manga: Arc<MangaInfo>,
+        chapters: Vec<Arc<ChapterInfo>>,
+        path: std::path::PathBuf,
+        status: DownloadStatus,
+    ) -> Self {
+        Self {
+            module,
+            manga,
+            chapters,
+            path,
+            status,
         }
     }
 }
