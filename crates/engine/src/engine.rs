@@ -2,30 +2,33 @@ use std::sync::Arc;
 
 use crate::{MadoEngineState, MadoModuleLoader};
 
-pub struct MadoEngine {
-    loader: Box<dyn MadoModuleLoader + Send>,
+pub struct MadoEngine<Loader>
+where
+    Loader: MadoModuleLoader + 'static + Send,
+{
+    loader: Loader,
     state: Arc<MadoEngineState>,
 }
 
 const _: () = {
     fn assert<T: Send + Sync>() {}
 
-    fn assert_all() {
-        assert::<MadoEngine>();
+    fn assert_all<Loader>()
+    where
+        Loader: MadoModuleLoader + Send + 'static,
+    {
+        assert::<MadoEngine<Loader>>();
     }
 };
 
-impl MadoEngine {
-    pub fn new<Loader>(loader: Loader) -> Self
-    where
-        Loader: MadoModuleLoader + 'static,
-    {
+impl<Loader> MadoEngine<Loader>
+where
+    Loader: MadoModuleLoader + Send + 'static,
+{
+    pub fn new(loader: Loader) -> Self {
         let state = Arc::new(MadoEngineState::default());
 
-        Self {
-            loader: Box::new(loader),
-            state,
-        }
+        Self { loader, state }
     }
 
     pub fn state(&self) -> Arc<MadoEngineState> {
