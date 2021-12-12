@@ -47,10 +47,9 @@ impl RuneMadoModule {
     }
 
     pub async fn get_chapter_images(&self, task: RuneChapterTask) -> Result<(), Error> {
-        Ok(self
-            .get_chapter_images
-            .async_call::<_, ()>((self.data.clone(), task))
-            .await?)
+        self.get_chapter_images
+            .async_call((self.data.clone(), task))
+            .await?
     }
 
     pub async fn download_image(
