@@ -53,6 +53,10 @@ impl MadoEngineState {
             fun(it);
         }
     }
+
+    pub fn tasks(&self) -> RwLockReadGuard<'_, Vec<Arc<DownloadInfo>>> {
+        self.tasks.read()
+    }
 }
 
 pub trait MadoEngineStateObserver: Send + Sync + 'static {

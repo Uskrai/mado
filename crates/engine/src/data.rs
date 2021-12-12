@@ -158,3 +158,32 @@ pub trait DownloadInfoObserver: std::fmt::Debug {
 }
 
 type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
+
+pub struct DownloadChapterInfo {
+    module: ArcMadoModule,
+    chapter: Arc<ChapterInfo>,
+    path: std::path::PathBuf,
+    status: Atomic<DownloadStatus>,
+}
+
+impl DownloadChapterInfo {
+    /// Get a reference to the download chapter info's chapter.
+    pub fn chapter(&self) -> &ChapterInfo {
+        self.chapter.as_ref()
+    }
+
+    /// Get a reference to the download chapter info's module.
+    pub fn module(&self) -> ArcMadoModule {
+        self.module.clone()
+    }
+
+    /// Get a reference to the download chapter info's path.
+    pub fn path(&self) -> &std::path::PathBuf {
+        &self.path
+    }
+
+    /// Get a reference to the download chapter info's status.
+    pub fn status(&self) -> DownloadStatus {
+        self.status.load(atomic::Ordering::SeqCst)
+    }
+}
