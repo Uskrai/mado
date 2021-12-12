@@ -4,15 +4,58 @@ use std::sync::Arc;
 use atomic::Atomic;
 use mado_core::{ArcMadoModule, ChapterInfo, MangaInfo};
 
+use crate::MadoEngineState;
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
 pub enum DownloadStatus {
     Resumed,
     Paused,
 }
 
+#[derive(Clone)]
+pub enum LateBindingModule {
+    Module(ArcMadoModule),
+    ModuleUUID(Arc<MadoEngineState>, mado_core::Uuid),
+}
+
+impl std::fmt::Debug for LateBindingModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LateBindingModule::ModuleUUID(_, uuid) => f
+                .debug_struct("LateBindingModule")
+                .field("uuid", uuid)
+                .finish(),
+            LateBindingModule::Module(module) => f
+                .debug_struct("LateBindingModule")
+                .field("module", module)
+                .finish(),
+        }
+    }
+}
+
+impl LateBindingModule {
+    pub async fn wait(&mut self) -> ArcMadoModule {
+        match self {
+            LateBindingModule::Module(module) => module.clone(),
+            LateBindingModule::ModuleUUID(state, uuid) => {
+                let module = loop {
+                    let module = state.modules().get_by_uuid(*uuid);
+                    if let Some(module) = module {
+                        break module;
+                    }
+                    tokio::task::yield_now().await;
+                };
+
+                *self = Self::Module(module.clone());
+                module
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct DownloadInfo {
-    module: ArcMadoModule,
+    module: tokio::sync::Mutex<LateBindingModule>,
     manga: Arc<MangaInfo>,
     chapters: Vec<Arc<ChapterInfo>>,
     path: std::path::PathBuf,
@@ -31,7 +74,7 @@ impl DownloadInfo {
         } = request;
 
         Self {
-            module,
+            module: LateBindingModule::Module(module).into(),
             manga,
             chapters,
             path,
@@ -50,9 +93,11 @@ impl DownloadInfo {
         &self.path
     }
 
-    /// Get a reference to the download info's module.
-    pub fn module(&self) -> &ArcMadoModule {
-        &self.module
+    /// Wait for module to be available.
+    ///
+    /// if the module is already available, this will return immediately.
+    pub async fn wait_module(&self) -> ArcMadoModule {
+        self.module.lock().await.wait().await
     }
 
     /// Get a reference to the downloaded chapters.
