@@ -181,7 +181,8 @@ impl MadoModule {
         for it in images.iter() {
             task.add(#{
                 id: it.src,
-                name: it.title
+                name: it.title,
+                extension: Url::parse(it.src).unwrap().extension().unwrap(),
             });
         }
 

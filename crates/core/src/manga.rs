@@ -30,6 +30,7 @@ pub struct ChapterInfo {
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct ChapterImageInfo {
     pub id: String,
+    pub extension: String,
     pub name: Option<String>,
 }
 

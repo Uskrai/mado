@@ -53,6 +53,12 @@ impl Url {
         use std::fmt::Write;
         write!(s, "{:?}", self.inner)
     }
+
+    pub fn extension(self) -> Option<String> {
+        let path = self.inner.path();
+        let path = std::path::Path::new(path);
+        path.extension().map(|it| it.to_string_lossy().to_string())
+    }
 }
 
 impl Display for Url {

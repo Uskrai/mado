@@ -163,7 +163,7 @@ pub fn load_module() -> Result<Module, ContextError> {
           parse
         }
         inst => {
-          to_string, query, clone, path
+          to_string, query, clone, path, extension
         }
         protocol => {
           to_string_debug: STRING_DEBUG

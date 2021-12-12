@@ -292,7 +292,8 @@ impl MadoModule {
         for it in pointer("/data/attributes/data")? {
             let images = `${server}/data/${hash}/${it}`;
             task.add(#{
-                id: images
+                id: images,
+                extension: Url::parse(images).unwrap().extension().unwrap(),
             });
         }
         Ok(())
