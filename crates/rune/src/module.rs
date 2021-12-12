@@ -1,3 +1,5 @@
+use std::pin::Pin;
+
 use crate::chapter_task::RuneChapterTask;
 use crate::function::RuneFunction;
 use crate::uuid::Uuid as RuneUuid;
@@ -95,10 +97,10 @@ impl MadoModule for RuneMadoModule {
     async fn download_image(
         &self,
         image: mado_core::ChapterImageInfo,
-    ) -> Result<Box<dyn mado_core::BytesStream>, mado_core::Error> {
+    ) -> Result<Pin<Box<dyn mado_core::BytesStream>>, mado_core::Error> {
         let stream = self.download_image(image).await?;
 
-        Ok(Box::new(stream))
+        Ok(Box::pin(stream))
     }
 }
 

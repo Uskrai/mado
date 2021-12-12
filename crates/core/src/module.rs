@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
+    pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -39,7 +40,7 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
     async fn download_image(
         &self,
         image: ChapterImageInfo,
-    ) -> Result<Box<dyn BytesStream>, crate::Error>;
+    ) -> Result<Pin<Box<dyn BytesStream>>, crate::Error>;
 }
 
 pub type ArcMadoModule = Arc<dyn MadoModule + Sync>;
@@ -163,7 +164,7 @@ impl<Map: MadoModuleMap> MutMadoModuleMap for MutexMadoModuleMap<Map> {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
+    use std::{pin::Pin, sync::Arc};
 
     use crate::{BytesStream, DefaultMadoModuleMap, MadoModuleMap};
 
@@ -207,7 +208,7 @@ mod test {
         async fn download_image(
             &self,
             _: crate::ChapterImageInfo,
-        ) -> Result<Box<dyn BytesStream>, crate::Error> {
+        ) -> Result<Pin<Box<dyn BytesStream>>, crate::Error> {
             todo!()
         }
     }
