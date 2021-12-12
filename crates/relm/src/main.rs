@@ -2,6 +2,7 @@ use anyhow::Context;
 use mado_core::ArcMadoModule;
 use mado_engine::{MadoEngine, MadoModuleLoader, ModuleLoadError};
 use relm4::RelmApp;
+use tracing_subscriber::{util::SubscriberInitExt, EnvFilter};
 
 use std::sync::Arc;
 
@@ -65,6 +66,11 @@ pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcMadoModule>, ModuleL
 
 #[tokio::main]
 pub async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .finish()
+        .init();
+
     let mado = MadoEngine::new(Loader);
     let model = mado_relm::AppModel::new(mado.state());
 
