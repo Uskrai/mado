@@ -1,4 +1,4 @@
-use std::{io::Write, path::PathBuf, sync::Arc};
+use std::{io::Write, path::PathBuf, sync::Arc, time::Duration};
 
 use futures::{Future, StreamExt};
 use mado_core::{ArcMadoModule, ChapterImageInfo, ChapterInfo};
@@ -30,6 +30,102 @@ pub struct ChapterTask {
     chapter: Arc<ChapterInfo>,
 }
 
+struct ChapterImageTask {
+    module: ArcMadoModule,
+    image: ChapterImageInfo,
+}
+
+impl ChapterImageTask {
+    fn new(module: ArcMadoModule, image: ChapterImageInfo) -> Self {
+        Self { module, image }
+    }
+
+    #[tracing::instrument(
+        level = "error",
+        skip_all,
+        fields(
+            self.image = %self.image.id,
+            self.module = %self.module.get_uuid()
+        )
+    )]
+    pub async fn download(&self) -> Result<Vec<u8>, mado_core::Error> {
+        let mut retry = 0;
+        const RETRY_LIMIT: u32 = 10;
+        let mut error;
+
+        // using loop to simulate do_while
+        loop {
+            let mut buffer = Vec::new();
+            let result = self.download_without_retry(&mut buffer).await;
+
+            let err = match result {
+                Ok(_) => return Ok(buffer),
+                Err(err) => err,
+            };
+
+            error = err;
+            retry += 1;
+
+            let retry_limit_reached = retry >= RETRY_LIMIT;
+
+            tracing::error!(
+                "{}, {}",
+                error,
+                if retry_limit_reached {
+                    "Stopping..."
+                } else {
+                    "Retrying..."
+                }
+            );
+
+            // return last error if retry limit reached.
+            if retry_limit_reached {
+                return Err(error);
+            }
+        }
+    }
+
+    async fn wait_timeout<F>(
+        &self,
+        future: F,
+        duration: Duration,
+    ) -> Result<F::Output, mado_core::Error>
+    where
+        F: Future,
+    {
+        let timeout = tokio::time::timeout(duration, future);
+
+        let result = timeout
+            .await
+            .map_err(|elapsed| mado_core::Error::ExternalError(elapsed.into()))?;
+
+        Ok(result)
+    }
+
+    pub async fn download_without_retry<W>(&self, buffer: &mut W) -> Result<(), mado_core::Error>
+    where
+        W: Write,
+    {
+        let mut stream = self
+            .module
+            .download_image(self.image.clone())
+            .await
+            .unwrap();
+
+        // TODO: make timeout dynamic
+        const TIMEOUT: u64 = 10;
+        let timeout = Duration::from_secs(TIMEOUT);
+
+        while let Some(bytes) = self.wait_timeout(stream.next(), timeout).await? {
+            let bytes = bytes?;
+            tracing::trace!("Writing {} bytes to buffer", bytes.len());
+            buffer.write_all(&bytes)?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct ChapterTaskReceiver {
     module: ArcMadoModule,
@@ -52,12 +148,11 @@ impl ChapterTaskReceiver {
 
         let mut i = 0;
         while let Some(image) = self.recv.recv().await {
-            let mut path = chapter_path.join(i.to_string());
-            path.set_extension(image.extension.clone());
+            let filename = format!("{:0>5}.{}", i, image.extension.clone());
+            let path = chapter_path.join(filename);
 
-            if !path.exists() {
-                self.download_image(path, image).await;
-            }
+            self.download_image(path, image).await.unwrap();
+
             i += 1;
         }
         tracing::trace!("Finished downloading chapter {:?}", self.chapter);
@@ -67,51 +162,26 @@ impl ChapterTaskReceiver {
         &self,
         path: PathBuf,
         image: ChapterImageInfo,
-    ) -> impl Future<Output = impl Send> {
+    ) -> impl Future<Output = Result<(), mado_core::Error>> {
         let module = self.module.clone();
         async move {
-            tracing::trace!("Start downloading {} {:?}", path.display(), image);
-            let mut stream = module.download_image(image.clone()).await.unwrap();
-            let mut buffer = Vec::new();
-            let mut retry = 0;
+            let exists = path.exists();
 
-            while let Some(bytes) = stream.next().await {
-                let bytes: Result<_, mado_core::Error> = bytes;
-                match bytes {
-                    Ok(bytes) => {
-                        buffer.write_all(&bytes).unwrap();
-                    }
-                    Err(err) => {
-                        tracing::error!(
-                            "error downloading {} {:?} because:{}",
-                            path.display(),
-                            image,
-                            err
-                        );
-                        match err {
-                            mado_core::Error::RequestError { .. }
-                            | mado_core::Error::UrlParseError { .. } => {
-                                retry += 1;
-                                if retry > 10 {
-                                    break;
-                                }
-                                tracing::info!("Retry downloading {} {:?}", path.display(), image);
-                                stream = module.download_image(image.clone()).await.unwrap();
-                            }
-                            mado_core::Error::UnsupportedUrl(_) => {
-                                todo!();
-                            }
-                            mado_core::Error::ExternalError(_) => {
-                                break;
-                            }
-                        }
-                    }
-                }
+            if !exists {
+                let task = ChapterImageTask::new(module.clone(), image.clone());
 
-                let mut file = std::fs::File::create(path.clone()).unwrap();
-                file.write_all(&buffer).unwrap();
+                tracing::trace!("Start downloading {} {:?}", path.display(), image);
+
+                let buffer = task.download().await?;
+
+                tracing::trace!("Finished downloading {} {:?}", path.display(), image);
+                let mut file = std::fs::File::create(&path).unwrap();
+                file.write_all(&buffer)?;
+                tracing::trace!("Finished writing to {}", path.display());
+            } else {
+                tracing::trace!("File {} already exists, skipping...", path.display());
             }
-            tracing::trace!("Finished downloading {} {:?}", path.display(), image);
+            Ok(())
         }
     }
 }
