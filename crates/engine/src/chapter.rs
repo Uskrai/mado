@@ -55,7 +55,9 @@ impl ChapterTaskReceiver {
             let mut path = chapter_path.join(i.to_string());
             path.set_extension(image.extension.clone());
 
-            self.download_image(path, image).await;
+            if !path.exists() {
+                self.download_image(path, image).await;
+            }
             i += 1;
         }
         tracing::trace!("Finished downloading chapter {:?}", self.chapter);
