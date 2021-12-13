@@ -18,5 +18,8 @@ pub enum Error {
     UnsupportedUrl(String),
 
     #[error(transparent)]
+    IOError(#[from] std::io::Error),
+
+    #[error(transparent)]
     ExternalError(#[from] anyhow::Error),
 }
