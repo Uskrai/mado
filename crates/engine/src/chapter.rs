@@ -70,14 +70,14 @@ impl ChapterTaskReceiver {
         async move {
             tracing::trace!("Start downloading {} {:?}", path.display(), image);
             let mut stream = module.download_image(image.clone()).await.unwrap();
-            let mut file = std::fs::File::create(path.clone()).unwrap();
+            let mut buffer = Vec::new();
             let mut retry = 0;
 
             while let Some(bytes) = stream.next().await {
                 let bytes: Result<_, mado_core::Error> = bytes;
                 match bytes {
                     Ok(bytes) => {
-                        file.write_all(&bytes).unwrap();
+                        buffer.write_all(&bytes).unwrap();
                     }
                     Err(err) => {
                         tracing::error!(
@@ -105,6 +105,9 @@ impl ChapterTaskReceiver {
                         }
                     }
                 }
+
+                let mut file = std::fs::File::create(path.clone()).unwrap();
+                file.write_all(&buffer).unwrap();
             }
             tracing::trace!("Finished downloading {} {:?}", path.display(), image);
         }
