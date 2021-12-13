@@ -64,8 +64,7 @@ pub fn load_module(path: &std::path::Path) -> Result<Vec<ArcMadoModule>, ModuleL
     Ok(result)
 }
 
-#[tokio::main]
-pub async fn main() {
+pub fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .finish()
@@ -74,8 +73,14 @@ pub async fn main() {
     let mado = MadoEngine::new(Loader);
     let model = mado_relm::AppModel::new(mado.state());
 
-    tokio::spawn(async { mado.run().await });
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
 
+    runtime.block_on(async move { mado.run().await });
+
+    let _guard = runtime.enter();
     let app = RelmApp::new(model);
-    app.run()
+    app.run();
 }
