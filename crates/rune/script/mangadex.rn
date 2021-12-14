@@ -408,14 +408,14 @@ mod test {
 
         let task = mado::MockChapterTask::new(chapter);
         let result = module.get_chapter_images(task).await?;
-        task
+        Ok(task)
     }
 
     #[test]
     pub async fn download_image() {
         use mado::http::Url;
         let module = create_module();
-        let chapter = get_chapter_images().await;
+        let chapter = get_chapter_images().await.unwrap();
         let image = chapter.get_image_info_at(0);
 
         module.download_image(image).await.unwrap()

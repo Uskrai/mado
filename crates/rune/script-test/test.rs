@@ -39,7 +39,16 @@ where
     T: 'static + Any,
 {
     fn from_value(value: rune::runtime::Value) -> Result<Self, RuneVmError> {
-        let inner = T::from_value(value)?;
+        let result = value
+            .into_result()?
+            .take()
+            .unwrap()
+            .map_err(mado_rune::Error::from_value);
+
+        let inner = match result {
+            Ok(inner) => T::from_value(inner)?,
+            Err(result) => return Err(RuneVmError::panic(result?)),
+        };
 
         Ok(Self { inner })
     }
@@ -167,7 +176,7 @@ async fn call_test(rune: Rune, name: String, hash: rune::Hash) -> Result<(), (St
 
     match_last! {
       "get_info" => OkDeserilizeValue<mado_core::MangaInfo>,
-      "get_chapter_images" => MockChapterTask,
+      "get_chapter_images" => OkAnyValue<MockChapterTask>,
       "download_image" => mado_rune::http::BytesStream,
       _ => rune::Value
     }
