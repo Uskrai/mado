@@ -78,9 +78,11 @@ pub fn main() {
         .build()
         .unwrap();
 
-    runtime.block_on(async move { mado.run().await });
-
     let _guard = runtime.enter();
+    tokio::spawn(async move {
+        mado.run().await;
+    });
+
     let app = RelmApp::new(model);
     app.run();
 }
