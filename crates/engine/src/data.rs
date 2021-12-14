@@ -57,7 +57,7 @@ impl LateBindingModule {
 pub struct DownloadInfo {
     module: tokio::sync::Mutex<LateBindingModule>,
     manga: Arc<MangaInfo>,
-    chapters: Vec<Arc<ChapterInfo>>,
+    chapters: Vec<Arc<DownloadChapterInfo>>,
     path: std::path::PathBuf,
     status: Atomic<DownloadStatus>,
     observers: Mutex<Vec<ArcDownloadInfoObserver>>,
@@ -72,6 +72,20 @@ impl DownloadInfo {
             path,
             status,
         } = request;
+
+        let chapters = chapters
+            .into_iter()
+            .map(|it| {
+                let path = path.join(it.to_string());
+                DownloadChapterInfo::new(
+                    LateBindingModule::Module(module.clone()),
+                    it,
+                    path,
+                    status,
+                )
+            })
+            .map(|it| Arc::new(it))
+            .collect();
 
         Self {
             module: LateBindingModule::Module(module).into(),
@@ -101,7 +115,7 @@ impl DownloadInfo {
     }
 
     /// Get a reference to the downloaded chapters.
-    pub fn chapters(&self) -> &[Arc<ChapterInfo>] {
+    pub fn chapters(&self) -> &[Arc<DownloadChapterInfo>] {
         &self.chapters
     }
 
@@ -159,21 +173,36 @@ pub trait DownloadInfoObserver: std::fmt::Debug {
 
 type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
 
+#[derive(Debug)]
 pub struct DownloadChapterInfo {
-    module: ArcMadoModule,
+    module: LateBindingModule,
     chapter: Arc<ChapterInfo>,
     path: std::path::PathBuf,
     status: Atomic<DownloadStatus>,
 }
 
 impl DownloadChapterInfo {
+    pub fn new(
+        module: LateBindingModule,
+        chapter: Arc<ChapterInfo>,
+        path: std::path::PathBuf,
+        status: DownloadStatus,
+    ) -> Self {
+        Self {
+            module,
+            chapter,
+            path,
+            status: Atomic::new(status),
+        }
+    }
+
     /// Get a reference to the download chapter info's chapter.
     pub fn chapter(&self) -> &ChapterInfo {
         self.chapter.as_ref()
     }
 
     /// Get a reference to the download chapter info's module.
-    pub fn module(&self) -> ArcMadoModule {
+    pub fn module(&self) -> LateBindingModule {
         self.module.clone()
     }
 

@@ -75,7 +75,7 @@ where
         async move {
             let module = info.wait_module().await;
             for it in info.chapters() {
-                let (task, receiver) = crate::chapter::create(it.clone(), module.clone());
+                let (task, receiver) = crate::chapter::create(it.clone());
 
                 let handler = tokio::spawn(receiver.run());
                 module.get_chapter_images(Box::new(task)).await.unwrap();

@@ -4,22 +4,17 @@ use futures::{Future, StreamExt};
 use mado_core::{ArcMadoModule, ChapterImageInfo, ChapterInfo};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-pub fn create(
-    chapter: Arc<ChapterInfo>,
-    module: ArcMadoModule,
-) -> (ChapterTask, ChapterTaskReceiver) {
+use crate::DownloadChapterInfo;
+
+pub fn create(info: Arc<DownloadChapterInfo>) -> (ChapterTask, ChapterTaskReceiver) {
     let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
 
     let task = ChapterTask {
         sender,
-        chapter: chapter.clone(),
+        info: info.clone(),
     };
 
-    let receiver = ChapterTaskReceiver {
-        module,
-        recv,
-        chapter,
-    };
+    let receiver = ChapterTaskReceiver { recv, info };
 
     (task, receiver)
 }
@@ -27,7 +22,7 @@ pub fn create(
 #[derive(Debug)]
 pub struct ChapterTask {
     sender: UnboundedSender<mado_core::ChapterImageInfo>,
-    chapter: Arc<ChapterInfo>,
+    info: Arc<DownloadChapterInfo>,
 }
 
 struct ChapterImageTask {
@@ -128,21 +123,14 @@ impl ChapterImageTask {
 
 #[derive(Debug)]
 pub struct ChapterTaskReceiver {
-    module: ArcMadoModule,
-    chapter: Arc<ChapterInfo>,
+    info: Arc<DownloadChapterInfo>,
     recv: UnboundedReceiver<mado_core::ChapterImageInfo>,
 }
 
 impl ChapterTaskReceiver {
     pub async fn run(mut self) {
-        tracing::trace!("Start downloading chapter {:?}", self.chapter);
-        let title = self
-            .chapter
-            .title
-            .clone()
-            .unwrap_or_else(|| "0000".to_string());
-
-        let chapter_path = PathBuf::from(title.clone());
+        tracing::trace!("Start downloading chapter {:?}", self.info);
+        let chapter_path = self.info.path();
 
         std::fs::create_dir_all(&chapter_path).unwrap();
 
@@ -155,7 +143,7 @@ impl ChapterTaskReceiver {
 
             i += 1;
         }
-        tracing::trace!("Finished downloading chapter {:?}", self.chapter);
+        tracing::trace!("Finished downloading chapter {:?}", self.info);
     }
 
     fn download_image(
@@ -163,8 +151,9 @@ impl ChapterTaskReceiver {
         path: PathBuf,
         image: ChapterImageInfo,
     ) -> impl Future<Output = Result<(), mado_core::Error>> {
-        let module = self.module.clone();
+        let mut module = self.info.module();
         async move {
+            let module = module.wait().await;
             let exists = path.exists();
 
             if !exists {
@@ -193,6 +182,6 @@ impl mado_core::ChapterTask for ChapterTask {
     }
 
     fn get_chapter(&self) -> &ChapterInfo {
-        &self.chapter
+        &self.info.chapter()
     }
 }
