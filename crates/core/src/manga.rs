@@ -49,12 +49,12 @@ impl Display for ChapterInfo {
 
         write_if!(volume, "Vol. {} ");
         write_if!(chapter, "Chapter {} ");
-        if self.volume.is_some() || self.chapter.is_some() {
+        if (self.volume.is_some() || self.chapter.is_some()) && self.title.is_some() {
             write!(f, ": ")?;
         }
-        write_if!(title, "{}");
-        write_if!(scanlator, " [{}]");
-        write!(f, " [{}]", self.language)?;
+        write_if!(title, "{} ");
+        write_if!(scanlator, "[{}] ");
+        write!(f, "[{}]", self.language)?;
 
         Ok(())
     }
