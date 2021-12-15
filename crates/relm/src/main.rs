@@ -70,18 +70,17 @@ pub fn main() {
         .finish()
         .init();
 
-    let mado = MadoEngine::new(Loader);
-    let model = mado_relm::AppModel::new(mado.state());
-
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
-
     let _guard = runtime.enter();
-    tokio::spawn(async move {
-        mado.run().await;
-    });
+
+    let mado = MadoEngine::new();
+    let model = mado_relm::AppModel::new(mado.state());
+
+    tokio::spawn(mado.load_module(Loader));
+    tokio::spawn(mado.run());
 
     let app = RelmApp::new(model);
     app.run();

@@ -2,53 +2,39 @@ use std::sync::Arc;
 
 use crate::{MadoEngineState, MadoEngineStateObserver, MadoModuleLoader};
 
-pub struct MadoEngine<Loader>
-where
-    Loader: MadoModuleLoader + 'static + Send,
-{
-    loader: Option<Loader>,
+pub struct MadoEngine {
     state: Arc<MadoEngineState>,
 }
 
 const _: () = {
     fn assert<T: Send + Sync>() {}
 
-    fn assert_all<Loader>()
-    where
-        Loader: MadoModuleLoader + Send + 'static,
-    {
-        assert::<MadoEngine<Loader>>();
+    fn assert_all() {
+        assert::<MadoEngine>();
     }
 };
 
-impl<Loader> MadoEngine<Loader>
-where
-    Loader: MadoModuleLoader + Send + 'static,
-{
-    pub fn new(loader: Loader) -> Self {
+impl MadoEngine {
+    pub fn new() -> Self {
         let state = Arc::new(MadoEngineState::default());
 
-        Self {
-            loader: Some(loader),
-            state,
-        }
+        Self { state }
     }
 
     pub fn state(&self) -> Arc<MadoEngineState> {
         self.state.clone()
     }
 
-    pub async fn run(mut self) {
-        self.load_module().await;
+    pub async fn run(self) {
         self.state.clone().connect(self);
     }
 
-    fn load_module(&mut self) -> impl std::future::Future<Output = impl Send> + Send + 'static {
-        let loader = self.loader.take();
+    pub fn load_module(
+        &self,
+        loader: impl MadoModuleLoader + 'static,
+    ) -> impl std::future::Future<Output = impl Send> + Send + 'static {
         let state = self.state.clone();
         async move {
-            let loader = loader?;
-
             let paths = loader.get_paths().await;
 
             for it in paths {
@@ -86,10 +72,13 @@ where
     }
 }
 
-impl<Loader> MadoEngineStateObserver for MadoEngine<Loader>
-where
-    Loader: MadoModuleLoader + Send + 'static,
-{
+impl Default for MadoEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MadoEngineStateObserver for MadoEngine {
     fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
 
     fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {}
