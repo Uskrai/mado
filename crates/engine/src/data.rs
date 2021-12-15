@@ -131,7 +131,11 @@ impl DownloadInfo {
     }
 
     pub fn connect(&self, observer: ArcDownloadInfoObserver) {
-        self.observers.lock().push(observer);
+        let mut observers = self.observers.lock();
+
+        observer.on_status_changed(self.status());
+
+        observers.push(observer);
     }
 
     fn emit(&self, fun: impl Fn(ArcDownloadInfoObserver)) {
