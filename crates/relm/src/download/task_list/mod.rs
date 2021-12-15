@@ -153,14 +153,19 @@ impl From<&DownloadInfo> for DownloadView {
 
 impl DownloadView {
     fn get_label_color(state: gtk::StateFlags) -> gtk::gdk::RGBA {
-        let widget = gtk::Label::default();
-        let ctx = widget.style_context();
-        let old = ctx.state();
-        ctx.set_state(state);
-        let color = ctx.color();
-        ctx.set_state(old);
+        thread_local! {
+            static WIDGET: gtk::Label = gtk::Label::default();
+        }
 
-        color
+        WIDGET.with(|widget| {
+            let ctx = widget.style_context();
+            let old = ctx.state();
+            ctx.set_state(state);
+            let color = ctx.color();
+            ctx.set_state(old);
+
+            color
+        })
     }
     pub fn set_download_status(&self, status: DownloadStatus) {
         self.title.remove_css_class("download-resumed");
