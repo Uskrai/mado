@@ -1,8 +1,7 @@
-#![allow(dead_code, unused_variables)]
 use std::sync::Arc;
 
 use gtk::prelude::*;
-use mado_engine::DownloadInfo;
+use mado_engine::{DownloadInfo, DownloadInfoObserver, DownloadStatus};
 
 #[derive(Debug)]
 pub struct DownloadItem {
@@ -31,7 +30,6 @@ pub trait TaskListParentModel: Model {
 #[derive(Clone)]
 pub struct TaskListModel {
     tasks: gio::ListStore,
-    vec: Vec<GDownloadItem>,
 }
 
 impl Model for TaskListModel {
@@ -44,7 +42,6 @@ impl<ParentModel: TaskListParentModel> ComponentUpdate<ParentModel> for TaskList
     fn init_model(parent: &ParentModel) -> Self {
         Self {
             tasks: parent.get_list(),
-            vec: Vec::new(),
         }
     }
 
@@ -97,38 +94,107 @@ where
 #[derive(Debug, Clone)]
 struct DownloadView {
     widget: gtk::Box,
-    label: gtk::Label,
+    title: gtk::Label,
 }
 
 impl From<&DownloadInfo> for DownloadView {
     fn from(info: &DownloadInfo) -> Self {
-        let label = gtk::Label::new(Some(&info.manga().title));
-
         let widget = gtk::Box::new(gtk::Orientation::Vertical, 5);
-        widget.append(&label);
 
-        Self { widget, label }
+        let title = gtk::Label::new(Some(&info.manga().title));
+        title.set_halign(gtk::Align::Start);
+
+        let style = format!(
+            r#"
+            .download-resumed {{
+                color: {};
+            }}
+            .download-paused {{
+                color: {};
+            }}
+            .download-error {{
+                color: RED;
+            }}
+        "#,
+            Self::get_label_color(gtk::StateFlags::NORMAL),
+            Self::get_label_color(gtk::StateFlags::INSENSITIVE)
+        );
+
+        let css = gtk::CssProvider::new();
+        css.load_from_data(style.as_bytes());
+
+        title
+            .style_context()
+            .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+        widget.append(&title);
+
+        Self { widget, title }
+    }
+}
+
+impl DownloadView {
+    fn get_label_color(state: gtk::StateFlags) -> gtk::gdk::RGBA {
+        let widget = gtk::Label::default();
+        let ctx = widget.style_context();
+        let old = ctx.state();
+        ctx.set_state(state);
+        let color = ctx.color();
+        ctx.set_state(old);
+
+        color
+    }
+    pub fn set_download_status(&self, status: DownloadStatus) {
+        self.title.remove_css_class("download-resumed");
+        self.title.remove_css_class("download-paused");
+
+        match status {
+            DownloadStatus::Resumed => {
+                self.title.add_css_class("download-resumed");
+            }
+            DownloadStatus::Paused => {
+                self.title.add_css_class("download-paused");
+            }
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 struct DownloadViewController {
-    sender: gtk::glib::Sender<()>,
+    sender: gtk::glib::Sender<DownloadMsg>,
+}
+
+pub enum DownloadMsg {
+    StatusChanged(DownloadStatus),
 }
 
 impl DownloadViewController {
-    pub fn connect(_: DownloadView, download: &mut DownloadItem) -> Self {
+    pub fn connect(view: DownloadView, download: &mut DownloadItem) -> Self {
         use gtk::glib;
 
         let (sender, recv) = gtk::glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let this = Self { sender };
 
-        recv.attach(None, |_| {
-            //
+        recv.attach(None, move |msg| {
+            match msg {
+                DownloadMsg::StatusChanged(status) => {
+                    view.set_download_status(status);
+                }
+            }
 
             gtk::glib::Continue(true)
         });
 
+        download.info.connect(Arc::new(this.clone()));
+
         this
+    }
+}
+
+impl DownloadInfoObserver for DownloadViewController {
+    fn on_status_changed(&self, status: DownloadStatus) {
+        self.sender
+            .send(DownloadMsg::StatusChanged(status))
+            .unwrap();
     }
 }
