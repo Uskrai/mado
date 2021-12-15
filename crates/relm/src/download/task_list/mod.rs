@@ -95,14 +95,19 @@ where
 struct DownloadView {
     widget: gtk::Box,
     title: gtk::Label,
+    status: gtk::Label,
 }
 
 impl From<&DownloadInfo> for DownloadView {
     fn from(info: &DownloadInfo) -> Self {
         let widget = gtk::Box::new(gtk::Orientation::Vertical, 5);
 
-        let title = gtk::Label::new(Some(&info.manga().title));
-        title.set_halign(gtk::Align::Start);
+        let title = gtk::Label::builder()
+            .label(&info.manga().title)
+            .halign(gtk::Align::Start)
+            .build();
+
+        let status = gtk::Label::builder().halign(gtk::Align::Start).build();
 
         let style = format!(
             r#"
@@ -123,13 +128,22 @@ impl From<&DownloadInfo> for DownloadView {
         let css = gtk::CssProvider::new();
         css.load_from_data(style.as_bytes());
 
-        title
-            .style_context()
-            .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        let register_css = |w: &gtk::Label| {
+            w.style_context()
+                .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        };
+
+        register_css(&title);
+        register_css(&status);
 
         widget.append(&title);
+        widget.append(&status);
 
-        Self { widget, title }
+        Self {
+            widget,
+            title,
+            status,
+        }
     }
 }
 
@@ -151,9 +165,11 @@ impl DownloadView {
         match status {
             DownloadStatus::Resumed => {
                 self.title.add_css_class("download-resumed");
+                self.status.set_text("");
             }
             DownloadStatus::Paused => {
                 self.title.add_css_class("download-paused");
+                self.status.set_text("Paused");
             }
         }
     }
