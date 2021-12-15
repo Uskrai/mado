@@ -167,17 +167,28 @@ impl DownloadView {
             color
         })
     }
+
     pub fn set_download_status(&self, status: DownloadStatus) {
-        self.title.remove_css_class("download-resumed");
-        self.title.remove_css_class("download-paused");
+        let remove_css = |title| {
+            self.title.remove_css_class(title);
+            self.status.remove_css_class(title);
+        };
+
+        let add_css = |title| {
+            self.title.add_css_class(title);
+            self.status.add_css_class(title);
+        };
+
+        remove_css("download-resumed");
+        remove_css("download-paused");
 
         match status {
             DownloadStatus::Resumed => {
-                self.title.add_css_class("download-resumed");
+                add_css("download-resumed");
                 self.status.set_text("");
             }
             DownloadStatus::Paused => {
-                self.title.add_css_class("download-paused");
+                add_css("download-paused");
                 self.status.set_text("Paused");
             }
         }
