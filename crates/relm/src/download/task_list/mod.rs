@@ -103,7 +103,11 @@ impl From<&DownloadInfo> for DownloadView {
         let widget = gtk::Box::new(gtk::Orientation::Vertical, 5);
 
         let title = gtk::Label::builder()
-            .label(&info.manga().title)
+            .use_markup(true)
+            .label(&format!(
+                "<span size='large'>{}</span>",
+                gtk::glib::markup_escape_text(&info.manga().title)
+            ))
             .halign(gtk::Align::Start)
             .build();
 
