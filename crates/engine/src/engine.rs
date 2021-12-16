@@ -79,10 +79,13 @@ impl MadoEngine {
             for it in info.chapters() {
                 let (task, receiver) = crate::chapter::create(it.clone());
 
-                let handler = tokio::spawn(receiver.run());
-                module.get_chapter_images(Box::new(task)).await.unwrap();
+                let receiver = async move {
+                    receiver.run().await;
+                    Ok(())
+                };
+                let task = module.get_chapter_images(Box::new(task));
 
-                handler.await.unwrap();
+                tokio::try_join!(task, receiver).unwrap();
             }
         }
     }
