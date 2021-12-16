@@ -59,6 +59,7 @@ pub struct DownloadInfo {
     manga: Arc<MangaInfo>,
     chapters: Vec<Arc<DownloadChapterInfo>>,
     path: std::path::PathBuf,
+    domain: mado_core::Url,
     status: Atomic<DownloadStatus>,
     observers: Mutex<Vec<ArcDownloadInfoObserver>>,
 }
@@ -87,11 +88,14 @@ impl DownloadInfo {
             .map(|it| Arc::new(it))
             .collect();
 
+        let domain = module.get_domain();
+
         Self {
             module: LateBindingModule::Module(module).into(),
             manga,
             chapters,
             path,
+            domain,
             status: Atomic::new(status),
             observers: Mutex::default(),
         }
@@ -105,6 +109,10 @@ impl DownloadInfo {
     /// Get a reference to the download info's path.
     pub fn path(&self) -> &std::path::PathBuf {
         &self.path
+    }
+
+    pub fn domain(&self) -> &mado_core::Url {
+        &self.domain
     }
 
     /// Wait for module to be available.
