@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{
+    mpsc::{UnboundedReceiver, UnboundedSender},
+    watch,
+};
 
-use crate::{MadoEngineState, MadoEngineStateObserver, MadoModuleLoader};
+use crate::{DownloadStatus, MadoEngineState, MadoEngineStateObserver, MadoModuleLoader};
 
 pub struct MadoEngine {
     state: Arc<MadoEngineState>,
@@ -33,16 +36,33 @@ impl MadoEngine {
     }
 
     pub async fn run(self) {
-        let (sender, mut recv) = tokio::sync::mpsc::unbounded_channel();
-        self.state.connect(MadoEngineSender(sender));
+        let mut rx = self.connect_state();
 
-        while let Some(msg) = recv.recv().await {
+        while let Some(msg) = rx.recv().await {
             match msg {
                 MadoEngineMsg::Download(info) => {
                     tokio::spawn(self.download(info));
                 }
             }
         }
+    }
+
+    pub fn connect_state(&self) -> UnboundedReceiver<MadoEngineMsg> {
+        pub struct MadoEngineSender(UnboundedSender<MadoEngineMsg>);
+
+        impl MadoEngineStateObserver for MadoEngineSender {
+            fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
+
+            fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {}
+
+            fn on_download(&self, info: Arc<crate::DownloadInfo>) {
+                self.0.send(MadoEngineMsg::Download(info)).unwrap();
+            }
+        }
+
+        let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
+        self.state.connect(MadoEngineSender(sender));
+        recv
     }
 
     pub fn load_module(
@@ -74,20 +94,7 @@ impl MadoEngine {
         &self,
         info: Arc<crate::DownloadInfo>,
     ) -> impl std::future::Future<Output = impl Send> + Send + 'static {
-        async move {
-            let module = info.wait_module().await;
-            for it in info.chapters() {
-                let (task, receiver) = crate::chapter::create(it.clone());
-
-                let receiver = async move {
-                    receiver.run().await;
-                    Ok(())
-                };
-                let task = module.get_chapter_images(Box::new(task));
-
-                tokio::try_join!(task, receiver).unwrap();
-            }
-        }
+        DownloadTask::new(info).run()
     }
 }
 
@@ -96,15 +103,89 @@ impl Default for MadoEngine {
         Self::new()
     }
 }
+#[derive(Debug)]
+pub enum DownloadTaskMsg {
+    Status(crate::DownloadStatus),
+}
 
-pub struct MadoEngineSender(UnboundedSender<MadoEngineMsg>);
+pub struct DownloadTask {
+    info: Arc<crate::DownloadInfo>,
+}
 
-impl MadoEngineStateObserver for MadoEngineSender {
-    fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
+impl DownloadTask {
+    pub fn new(info: Arc<crate::DownloadInfo>) -> Self {
+        Self { info }
+    }
 
-    fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {}
+    pub async fn run(self) {
+        let mut status = {
+            let (tx_status, rx_status) = watch::channel(self.info.status());
 
-    fn on_download(&self, info: Arc<crate::DownloadInfo>) {
-        self.0.send(MadoEngineMsg::Download(info)).unwrap();
+            let sender = DownloadTaskSender { status: tx_status };
+            self.info.connect(Arc::new(sender));
+
+            rx_status
+        };
+
+        loop {
+            self.wait_status(&mut status, DownloadStatus::Resumed).await;
+            let paused = self.wait_status(&mut status, DownloadStatus::Paused);
+            let dl = self.download();
+            let result = tokio::select! {
+                _ = paused => {
+                    continue;
+                }
+                r = dl => {
+                    r
+                }
+            };
+
+            match result {
+                Ok(_) => {
+                    break;
+                }
+                Err(err) => {
+                    tracing::error!("{}", err);
+                }
+            }
+        }
+    }
+
+    async fn wait_status(&self, rx: &mut watch::Receiver<DownloadStatus>, status: DownloadStatus) {
+        loop {
+            if *rx.borrow_and_update() == status {
+                return;
+            }
+
+            if rx.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+
+    async fn download(&self) -> Result<(), mado_core::Error> {
+        let module = self.info.wait_module().await;
+        for it in self.info.chapters() {
+            let (task, receiver) = crate::chapter::create(it.clone());
+
+            let receiver = async move {
+                receiver.run().await;
+                Ok(())
+            };
+            let task = module.get_chapter_images(Box::new(task));
+
+            tokio::try_join!(task, receiver)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct DownloadTaskSender {
+    status: watch::Sender<DownloadStatus>,
+}
+impl crate::DownloadInfoObserver for DownloadTaskSender {
+    fn on_status_changed(&self, status: crate::DownloadStatus) {
+        self.status.send_replace(status);
     }
 }
