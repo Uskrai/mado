@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use tokio::sync::mpsc::UnboundedSender;
+
 use crate::{MadoEngineState, MadoEngineStateObserver, MadoModuleLoader};
 
 pub struct MadoEngine {
@@ -14,6 +16,11 @@ const _: () = {
     }
 };
 
+#[derive(Debug)]
+pub enum MadoEngineMsg {
+    Download(Arc<crate::DownloadInfo>),
+}
+
 impl MadoEngine {
     pub fn new() -> Self {
         let state = Arc::new(MadoEngineState::default());
@@ -26,7 +33,16 @@ impl MadoEngine {
     }
 
     pub async fn run(self) {
-        self.state.clone().connect(self);
+        let (sender, mut recv) = tokio::sync::mpsc::unbounded_channel();
+        self.state.connect(MadoEngineSender(sender));
+
+        while let Some(msg) = recv.recv().await {
+            match msg {
+                MadoEngineMsg::Download(info) => {
+                    tokio::spawn(self.download(info));
+                }
+            }
+        }
     }
 
     pub fn load_module(
@@ -78,12 +94,14 @@ impl Default for MadoEngine {
     }
 }
 
-impl MadoEngineStateObserver for MadoEngine {
+pub struct MadoEngineSender(UnboundedSender<MadoEngineMsg>);
+
+impl MadoEngineStateObserver for MadoEngineSender {
     fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
 
     fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {}
 
     fn on_download(&self, info: Arc<crate::DownloadInfo>) {
-        tokio::spawn(self.download(info));
+        self.0.send(MadoEngineMsg::Download(info)).unwrap();
     }
 }
