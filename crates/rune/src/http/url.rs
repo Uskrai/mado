@@ -67,7 +67,7 @@ impl Display for Url {
     }
 }
 
-impl From<Url> for mado_core::url::Url {
+impl From<Url> for mado_core::Url {
     fn from(v: Url) -> Self {
         v.inner
     }

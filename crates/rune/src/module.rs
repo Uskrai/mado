@@ -80,11 +80,11 @@ impl MadoModule for RuneMadoModule {
         &self.name
     }
 
-    fn get_domain(&self) -> mado_core::url::Url {
+    fn get_domain(&self) -> mado_core::Url {
         self.domain.clone().into()
     }
 
-    async fn get_info(&self, url: mado_core::url::Url) -> Result<MangaInfo, mado_core::Error> {
+    async fn get_info(&self, url: mado_core::Url) -> Result<MangaInfo, mado_core::Error> {
         self.get_info(Url::from(url)).await.map_err(Into::into)
     }
 

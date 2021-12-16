@@ -7,6 +7,7 @@ pub use error::Error;
 pub use manga::*;
 
 pub mod url;
+pub use self::url::Url;
 
 mod map_error;
 pub use map_error::*;
