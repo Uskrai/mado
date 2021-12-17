@@ -191,6 +191,10 @@ impl DownloadView {
                 add_css("download-paused");
                 self.status.set_text("Paused");
             }
+            DownloadStatus::Finished => {
+                add_css("download-resumed");
+                self.status.set_text("Finished");
+            }
         }
     }
 }

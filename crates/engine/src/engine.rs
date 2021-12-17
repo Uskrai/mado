@@ -166,6 +166,10 @@ impl DownloadTask {
     async fn download(&self) -> Result<(), mado_core::Error> {
         let module = self.info.wait_module().await;
         for it in self.info.chapters() {
+            if let DownloadStatus::Finished = it.status() {
+                continue;
+            }
+
             let (task, receiver) = crate::chapter::create(it.clone());
 
             let receiver = receiver.run();
@@ -173,6 +177,7 @@ impl DownloadTask {
 
             tokio::try_join!(task, receiver)?;
         }
+        self.info.set_status(DownloadStatus::Finished);
         Ok(())
     }
 }

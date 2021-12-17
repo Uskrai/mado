@@ -10,6 +10,7 @@ use crate::MadoEngineState;
 pub enum DownloadStatus {
     Resumed,
     Paused,
+    Finished,
 }
 
 #[derive(Clone)]

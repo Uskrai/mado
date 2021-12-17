@@ -157,6 +157,7 @@ impl ChapterTaskReceiver {
 
             i += 1;
         }
+        self.info.set_status(crate::DownloadStatus::Finished);
         tracing::trace!("Finished downloading chapter {:?}", self.info);
 
         Ok(())
