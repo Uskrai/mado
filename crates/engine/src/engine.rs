@@ -168,10 +168,7 @@ impl DownloadTask {
         for it in self.info.chapters() {
             let (task, receiver) = crate::chapter::create(it.clone());
 
-            let receiver = async move {
-                receiver.run().await;
-                Ok(())
-            };
+            let receiver = receiver.run();
             let task = module.get_chapter_images(Box::new(task));
 
             tokio::try_join!(task, receiver)?;

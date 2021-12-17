@@ -128,7 +128,7 @@ pub struct ChapterTaskReceiver {
 }
 
 impl ChapterTaskReceiver {
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> Result<(), mado_core::Error> {
         tracing::trace!("Start downloading chapter {:?}", self.info);
         let chapter_path = self.info.path();
 
@@ -139,11 +139,13 @@ impl ChapterTaskReceiver {
             let filename = format!("{:0>5}.{}", i, image.extension.clone());
             let path = chapter_path.join(filename);
 
-            self.download_image(path, image).await.unwrap();
+            self.download_image(path, image).await?;
 
             i += 1;
         }
         tracing::trace!("Finished downloading chapter {:?}", self.info);
+
+        Ok(())
     }
 
     fn download_image(
