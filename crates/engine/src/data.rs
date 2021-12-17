@@ -227,4 +227,8 @@ impl DownloadChapterInfo {
     pub fn status(&self) -> DownloadStatus {
         self.status.load(atomic::Ordering::SeqCst)
     }
+
+    pub fn set_status(&self, status: DownloadStatus) {
+        self.status.store(status, atomic::Ordering::SeqCst);
+    }
 }
