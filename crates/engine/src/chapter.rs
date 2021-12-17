@@ -19,6 +19,48 @@ pub fn create(info: Arc<DownloadChapterInfo>) -> (ChapterTask, ChapterTaskReceiv
     (task, receiver)
 }
 
+/// Run future returned by fun until the future return Ok or limit reached.
+/// the future will be called once even if limit is 0.
+#[inline]
+pub async fn do_while_err_or_n<F, R, O, E>(limit: usize, mut fun: F) -> Result<O, E>
+where
+    F: FnMut() -> R,
+    R: Future<Output = Result<O, E>>,
+    E: std::fmt::Display,
+{
+    let mut retry = 0;
+    let mut error;
+
+    // using loop to simulate do_while
+    loop {
+        let result = fun().await;
+
+        error = match result {
+            Ok(ok) => return Ok(ok),
+            Err(err) => err,
+        };
+
+        retry += 1;
+
+        let retry_limit_reached = retry >= limit;
+
+        tracing::error!(
+            "{}, {}",
+            error,
+            if retry_limit_reached {
+                "Stopping..."
+            } else {
+                "Retrying..."
+            }
+        );
+
+        // return last error if retry limit reached.
+        if retry_limit_reached {
+            break Err(error);
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ChapterTask {
     sender: UnboundedSender<mado_core::ChapterImageInfo>,
@@ -44,40 +86,12 @@ impl ChapterImageTask {
         )
     )]
     pub async fn download(&self) -> Result<Vec<u8>, mado_core::Error> {
-        let mut retry = 0;
-        const RETRY_LIMIT: u32 = 10;
-        let mut error;
-
-        // using loop to simulate do_while
-        loop {
+        do_while_err_or_n(0, || async move {
             let mut buffer = Vec::new();
-            let result = self.download_without_retry(&mut buffer).await;
-
-            let err = match result {
-                Ok(_) => return Ok(buffer),
-                Err(err) => err,
-            };
-
-            error = err;
-            retry += 1;
-
-            let retry_limit_reached = retry >= RETRY_LIMIT;
-
-            tracing::error!(
-                "{}, {}",
-                error,
-                if retry_limit_reached {
-                    "Stopping..."
-                } else {
-                    "Retrying..."
-                }
-            );
-
-            // return last error if retry limit reached.
-            if retry_limit_reached {
-                return Err(error);
-            }
-        }
+            self.download_without_retry(&mut buffer).await?;
+            Ok(buffer)
+        })
+        .await
     }
 
     async fn wait_timeout<F>(
