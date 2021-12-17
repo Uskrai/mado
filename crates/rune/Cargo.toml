@@ -8,9 +8,6 @@ license = "MIT"
 anyhow = "1"
 async-trait = "0.1"
 
-
-tracing = { git = "https://github.com/tokio-rs/tracing" }
-
 futures-core = "0.3"
 bytes = "1.1"
 
