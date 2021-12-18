@@ -1,16 +1,39 @@
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use atomic::Atomic;
 use mado_core::{ArcMadoModule, ChapterInfo, MangaInfo};
 
 use crate::MadoEngineState;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
-pub enum DownloadStatus {
-    Resumed,
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum DownloadResumedStatus {
+    Waiting,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum DownloadProgressStatus {
+    Resumed(DownloadResumedStatus),
     Paused,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum DownloadStatus {
+    InProgress(DownloadProgressStatus),
     Finished,
+}
+
+impl DownloadStatus {
+    pub fn is_resumed(&self) -> bool {
+        matches!(self, Self::InProgress(DownloadProgressStatus::Resumed(..)))
+    }
+
+    pub fn is_paused(&self) -> bool {
+        matches!(self, Self::InProgress(DownloadProgressStatus::Paused))
+    }
+
+    pub fn is_completed(&self) -> bool {
+        matches!(self, Self::Finished)
+    }
 }
 
 #[derive(Clone)]
@@ -61,7 +84,7 @@ pub struct DownloadInfo {
     chapters: Vec<Arc<DownloadChapterInfo>>,
     path: std::path::PathBuf,
     domain: mado_core::Url,
-    status: Atomic<DownloadStatus>,
+    status: Mutex<DownloadStatus>,
     observers: Mutex<Vec<ArcDownloadInfoObserver>>,
 }
 
@@ -83,7 +106,7 @@ impl DownloadInfo {
                     LateBindingModule::Module(module.clone()),
                     it,
                     path,
-                    status,
+                    DownloadStatus::InProgress(status.into()),
                 )
             })
             .map(|it| Arc::new(it))
@@ -97,14 +120,14 @@ impl DownloadInfo {
             chapters,
             path,
             domain,
-            status: Atomic::new(status),
+            status: Mutex::new(DownloadStatus::InProgress(status.into())),
             observers: Mutex::default(),
         }
     }
 
     /// Get download info's status.
-    pub fn status(&self) -> DownloadStatus {
-        self.status.load(atomic::Ordering::SeqCst)
+    pub fn status(&self) -> impl std::ops::Deref<Target = DownloadStatus> + '_ {
+        self.status.lock()
     }
 
     /// Get a reference to the download info's path.
@@ -130,8 +153,24 @@ impl DownloadInfo {
 
     /// Change download's status, then emit [`DownloadInfoObserver::on_status_changed`]
     pub fn set_status(&self, status: DownloadStatus) {
-        self.status.store(status, atomic::Ordering::SeqCst);
-        self.emit(|it| it.on_status_changed(status));
+        let mut lock = self.status.lock();
+        *lock = status;
+        self.emit(|it| it.on_status_changed(&lock));
+    }
+
+    /// Resume Download
+    pub fn resume(&self, resume: bool) {
+        let status = if let DownloadStatus::InProgress(_) = *self.status() {
+            if resume {
+                DownloadProgressStatus::Resumed(DownloadResumedStatus::Waiting)
+            } else {
+                DownloadProgressStatus::Paused
+            }
+        } else {
+            return;
+        };
+
+        self.set_status(DownloadStatus::InProgress(status));
     }
 
     /// Get a reference to the download info's manga.
@@ -142,7 +181,7 @@ impl DownloadInfo {
     pub fn connect(&self, observer: ArcDownloadInfoObserver) {
         let mut observers = self.observers.lock();
 
-        observer.on_status_changed(self.status());
+        observer.on_status_changed(&self.status());
 
         observers.push(observer);
     }
@@ -159,7 +198,25 @@ pub struct DownloadRequest {
     manga: Arc<MangaInfo>,
     chapters: Vec<Arc<ChapterInfo>>,
     path: std::path::PathBuf,
-    status: DownloadStatus,
+    status: DownloadRequestStatus,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum DownloadRequestStatus {
+    Resume,
+    Pause,
+}
+
+impl From<DownloadRequestStatus> for DownloadProgressStatus {
+    fn from(this: DownloadRequestStatus) -> Self {
+        match this {
+            DownloadRequestStatus::Resume => {
+                DownloadProgressStatus::Resumed(DownloadResumedStatus::Waiting)
+            }
+            DownloadRequestStatus::Pause => DownloadProgressStatus::Paused,
+        }
+    }
+    //
 }
 
 impl DownloadRequest {
@@ -168,7 +225,7 @@ impl DownloadRequest {
         manga: Arc<MangaInfo>,
         chapters: Vec<Arc<ChapterInfo>>,
         path: std::path::PathBuf,
-        status: DownloadStatus,
+        status: DownloadRequestStatus,
     ) -> Self {
         Self {
             module,
@@ -181,7 +238,7 @@ impl DownloadRequest {
 }
 
 pub trait DownloadInfoObserver: std::fmt::Debug {
-    fn on_status_changed(&self, status: DownloadStatus);
+    fn on_status_changed(&self, status: &DownloadStatus);
 }
 
 type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
@@ -191,7 +248,7 @@ pub struct DownloadChapterInfo {
     module: LateBindingModule,
     chapter: Arc<ChapterInfo>,
     path: std::path::PathBuf,
-    status: Atomic<DownloadStatus>,
+    status: Mutex<DownloadStatus>,
 }
 
 impl DownloadChapterInfo {
@@ -205,7 +262,7 @@ impl DownloadChapterInfo {
             module,
             chapter,
             path,
-            status: Atomic::new(status),
+            status: Mutex::new(status),
         }
     }
 
@@ -225,11 +282,11 @@ impl DownloadChapterInfo {
     }
 
     /// Get a reference to the download chapter info's status.
-    pub fn status(&self) -> DownloadStatus {
-        self.status.load(atomic::Ordering::SeqCst)
+    pub fn status(&self) -> impl std::ops::Deref<Target = DownloadStatus> + '_ {
+        self.status.lock()
     }
 
     pub fn set_status(&self, status: DownloadStatus) {
-        self.status.store(status, atomic::Ordering::SeqCst);
+        *self.status.lock() = status;
     }
 }

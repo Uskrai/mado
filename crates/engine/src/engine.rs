@@ -118,18 +118,11 @@ impl DownloadTask {
     }
 
     pub async fn run(self) {
-        let mut status = {
-            let (tx_status, rx_status) = watch::channel(self.info.status());
-
-            let sender = DownloadTaskSender { status: tx_status };
-            self.info.connect(Arc::new(sender));
-
-            rx_status
-        };
-
+        let status = DownloadTaskSender::connect(self.info.clone());
         loop {
-            self.wait_status(&mut status, DownloadStatus::Resumed).await;
-            let paused = self.wait_status(&mut status, DownloadStatus::Paused);
+            status.wait_status(DownloadStatus::is_resumed).await;
+
+            let paused = status.wait_status(DownloadStatus::is_paused);
             let dl = self.download();
             let result = tokio::select! {
                 _ = paused => {
@@ -142,7 +135,8 @@ impl DownloadTask {
 
             match result {
                 Ok(_) => {
-                    break;
+                    self.info.set_status(DownloadStatus::Finished);
+                    continue;
                 }
                 Err(err) => {
                     tracing::error!("{}", err);
@@ -151,22 +145,10 @@ impl DownloadTask {
         }
     }
 
-    async fn wait_status(&self, rx: &mut watch::Receiver<DownloadStatus>, status: DownloadStatus) {
-        loop {
-            if *rx.borrow_and_update() == status {
-                return;
-            }
-
-            if rx.changed().await.is_err() {
-                return;
-            }
-        }
-    }
-
     async fn download(&self) -> Result<(), mado_core::Error> {
         let module = self.info.wait_module().await;
         for it in self.info.chapters() {
-            if let DownloadStatus::Finished = it.status() {
+            if it.status().is_completed() {
                 continue;
             }
 
@@ -176,6 +158,7 @@ impl DownloadTask {
             let task = module.get_chapter_images(Box::new(task));
 
             tokio::try_join!(task, receiver)?;
+            it.set_status(DownloadStatus::Finished);
         }
         self.info.set_status(DownloadStatus::Finished);
         Ok(())
@@ -184,10 +167,39 @@ impl DownloadTask {
 
 #[derive(Debug)]
 pub struct DownloadTaskSender {
-    status: watch::Sender<DownloadStatus>,
+    info: Arc<crate::DownloadInfo>,
+    status: watch::Sender<()>,
 }
+
+impl DownloadTaskSender {
+    pub fn connect(info: Arc<crate::DownloadInfo>) -> Arc<Self> {
+        let (status, _) = watch::channel(());
+        let this = Arc::new(Self {
+            info: info.clone(),
+            status,
+        });
+
+        info.connect(this.clone());
+        this
+    }
+
+    pub async fn wait_status(&self, fun: impl Fn(&DownloadStatus) -> bool) {
+        let mut rx = self.status.subscribe();
+        loop {
+            rx.borrow_and_update();
+            if fun(&self.info.status()) {
+                return;
+            }
+
+            if rx.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+}
+
 impl crate::DownloadInfoObserver for DownloadTaskSender {
-    fn on_status_changed(&self, status: crate::DownloadStatus) {
-        self.status.send_replace(status);
+    fn on_status_changed(&self, _: &DownloadStatus) {
+        self.status.send_replace(());
     }
 }

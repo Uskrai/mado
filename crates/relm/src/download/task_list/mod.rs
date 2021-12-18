@@ -98,6 +98,9 @@ struct DownloadView {
     status: gtk::Label,
 }
 
+const DOWNLOAD_RESUMED_CSS: &str = "download-resumed";
+const DOWNLOAD_PAUSED_CSS: &str = "download-paused";
+
 impl From<&DownloadInfo> for DownloadView {
     fn from(info: &DownloadInfo) -> Self {
         let widget = gtk::Box::new(gtk::Orientation::Vertical, 5);
@@ -168,7 +171,7 @@ impl DownloadView {
         })
     }
 
-    pub fn set_download_status(&self, status: DownloadStatus) {
+    pub fn set_download_status(&self, status: &DownloadStatus) {
         let remove_css = |title| {
             self.title.remove_css_class(title);
             self.status.remove_css_class(title);
@@ -183,18 +186,19 @@ impl DownloadView {
         remove_css("download-paused");
 
         match status {
-            DownloadStatus::Resumed => {
-                add_css("download-resumed");
-                self.status.set_text("");
-            }
-            DownloadStatus::Paused => {
-                add_css("download-paused");
-                self.status.set_text("Paused");
-            }
             DownloadStatus::Finished => {
-                add_css("download-resumed");
+                add_css(DOWNLOAD_RESUMED_CSS);
                 self.status.set_text("Finished");
             }
+            DownloadStatus::InProgress(progress) => match progress {
+                mado_engine::DownloadProgressStatus::Resumed(..) => {
+                    add_css(DOWNLOAD_RESUMED_CSS);
+                }
+                mado_engine::DownloadProgressStatus::Paused => {
+                    add_css(DOWNLOAD_PAUSED_CSS);
+                    self.status.set_text("Paused");
+                }
+            },
         }
     }
 }
@@ -205,7 +209,7 @@ struct DownloadViewController {
 }
 
 pub enum DownloadMsg {
-    StatusChanged(DownloadStatus),
+    StatusChanged,
 }
 
 impl DownloadViewController {
@@ -215,10 +219,11 @@ impl DownloadViewController {
         let (sender, recv) = gtk::glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let this = Self { sender };
 
+        let info = download.info.clone();
         recv.attach(None, move |msg| {
             match msg {
-                DownloadMsg::StatusChanged(status) => {
-                    view.set_download_status(status);
+                DownloadMsg::StatusChanged => {
+                    view.set_download_status(&info.status());
                 }
             }
 
@@ -232,9 +237,7 @@ impl DownloadViewController {
 }
 
 impl DownloadInfoObserver for DownloadViewController {
-    fn on_status_changed(&self, status: DownloadStatus) {
-        self.sender
-            .send(DownloadMsg::StatusChanged(status))
-            .unwrap();
+    fn on_status_changed(&self, _: &DownloadStatus) {
+        self.sender.send(DownloadMsg::StatusChanged).unwrap();
     }
 }

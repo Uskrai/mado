@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use mado_core::{url::Url, ArcMadoModule, Error, MangaInfo};
-use mado_engine::{DownloadRequest, DownloadStatus};
+use mado_engine::{DownloadRequest, DownloadRequestStatus};
 
 use crate::AbortOnDropHandle;
 
@@ -169,7 +169,7 @@ where
                     manga_info,
                     selected,
                     path,
-                    DownloadStatus::Resumed,
+                    DownloadRequestStatus::Resume,
                 );
 
                 let msg = T::Msg::download_request(request);
