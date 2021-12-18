@@ -16,6 +16,9 @@ parking_lot = "0.11"
 [dependencies.tokio]
 version = "1"
 features = [
+  "sync",
+  "macros",
+  "time",
   "rt"
 ]
 
