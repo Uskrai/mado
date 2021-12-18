@@ -125,9 +125,16 @@ impl ChapterImageTask {
         const TIMEOUT: u64 = 10;
         let timeout = Duration::from_secs(TIMEOUT);
 
+        let mut total = 0;
         while let Some(bytes) = self.wait_timeout(stream.next(), timeout).await? {
             let bytes = bytes?;
-            tracing::trace!("Writing {} bytes to buffer", bytes.len());
+            total += bytes.len();
+            tracing::trace!(
+                "Writing {} bytes to buffer, total: {} bytes",
+                bytes.len(),
+                total
+            );
+
             buffer.write_all(&bytes)?;
         }
 
