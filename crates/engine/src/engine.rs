@@ -53,8 +53,6 @@ impl MadoEngine {
         impl MadoEngineStateObserver for MadoEngineSender {
             fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
 
-            fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {}
-
             fn on_download(&self, info: Arc<crate::DownloadInfo>) {
                 self.0.send(MadoEngineMsg::Download(info)).unwrap();
             }
@@ -73,15 +71,17 @@ impl MadoEngine {
         async move {
             let paths = loader.get_paths().await;
 
-            for it in paths {
-                match loader.load(it.clone()).await {
+            for path in paths {
+                match loader.load(path.clone()).await {
                     Ok(modules) => {
                         for it in modules {
-                            state.push_module(it);
+                            if let Err(err) = state.push_module(it) {
+                                tracing::error!("error pushing {}: {}", path.display(), err);
+                            }
                         }
                     }
                     Err(err) => {
-                        tracing::error!("error loading {}: {}", it.display(), err);
+                        tracing::error!("error loading {}: {}", path.display(), err);
                     }
                 }
             }

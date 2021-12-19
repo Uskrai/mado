@@ -92,10 +92,6 @@ impl MadoEngineStateObserver for RelmMadoEngineStateObserver {
         self.sender.send(crate::AppMsg::PushModule(module)).unwrap();
     }
 
-    fn on_push_module_fail(&self, _: mado_core::MadoModuleMapError) {
-        todo!();
-    }
-
     fn on_download(&self, info: Arc<mado_engine::DownloadInfo>) {
         self.download_sender
             .send(DownloadMsg::CreateDownloadView(info))

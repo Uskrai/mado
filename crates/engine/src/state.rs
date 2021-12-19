@@ -21,11 +21,10 @@ impl MadoEngineState {
     pub fn modules(&self) -> ArcMadoModuleMap {
         self.modules.clone()
     }
-    pub fn push_module(&self, module: ArcMadoModule) {
-        match self.modules.push_mut(module.clone()) {
-            Ok(_) => self.emit(move |it| it.on_push_module(module.clone())),
-            Err(err) => self.emit(move |it| it.on_push_module_fail(err.clone())),
-        }
+    pub fn push_module(&self, module: ArcMadoModule) -> Result<(), mado_core::MadoModuleMapError> {
+        self.modules.push_mut(module.clone())?;
+        self.emit(move |it| it.on_push_module(module.clone()));
+        Ok(())
     }
 
     pub fn download_request(&self, request: DownloadRequest) {
@@ -61,8 +60,6 @@ impl MadoEngineState {
 
 pub trait MadoEngineStateObserver: Send + Sync + 'static {
     fn on_push_module(&self, module: ArcMadoModule);
-
-    fn on_push_module_fail(&self, error: mado_core::MadoModuleMapError);
 
     fn on_download(&self, info: Arc<DownloadInfo>);
 }
