@@ -148,7 +148,7 @@ impl VectorMethod {
                     let name = syn::parse_str::<Ident>(name).unwrap();
 
                     items.push(parse_quote! {
-                      module.inst_fn(::rune::Protocol::#name, #ty::#ident)?;
+                      module.inst_fn(::rune::runtime::Protocol::#name, #ty::#ident)?;
                     });
                 }
             }
