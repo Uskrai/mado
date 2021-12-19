@@ -14,7 +14,7 @@ pub struct MadoEngineState {
     observers: Mutex<Vec<BoxedMadoEngineStateObserver>>,
 }
 
-type DynMadoEngineStateObserver = dyn MadoEngineStateObserver + Send + Sync + 'static;
+type DynMadoEngineStateObserver = dyn MadoEngineStateObserver;
 type BoxedMadoEngineStateObserver = Box<DynMadoEngineStateObserver>;
 
 impl MadoEngineState {
@@ -33,9 +33,10 @@ impl MadoEngineState {
         self.emit(move |it| it.on_download(info.clone()));
     }
 
-    pub fn connect(&self, observer: impl MadoEngineStateObserver + Send + Sync + 'static) {
-        let observer = Box::new(observer);
-
+    /// Connect observer to state.
+    ///
+    /// This will also call on_* of previously pushed item.
+    pub fn connect(&self, observer: impl MadoEngineStateObserver) {
         for it in self.tasks.write().iter() {
             observer.on_download(it.clone());
         }
@@ -44,7 +45,12 @@ impl MadoEngineState {
             observer.on_push_module(it.clone());
         }
 
-        self.observers.lock().push(observer);
+        self.connect_only(observer);
+    }
+
+    /// Connect without calling on_* method.
+    pub fn connect_only(&self, observer: impl MadoEngineStateObserver) {
+        self.observers.lock().push(Box::new(observer));
     }
 
     fn emit(&self, fun: impl Fn(&BoxedMadoEngineStateObserver)) {
