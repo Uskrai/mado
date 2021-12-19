@@ -1,5 +1,5 @@
 [package]
-name = "uuid"
+name = "mado-uuid"
 version = "0.0.0"
 edition = "2021"
 
