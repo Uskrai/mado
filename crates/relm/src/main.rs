@@ -1,6 +1,6 @@
 use anyhow::Context;
 use mado_core::ArcMadoModule;
-use mado_engine::{MadoEngine, MadoModuleLoader, ModuleLoadError};
+use mado_engine::{MadoEngine, MadoEngineState, MadoModuleLoader, ModuleLoadError};
 use relm4::RelmApp;
 use tracing_subscriber::{util::SubscriberInitExt, EnvFilter};
 
@@ -76,7 +76,8 @@ pub fn main() {
         .unwrap();
     let _guard = runtime.enter();
 
-    let mado = MadoEngine::new();
+    let state = MadoEngineState::new(Default::default(), Vec::new());
+    let mado = MadoEngine::new(state);
     let model = mado_relm::AppModel::new(mado.state());
 
     tokio::spawn(mado.load_module(Loader));

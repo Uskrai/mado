@@ -25,8 +25,8 @@ pub enum MadoEngineMsg {
 }
 
 impl MadoEngine {
-    pub fn new() -> Self {
-        let state = Arc::new(MadoEngineState::default());
+    pub fn new(state: MadoEngineState) -> Self {
+        let state = Arc::new(state);
 
         Self { state }
     }
@@ -98,11 +98,6 @@ impl MadoEngine {
     }
 }
 
-impl Default for MadoEngine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 #[derive(Debug)]
 pub enum DownloadTaskMsg {
     Status(crate::DownloadStatus),
