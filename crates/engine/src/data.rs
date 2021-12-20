@@ -2,9 +2,7 @@ use crate::path::Utf8PathBuf;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use mado_core::{ArcMadoModule, ChapterInfo, MangaInfo};
-
-use crate::MadoEngineState;
+use mado_core::{ArcMadoModule, ArcMadoModuleMap, ChapterInfo, MangaInfo};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum DownloadResumedStatus {
@@ -46,7 +44,7 @@ impl DownloadStatus {
 #[derive(Clone)]
 pub enum LateBindingModule {
     Module(ArcMadoModule),
-    ModuleUUID(Arc<MadoEngineState>, mado_core::Uuid),
+    ModuleUUID(ArcMadoModuleMap, mado_core::Uuid),
 }
 
 impl std::fmt::Debug for LateBindingModule {
@@ -68,9 +66,9 @@ impl LateBindingModule {
     pub async fn wait(&mut self) -> ArcMadoModule {
         match self {
             LateBindingModule::Module(module) => module.clone(),
-            LateBindingModule::ModuleUUID(state, uuid) => {
+            LateBindingModule::ModuleUUID(map, uuid) => {
                 let module = loop {
-                    let module = state.modules().get_by_uuid(*uuid);
+                    let module = map.get_by_uuid(*uuid);
                     if let Some(module) = module {
                         break module;
                     }
