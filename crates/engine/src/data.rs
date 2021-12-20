@@ -93,7 +93,7 @@ impl LateBindingModule {
 pub struct DownloadInfo {
     module: tokio::sync::Mutex<LateBindingModule>,
     module_uuid: mado_core::Uuid,
-    manga: Arc<MangaInfo>,
+    manga_title: String,
     chapters: Vec<Arc<DownloadChapterInfo>>,
     path: Utf8PathBuf,
     domain: mado_core::Url,
@@ -130,7 +130,7 @@ impl DownloadInfo {
         Self {
             module_uuid: module.get_uuid(),
             module: LateBindingModule::Module(module).into(),
-            manga,
+            manga_title: manga.title.clone(),
             chapters,
             path,
             domain,
@@ -191,9 +191,9 @@ impl DownloadInfo {
         self.set_status(DownloadStatus::InProgress(status));
     }
 
-    /// Get a reference to the download info's manga.
-    pub fn manga(&self) -> &Arc<MangaInfo> {
-        &self.manga
+    /// Get a reference to the download info's manga's title.
+    pub fn manga(&self) -> &str {
+        &self.manga_title
     }
 
     pub fn connect(&self, observer: ArcDownloadInfoObserver) {
