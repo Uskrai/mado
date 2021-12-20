@@ -80,6 +80,13 @@ impl LateBindingModule {
             }
         }
     }
+
+    pub fn uuid(&self) -> mado_core::Uuid {
+        match self {
+            LateBindingModule::Module(module) => module.get_uuid(),
+            LateBindingModule::ModuleUUID(_, uuid) => *uuid,
+        }
+    }
 }
 
 #[derive(Debug)]
