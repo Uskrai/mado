@@ -100,6 +100,7 @@ struct DownloadView {
 
 const DOWNLOAD_RESUMED_CSS: &str = "download-resumed";
 const DOWNLOAD_PAUSED_CSS: &str = "download-paused";
+const DOWNLOAD_ERROR_CSS: &str = "download-error";
 
 impl From<&DownloadInfo> for DownloadView {
     fn from(info: &DownloadInfo) -> Self {
@@ -182,8 +183,9 @@ impl DownloadView {
             self.status.add_css_class(title);
         };
 
-        remove_css("download-resumed");
-        remove_css("download-paused");
+        remove_css(DOWNLOAD_RESUMED_CSS);
+        remove_css(DOWNLOAD_PAUSED_CSS);
+        remove_css(DOWNLOAD_ERROR_CSS);
 
         match status {
             DownloadStatus::Finished => {
@@ -197,6 +199,10 @@ impl DownloadView {
                 mado_engine::DownloadProgressStatus::Paused => {
                     add_css(DOWNLOAD_PAUSED_CSS);
                     self.status.set_text("Paused");
+                }
+                mado_engine::DownloadProgressStatus::Error(error) => {
+                    add_css(DOWNLOAD_ERROR_CSS);
+                    self.status.set_text(error);
                 }
             },
         }

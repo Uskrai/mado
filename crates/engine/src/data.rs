@@ -15,6 +15,8 @@ pub enum DownloadResumedStatus {
 pub enum DownloadProgressStatus {
     Resumed(DownloadResumedStatus),
     Paused,
+    // we don't need StdError here because this is only used to shows to user
+    Error(String),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -34,6 +36,10 @@ impl DownloadStatus {
 
     pub fn is_completed(&self) -> bool {
         matches!(self, Self::Finished)
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::InProgress(DownloadProgressStatus::Error(..)))
     }
 }
 
