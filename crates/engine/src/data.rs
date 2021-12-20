@@ -1,3 +1,4 @@
+use crate::path::Utf8PathBuf;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -80,9 +81,10 @@ impl LateBindingModule {
 #[derive(Debug)]
 pub struct DownloadInfo {
     module: tokio::sync::Mutex<LateBindingModule>,
+    module_uuid: mado_core::Uuid,
     manga: Arc<MangaInfo>,
     chapters: Vec<Arc<DownloadChapterInfo>>,
-    path: std::path::PathBuf,
+    path: Utf8PathBuf,
     domain: mado_core::Url,
     status: Mutex<DownloadStatus>,
     observers: Mutex<Vec<ArcDownloadInfoObserver>>,
@@ -115,6 +117,7 @@ impl DownloadInfo {
         let domain = module.get_domain();
 
         Self {
+            module_uuid: module.get_uuid(),
             module: LateBindingModule::Module(module).into(),
             manga,
             chapters,
@@ -131,8 +134,12 @@ impl DownloadInfo {
     }
 
     /// Get a reference to the download info's path.
-    pub fn path(&self) -> &std::path::PathBuf {
+    pub fn path(&self) -> &Utf8PathBuf {
         &self.path
+    }
+
+    pub fn module_uuid(&self) -> &mado_core::Uuid {
+        &self.module_uuid
     }
 
     pub fn domain(&self) -> &mado_core::Url {
@@ -197,7 +204,7 @@ pub struct DownloadRequest {
     module: ArcMadoModule,
     manga: Arc<MangaInfo>,
     chapters: Vec<Arc<ChapterInfo>>,
-    path: std::path::PathBuf,
+    path: Utf8PathBuf,
     status: DownloadRequestStatus,
 }
 
@@ -224,7 +231,7 @@ impl DownloadRequest {
         module: ArcMadoModule,
         manga: Arc<MangaInfo>,
         chapters: Vec<Arc<ChapterInfo>>,
-        path: std::path::PathBuf,
+        path: Utf8PathBuf,
         status: DownloadRequestStatus,
     ) -> Self {
         Self {
@@ -247,7 +254,7 @@ type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
 pub struct DownloadChapterInfo {
     module: LateBindingModule,
     chapter: Arc<ChapterInfo>,
-    path: std::path::PathBuf,
+    path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
 }
 
@@ -255,7 +262,7 @@ impl DownloadChapterInfo {
     pub fn new(
         module: LateBindingModule,
         chapter: Arc<ChapterInfo>,
-        path: std::path::PathBuf,
+        path: Utf8PathBuf,
         status: DownloadStatus,
     ) -> Self {
         Self {
@@ -277,7 +284,7 @@ impl DownloadChapterInfo {
     }
 
     /// Get a reference to the download chapter info's path.
-    pub fn path(&self) -> &std::path::PathBuf {
+    pub fn path(&self) -> &Utf8PathBuf {
         &self.path
     }
 

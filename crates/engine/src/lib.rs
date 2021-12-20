@@ -21,9 +21,14 @@ pub enum ModuleLoadError {
 /// Traits to Load [`crate::MadoModule`]
 #[async_trait::async_trait]
 pub trait MadoModuleLoader: Send + Sync {
-    async fn get_paths(&self) -> Vec<std::path::PathBuf>;
+    async fn get_paths(&self) -> Vec<path::Utf8PathBuf>;
     async fn load(
         &self,
-        path: std::path::PathBuf,
+        path: path::Utf8PathBuf,
     ) -> Result<Vec<ArcMadoModule>, crate::ModuleLoadError>;
+}
+
+pub mod path {
+    pub use camino::Utf8Path;
+    pub use camino::Utf8PathBuf;
 }

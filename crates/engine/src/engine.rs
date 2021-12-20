@@ -76,12 +76,12 @@ impl MadoEngine {
                     Ok(modules) => {
                         for it in modules {
                             if let Err(err) = state.push_module(it) {
-                                tracing::error!("error pushing {}: {}", path.display(), err);
+                                tracing::error!("error pushing {}: {}", path, err);
                             }
                         }
                     }
                     Err(err) => {
-                        tracing::error!("error loading {}: {}", path.display(), err);
+                        tracing::error!("error loading {}: {}", path, err);
                     }
                 }
             }

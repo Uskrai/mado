@@ -163,7 +163,7 @@ where
                     return;
                 }
 
-                let path = std::path::PathBuf::from(&manga_info.title);
+                let path = manga_info.title.clone().into();
                 let request = DownloadRequest::new(
                     module,
                     manga_info,

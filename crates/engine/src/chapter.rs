@@ -1,10 +1,10 @@
-use std::{io::Write, path::PathBuf, sync::Arc, time::Duration};
+use std::{io::Write, sync::Arc, time::Duration};
 
 use futures::{Future, StreamExt};
 use mado_core::{ArcMadoModule, ChapterImageInfo, ChapterInfo};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use crate::DownloadChapterInfo;
+use crate::{path::Utf8PathBuf, DownloadChapterInfo};
 
 pub fn create(info: Arc<DownloadChapterInfo>) -> (ChapterTask, ChapterTaskReceiver) {
     let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
@@ -172,7 +172,7 @@ impl ChapterTaskReceiver {
 
     fn download_image(
         &self,
-        path: PathBuf,
+        path: Utf8PathBuf,
         image: ChapterImageInfo,
     ) -> impl Future<Output = Result<(), mado_core::Error>> {
         let mut module = self.info.module();
@@ -183,16 +183,16 @@ impl ChapterTaskReceiver {
             if !exists {
                 let task = ChapterImageTask::new(module.clone(), image.clone());
 
-                tracing::trace!("Start downloading {} {:?}", path.display(), image);
+                tracing::trace!("Start downloading {} {:?}", path, image);
 
                 let buffer = task.download().await?;
 
-                tracing::trace!("Finished downloading {} {:?}", path.display(), image);
+                tracing::trace!("Finished downloading {} {:?}", path, image);
                 let mut file = std::fs::File::create(&path).unwrap();
                 file.write_all(&buffer)?;
-                tracing::trace!("Finished writing to {}", path.display());
+                tracing::trace!("Finished writing to {}", path);
             } else {
-                tracing::trace!("File {} already exists, skipping...", path.display());
+                tracing::trace!("File {} already exists, skipping...", path);
             }
             Ok(())
         }
