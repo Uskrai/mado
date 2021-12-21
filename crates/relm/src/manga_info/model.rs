@@ -37,7 +37,7 @@ where
 pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
     chapters: VecChapters,
-    current_handle: Option<(ArcMadoModule, AbortOnDropHandle<()>)>,
+    current_handle: Option<(ArcMadoModule, Url, AbortOnDropHandle<()>)>,
     manga_info: Option<Arc<MangaInfo>>,
 }
 
@@ -92,7 +92,7 @@ impl MangaInfoModel {
         // clear previous info
         send!(sender, Msg::Clear);
 
-        let task = Self::get_info(module.clone(), url, sender);
+        let task = Self::get_info(module.clone(), url.clone(), sender);
 
         // reset current handle.
         // handle is automatically aborted when droped
@@ -100,7 +100,7 @@ impl MangaInfoModel {
         // by making it None first
         self.current_handle = None;
         // then we can spawn new task
-        self.current_handle = Some((module, tokio::spawn(task).into()));
+        self.current_handle = Some((module, url, tokio::spawn(task).into()));
     }
 
     pub async fn get_info(module: ArcMadoModule, url: Url, sender: relm4::Sender<Msg>) {
@@ -140,8 +140,8 @@ where
     ) {
         match msg {
             Msg::Download => {
-                let module = match &self.current_handle {
-                    Some((module, _)) => module.clone(),
+                let (module, url) = match &self.current_handle {
+                    Some((module, url, _)) => (module.clone(), url.clone()),
                     _ => {
                         return;
                     }
@@ -169,6 +169,7 @@ where
                     manga_info,
                     selected,
                     path,
+                    Some(url),
                     DownloadRequestStatus::Resume,
                 );
 

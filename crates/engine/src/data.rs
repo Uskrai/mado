@@ -2,7 +2,7 @@ use crate::path::Utf8PathBuf;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use mado_core::{ArcMadoModule, ArcMadoModuleMap, ChapterInfo, MangaInfo};
+use mado_core::{ArcMadoModule, ArcMadoModuleMap, ChapterInfo, MangaInfo, Url, Uuid};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum DownloadResumedStatus {
@@ -44,13 +44,13 @@ impl DownloadStatus {
 #[derive(Clone)]
 pub enum LateBindingModule {
     Module(ArcMadoModule),
-    ModuleUUID(ArcMadoModuleMap, mado_core::Uuid),
+    WaitModule(ArcMadoModuleMap, Uuid),
 }
 
 impl std::fmt::Debug for LateBindingModule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LateBindingModule::ModuleUUID(_, uuid) => f
+            LateBindingModule::WaitModule(_, uuid) => f
                 .debug_struct("LateBindingModule")
                 .field("uuid", uuid)
                 .finish(),
@@ -66,7 +66,7 @@ impl LateBindingModule {
     pub async fn wait(&mut self) -> ArcMadoModule {
         match self {
             LateBindingModule::Module(module) => module.clone(),
-            LateBindingModule::ModuleUUID(map, uuid) => {
+            LateBindingModule::WaitModule(map, uuid) => {
                 let module = loop {
                     let module = map.get_by_uuid(*uuid);
                     if let Some(module) = module {
@@ -81,34 +81,73 @@ impl LateBindingModule {
         }
     }
 
-    pub fn uuid(&self) -> mado_core::Uuid {
+    pub fn uuid(&self) -> Uuid {
         match self {
             LateBindingModule::Module(module) => module.get_uuid(),
-            LateBindingModule::ModuleUUID(_, uuid) => *uuid,
+            LateBindingModule::WaitModule(_, uuid) => *uuid,
         }
     }
 }
 
 #[derive(Debug)]
-pub struct DownloadInfo {
+pub struct ModuleInfo {
+    uuid: Uuid,
     module: tokio::sync::Mutex<LateBindingModule>,
-    module_uuid: mado_core::Uuid,
+}
+
+impl ModuleInfo {
+    pub fn new(module: LateBindingModule) -> Self {
+        let uuid = module.uuid();
+        Self {
+            uuid,
+            module: tokio::sync::Mutex::new(module),
+        }
+    }
+
+    pub async fn lock(&self) -> tokio::sync::MutexGuard<'_, LateBindingModule> {
+        self.module.lock().await
+    }
+}
+
+#[derive(Debug)]
+pub struct DownloadInfo {
+    module: ModuleInfo,
     manga_title: String,
     chapters: Vec<Arc<DownloadChapterInfo>>,
     path: Utf8PathBuf,
-    domain: mado_core::Url,
+    url: Option<Url>,
     status: Mutex<DownloadStatus>,
     observers: Mutex<Vec<ArcDownloadInfoObserver>>,
 }
 
 impl DownloadInfo {
-    pub fn new(request: DownloadRequest) -> Self {
+    /// Create new Download info.
+    pub fn new(
+        module: LateBindingModule,
+        title: String,
+        chapters: Vec<Arc<DownloadChapterInfo>>,
+        path: Utf8PathBuf,
+        url: Option<Url>,
+        status: DownloadStatus,
+    ) -> Self {
+        Self {
+            module: ModuleInfo::new(module),
+            manga_title: title,
+            chapters,
+            path,
+            url,
+            status: Mutex::new(status),
+            observers: Mutex::new(Vec::new()),
+        }
+    }
+    pub fn from_request(request: DownloadRequest) -> Self {
         let DownloadRequest {
             module,
             manga,
             chapters,
             path,
             status,
+            url,
         } = request;
 
         let chapters = chapters
@@ -122,21 +161,17 @@ impl DownloadInfo {
                     DownloadStatus::InProgress(status.into()),
                 )
             })
-            .map(|it| Arc::new(it))
+            .map(Arc::new)
             .collect();
 
-        let domain = module.get_domain();
-
-        Self {
-            module_uuid: module.get_uuid(),
-            module: LateBindingModule::Module(module).into(),
-            manga_title: manga.title.clone(),
+        Self::new(
+            LateBindingModule::Module(module),
+            manga.title.clone(),
             chapters,
             path,
-            domain,
-            status: Mutex::new(DownloadStatus::InProgress(status.into())),
-            observers: Mutex::default(),
-        }
+            url,
+            DownloadStatus::InProgress(status.into()),
+        )
     }
 
     /// Get download info's status.
@@ -149,12 +184,20 @@ impl DownloadInfo {
         &self.path
     }
 
-    pub fn module_uuid(&self) -> &mado_core::Uuid {
-        &self.module_uuid
+    pub fn module_uuid(&self) -> &Uuid {
+        &self.module.uuid
     }
 
-    pub fn domain(&self) -> &mado_core::Url {
-        &self.domain
+    pub fn manga_title(&self) -> &str {
+        &self.manga_title
+    }
+
+    pub fn module_domain(&self) -> Option<&str> {
+        self.url.as_ref().map(|url| url.domain()).flatten()
+    }
+
+    pub fn url(&self) -> Option<&Url> {
+        self.url.as_ref()
     }
 
     /// Wait for module to be available.
@@ -216,6 +259,7 @@ pub struct DownloadRequest {
     manga: Arc<MangaInfo>,
     chapters: Vec<Arc<ChapterInfo>>,
     path: Utf8PathBuf,
+    url: Option<Url>,
     status: DownloadRequestStatus,
 }
 
@@ -234,7 +278,6 @@ impl From<DownloadRequestStatus> for DownloadProgressStatus {
             DownloadRequestStatus::Pause => DownloadProgressStatus::Paused,
         }
     }
-    //
 }
 
 impl DownloadRequest {
@@ -243,6 +286,7 @@ impl DownloadRequest {
         manga: Arc<MangaInfo>,
         chapters: Vec<Arc<ChapterInfo>>,
         path: Utf8PathBuf,
+        url: Option<Url>,
         status: DownloadRequestStatus,
     ) -> Self {
         Self {
@@ -251,6 +295,7 @@ impl DownloadRequest {
             chapters,
             path,
             status,
+            url,
         }
     }
 }

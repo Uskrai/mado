@@ -110,7 +110,7 @@ impl From<&DownloadInfo> for DownloadView {
             .use_markup(true)
             .label(&format!(
                 "<span size='large'>{}</span>",
-                gtk::glib::markup_escape_text(&info.manga().title)
+                gtk::glib::markup_escape_text(info.manga())
             ))
             .halign(gtk::Align::Start)
             .build();
