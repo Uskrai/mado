@@ -153,10 +153,12 @@ impl DownloadInfo {
         let chapters = chapters
             .into_iter()
             .map(|it| {
-                let path = path.join(it.to_string());
+                let title = it.to_string();
+                let path = path.join(&title);
                 DownloadChapterInfo::new(
                     LateBindingModule::Module(module.clone()),
-                    it,
+                    it.id.clone(),
+                    title,
                     path,
                     DownloadStatus::InProgress(status.into()),
                 )
@@ -309,7 +311,8 @@ type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
 #[derive(Debug)]
 pub struct DownloadChapterInfo {
     module: LateBindingModule,
-    chapter: Arc<ChapterInfo>,
+    title: String,
+    id: String,
     path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
 }
@@ -317,21 +320,18 @@ pub struct DownloadChapterInfo {
 impl DownloadChapterInfo {
     pub fn new(
         module: LateBindingModule,
-        chapter: Arc<ChapterInfo>,
+        id: String,
+        title: String,
         path: Utf8PathBuf,
         status: DownloadStatus,
     ) -> Self {
         Self {
             module,
-            chapter,
+            title,
+            id,
             path,
             status: Mutex::new(status),
         }
-    }
-
-    /// Get a reference to the download chapter info's chapter.
-    pub fn chapter(&self) -> &ChapterInfo {
-        self.chapter.as_ref()
     }
 
     /// Get a reference to the download chapter info's module.
@@ -344,10 +344,6 @@ impl DownloadChapterInfo {
         &self.path
     }
 
-    pub fn title(&self) -> Option<&str> {
-        self.chapter.title.as_ref().map(|s| s.as_str())
-    }
-
     /// Get a reference to the download chapter info's status.
     pub fn status(&self) -> impl std::ops::Deref<Target = DownloadStatus> + '_ {
         self.status.lock()
@@ -355,5 +351,17 @@ impl DownloadChapterInfo {
 
     pub fn set_status(&self, status: DownloadStatus) {
         *self.status.lock() = status;
+    }
+
+    /// Get a reference to the download chapter info's title.
+    ///
+    /// this isn't necessarily ChapterInfo::title
+    pub fn title(&self) -> &str {
+        self.title.as_ref()
+    }
+
+    /// Get a reference to the chapter id.
+    pub fn id(&self) -> &str {
+        self.id.as_ref()
     }
 }
