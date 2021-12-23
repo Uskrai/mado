@@ -118,6 +118,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "camino"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52d74260d9bf6944e2208aa46841b4b8f0d7ffc0849a06837b2f510337f86b2b"
+
+[[package]]
 name = "cc"
 version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -960,6 +966,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atomic",
+ "camino",
  "futures",
  "mado-core",
  "parking_lot",
