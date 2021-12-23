@@ -83,7 +83,7 @@ impl LateBindingModule {
 
     pub fn uuid(&self) -> Uuid {
         match self {
-            LateBindingModule::Module(module) => module.get_uuid(),
+            LateBindingModule::Module(module) => module.uuid(),
             LateBindingModule::WaitModule(_, uuid) => *uuid,
         }
     }
@@ -342,6 +342,10 @@ impl DownloadChapterInfo {
     /// Get a reference to the download chapter info's path.
     pub fn path(&self) -> &Utf8PathBuf {
         &self.path
+    }
+
+    pub fn title(&self) -> Option<&str> {
+        self.chapter.title.as_ref().map(|s| s.as_str())
     }
 
     /// Get a reference to the download chapter info's status.

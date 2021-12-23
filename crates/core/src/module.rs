@@ -21,12 +21,12 @@ impl<T> BytesStream for T where T: futures_core::stream::Stream<Item = Result<By
 pub trait MadoModule: Send + Sync + Debug + 'static {
     /// Get UUID of module. this value should be const
     /// and should'nt be changed ever.
-    fn get_uuid(&self) -> Uuid;
+    fn uuid(&self) -> Uuid;
 
     /// Get module's user readable name.
-    fn get_name(&self) -> &str;
+    fn name(&self) -> &str;
 
-    fn get_domain(&self) -> crate::url::Url;
+    fn domain(&self) -> &crate::url::Url;
 
     /// Get Manga information from `url`
     async fn get_info(&self, url: crate::url::Url) -> Result<MangaInfo, Error>;
@@ -98,17 +98,17 @@ impl MadoModuleMap for DefaultMadoModuleMap {
     }
 
     fn push(&mut self, module: ArcMadoModule) -> std::result::Result<(), MadoModuleMapError> {
-        match self.uuids.insert(module.get_uuid(), module.clone()) {
+        match self.uuids.insert(module.uuid(), module.clone()) {
             Some(prev) => {
-                let error = DuplicateUUIDError::new(prev.get_uuid(), prev.clone(), module);
-                let uuid = prev.get_uuid();
+                let error = DuplicateUUIDError::new(prev.uuid(), prev.clone(), module);
+                let uuid = prev.uuid();
                 // restore previous module first.
                 self.uuids.insert(uuid, prev.clone());
                 // then return err
                 Err(error.into())
             }
             None => {
-                let mut url = module.get_domain();
+                let mut url = module.domain().clone();
                 remove_domain(&mut url);
                 self.domains.insert(url, module.clone());
                 self.vec.push(module);
@@ -164,31 +164,31 @@ impl<Map: MadoModuleMap> MutMadoModuleMap for MutexMadoModuleMap<Map> {
 mod test {
     use std::{pin::Pin, sync::Arc};
 
-    use crate::{BytesStream, DefaultMadoModuleMap, MadoModuleMap};
+    use crate::{url::Url, BytesStream, DefaultMadoModuleMap, MadoModuleMap};
 
     #[derive(Clone, Debug)]
     pub struct MockMadoModule {
         uuid: crate::Uuid,
-        url: crate::url::Url,
+        url: url::Url,
     }
 
     impl MockMadoModule {
-        pub fn new(uuid: super::Uuid, url: crate::url::Url) -> Self {
+        pub fn new(uuid: super::Uuid, url: url::Url) -> Self {
             Self { uuid, url }
         }
     }
 
     #[async_trait::async_trait]
     impl super::MadoModule for MockMadoModule {
-        fn get_uuid(&self) -> uuid::Uuid {
+        fn uuid(&self) -> uuid::Uuid {
             self.uuid
         }
 
-        fn get_domain(&self) -> crate::url::Url {
-            self.url.clone()
+        fn domain(&self) -> &Url {
+            &self.url
         }
 
-        async fn get_info(&self, _: crate::url::Url) -> Result<crate::MangaInfo, crate::Error> {
+        async fn get_info(&self, _: Url) -> Result<crate::MangaInfo, crate::Error> {
             todo!()
         }
 
@@ -199,7 +199,7 @@ mod test {
             todo!()
         }
 
-        fn get_name(&self) -> &str {
+        fn name(&self) -> &str {
             "test"
         }
 
@@ -216,7 +216,7 @@ mod test {
         let mut map = DefaultMadoModuleMap::default();
         let mock = Arc::new(MockMadoModule::new(
             super::Uuid::from_u128(123),
-            crate::url::Url::parse("https://google.com").unwrap(),
+            url::Url::parse("https://google.com").unwrap(),
         ));
 
         map.push(mock.clone()).unwrap();

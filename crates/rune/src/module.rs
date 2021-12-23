@@ -8,8 +8,8 @@ use crate::Rune;
 use crate::SendValue;
 use mado_core::ChapterImageInfo;
 use mado_core::MadoModule;
+use mado_core::Url;
 
-use super::http::Url;
 use super::Error;
 
 use async_trait::async_trait;
@@ -39,7 +39,7 @@ pub struct RuneMadoModule {
     data: SendValue,
 }
 impl RuneMadoModule {
-    async fn get_info(&self, url: Url) -> Result<MangaInfo, Error> {
+    async fn get_info(&self, url: super::http::Url) -> Result<MangaInfo, Error> {
         let fut = self
             .get_info
             .async_call::<_, DeserializeResult<_>>((self.data.clone(), url))
@@ -72,20 +72,20 @@ impl RuneMadoModule {
 
 #[async_trait]
 impl MadoModule for RuneMadoModule {
-    fn get_uuid(&self) -> Uuid {
+    fn uuid(&self) -> Uuid {
         self.uuid
     }
 
-    fn get_name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
 
-    fn get_domain(&self) -> mado_core::Url {
-        self.domain.clone().into()
+    fn domain(&self) -> &Url {
+        &self.domain
     }
 
-    async fn get_info(&self, url: mado_core::Url) -> Result<MangaInfo, mado_core::Error> {
-        self.get_info(Url::from(url)).await.map_err(Into::into)
+    async fn get_info(&self, url: Url) -> Result<MangaInfo, mado_core::Error> {
+        self.get_info(url.into()).await.map_err(Into::into)
     }
 
     async fn get_chapter_images(&self, task: Box<dyn ChapterTask>) -> Result<(), mado_core::Error> {
@@ -122,7 +122,7 @@ impl RuneMadoModule {
 
         let uuid = from_value::<RuneUuid, _>(obj["uuid"].clone())?.into();
         let name = from_value(obj["name"].clone())?;
-        let domain = from_value(obj["domain"].clone())?;
+        let domain = from_value::<super::http::Url, _>(obj["domain"].clone())?.into_inner();
 
         macro_rules! get_function {
             ($name:literal) => {

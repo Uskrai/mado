@@ -54,8 +54,8 @@ impl AppUpdate for AppModel {
             AppMsg::PushModule(module) => {
                 tracing::trace!(
                     "Pushing module domain:{}, uuid:{}",
-                    module.get_domain(),
-                    module.get_uuid()
+                    module.domain(),
+                    module.uuid()
                 );
             }
             AppMsg::DownloadRequest(info) => {

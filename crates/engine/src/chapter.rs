@@ -82,7 +82,7 @@ impl ChapterImageTask {
         skip_all,
         fields(
             self.image = %self.image.id,
-            self.module = %self.module.get_uuid()
+            self.module = %self.module.uuid()
         )
     )]
     pub async fn download(&self) -> Result<Vec<u8>, mado_core::Error> {

@@ -4,7 +4,7 @@ use crate::ArcMadoModule;
 
 #[derive(thiserror::Error, Clone)]
 #[error(
-    "{} and {} have conflicting uuid: {}", previous.get_domain(), current.get_domain(), uuid
+    "{} and {} have conflicting uuid: {}", previous.domain(), current.domain(), uuid
 )]
 pub struct DuplicateUUIDError {
     uuid: Uuid,
@@ -26,8 +26,8 @@ impl std::fmt::Debug for DuplicateUUIDError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DuplicateUUIDError")
             .field("uuid", &self.uuid)
-            .field("previous_domain", &self.previous.get_domain())
-            .field("current_domain", &self.current.get_domain())
+            .field("previous_domain", &self.previous.domain())
+            .field("current_domain", &self.current.domain())
             .finish()
     }
 }
