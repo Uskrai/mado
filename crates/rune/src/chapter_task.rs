@@ -27,7 +27,7 @@ impl RuneChapterTask {
     }
 
     pub fn get_chapter_id(&self) -> String {
-        self.inner.get_chapter().id.clone()
+        self.inner.get_chapter_id().to_string()
     }
 }
 

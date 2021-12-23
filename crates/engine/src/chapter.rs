@@ -1,7 +1,7 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
 use futures::{Future, StreamExt};
-use mado_core::{ArcMadoModule, ChapterImageInfo, ChapterInfo};
+use mado_core::{ArcMadoModule, ChapterImageInfo};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{path::Utf8PathBuf, DownloadChapterInfo};
@@ -205,7 +205,7 @@ impl mado_core::ChapterTask for ChapterTask {
         self.sender.send(image).unwrap();
     }
 
-    fn get_chapter(&self) -> &ChapterInfo {
-        &self.info.chapter()
+    fn get_chapter_id(&self) -> &str {
+        &self.info.chapter().id
     }
 }

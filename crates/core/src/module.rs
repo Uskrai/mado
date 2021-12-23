@@ -7,13 +7,11 @@ use std::{
 
 use bytes::Bytes;
 
-use crate::{
-    ChapterImageInfo, ChapterInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid,
-};
+use crate::{ChapterImageInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid};
 
 pub trait ChapterTask: Send {
     fn add(&mut self, image: ChapterImageInfo);
-    fn get_chapter(&self) -> &ChapterInfo;
+    fn get_chapter_id(&self) -> &str;
 }
 
 pub trait BytesStream: futures_core::stream::Stream<Item = Result<Bytes, Error>> + Send {}
