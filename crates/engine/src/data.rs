@@ -334,7 +334,7 @@ type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
 pub struct DownloadChapterInfo {
     module: LateBindingModule,
     title: String,
-    id: String,
+    chapter_id: String,
     path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
 }
@@ -342,7 +342,7 @@ pub struct DownloadChapterInfo {
 impl DownloadChapterInfo {
     pub fn new(
         module: LateBindingModule,
-        id: String,
+        chapter_id: String,
         title: String,
         path: Utf8PathBuf,
         status: DownloadStatus,
@@ -350,7 +350,7 @@ impl DownloadChapterInfo {
         Self {
             module,
             title,
-            id,
+            chapter_id,
             path,
             status: Mutex::new(status),
         }
@@ -383,7 +383,7 @@ impl DownloadChapterInfo {
     }
 
     /// Get a reference to the chapter id.
-    pub fn id(&self) -> &str {
-        self.id.as_ref()
+    pub fn chapter_id(&self) -> &str {
+        self.chapter_id.as_ref()
     }
 }
