@@ -257,12 +257,18 @@ impl DownloadInfo {
         &self.manga_title
     }
 
+    /// Connect and send current state.
     pub fn connect(&self, observer: ArcDownloadInfoObserver) {
         let mut observers = self.observers.lock();
 
         observer.on_status_changed(&self.status());
 
         observers.push(observer);
+    }
+
+    /// Connect without sending current state
+    pub fn connect_only(&self, observer: ArcDownloadInfoObserver) {
+        self.observers.lock().push(observer);
     }
 
     fn emit(&self, fun: impl Fn(ArcDownloadInfoObserver)) {
