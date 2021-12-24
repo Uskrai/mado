@@ -39,6 +39,22 @@ impl DownloadStatus {
     pub fn is_error(&self) -> bool {
         matches!(self, Self::InProgress(DownloadProgressStatus::Error(..)))
     }
+
+    pub fn resumed(status: DownloadResumedStatus) -> Self {
+        Self::InProgress(DownloadProgressStatus::Resumed(status))
+    }
+
+    pub fn paused() -> Self {
+        Self::InProgress(DownloadProgressStatus::Paused)
+    }
+
+    pub fn error<S: Into<String>>(error: S) -> Self {
+        Self::InProgress(DownloadProgressStatus::Error(error.into()))
+    }
+
+    pub fn finished() -> Self {
+        Self::Finished
+    }
 }
 
 #[derive(Clone)]
