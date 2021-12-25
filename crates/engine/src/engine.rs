@@ -5,7 +5,10 @@ use tokio::sync::{
     watch,
 };
 
-use crate::{DownloadStatus, MadoEngineState, MadoEngineStateObserver, MadoModuleLoader};
+use crate::{
+    DownloadResumedStatus, DownloadStatus, MadoEngineState, MadoEngineStateObserver,
+    MadoModuleLoader,
+};
 
 pub struct MadoEngine {
     state: Arc<MadoEngineState>,
@@ -135,6 +138,7 @@ impl DownloadTask {
                 }
                 Err(err) => {
                     tracing::error!("{}", err);
+                    self.info.set_status(DownloadStatus::error(err));
                 }
             }
         }
@@ -142,6 +146,8 @@ impl DownloadTask {
 
     async fn download(&self) -> Result<(), mado_core::Error> {
         let module = self.info.wait_module().await;
+        self.info
+            .set_status(DownloadStatus::resumed(DownloadResumedStatus::Downloading));
         for it in self.info.chapters() {
             if it.status().is_completed() {
                 continue;

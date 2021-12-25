@@ -183,6 +183,10 @@ impl DownloadView {
             self.status.add_css_class(title);
         };
 
+        let set_text = |text| {
+            self.status.set_text(text);
+        };
+
         remove_css(DOWNLOAD_RESUMED_CSS);
         remove_css(DOWNLOAD_PAUSED_CSS);
         remove_css(DOWNLOAD_ERROR_CSS);
@@ -190,19 +194,28 @@ impl DownloadView {
         match status {
             DownloadStatus::Finished => {
                 add_css(DOWNLOAD_RESUMED_CSS);
-                self.status.set_text("Finished");
+                set_text("Finished");
             }
+
             DownloadStatus::InProgress(progress) => match progress {
-                mado_engine::DownloadProgressStatus::Resumed(..) => {
+                mado_engine::DownloadProgressStatus::Resumed(v) => {
                     add_css(DOWNLOAD_RESUMED_CSS);
+                    match v {
+                        mado_engine::DownloadResumedStatus::Waiting => {
+                            set_text("Waiting");
+                        }
+                        mado_engine::DownloadResumedStatus::Downloading => {
+                            set_text("Downloading");
+                        }
+                    }
                 }
                 mado_engine::DownloadProgressStatus::Paused => {
                     add_css(DOWNLOAD_PAUSED_CSS);
-                    self.status.set_text("Paused");
+                    set_text("Paused");
                 }
                 mado_engine::DownloadProgressStatus::Error(error) => {
                     add_css(DOWNLOAD_ERROR_CSS);
-                    self.status.set_text(error);
+                    set_text(error);
                 }
             },
         }

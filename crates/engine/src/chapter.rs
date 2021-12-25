@@ -206,6 +206,6 @@ impl mado_core::ChapterTask for ChapterTask {
     }
 
     fn get_chapter_id(&self) -> &str {
-        &self.info.chapter_id()
+        self.info.chapter_id()
     }
 }

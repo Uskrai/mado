@@ -7,6 +7,7 @@ use mado_core::{ArcMadoModule, ArcMadoModuleMap, ChapterInfo, MangaInfo, Url, Uu
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum DownloadResumedStatus {
     Waiting,
+    Downloading,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -48,8 +49,8 @@ impl DownloadStatus {
         Self::InProgress(DownloadProgressStatus::Paused)
     }
 
-    pub fn error<S: Into<String>>(error: S) -> Self {
-        Self::InProgress(DownloadProgressStatus::Error(error.into()))
+    pub fn error<S: std::fmt::Display>(error: S) -> Self {
+        Self::InProgress(DownloadProgressStatus::Error(error.to_string()))
     }
 
     pub fn finished() -> Self {
