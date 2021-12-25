@@ -18,8 +18,10 @@ type DynMadoEngineStateObserver = dyn MadoEngineStateObserver;
 type BoxedMadoEngineStateObserver = Box<DynMadoEngineStateObserver>;
 
 impl MadoEngineState {
-    pub fn new(modules: DefaultMadoModuleMap, tasks: Vec<Arc<DownloadInfo>>) -> Self {
-        let modules = Arc::new(MutexMadoModuleMap::new(modules));
+    pub fn new(
+        modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
+        tasks: Vec<Arc<DownloadInfo>>,
+    ) -> Self {
         let tasks = RwLock::new(tasks);
 
         Self {
