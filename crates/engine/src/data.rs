@@ -338,6 +338,11 @@ pub struct DownloadChapterInfo {
     chapter_id: String,
     path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
+    observers: Mutex<Vec<Box<dyn DownloadChapterInfoObserver>>>,
+}
+
+pub trait DownloadChapterInfoObserver: std::fmt::Debug + Send + Sync {
+    fn on_status_changed(&self, status: &DownloadStatus);
 }
 
 impl DownloadChapterInfo {
@@ -354,6 +359,7 @@ impl DownloadChapterInfo {
             chapter_id,
             path,
             status: Mutex::new(status),
+            observers: Default::default(),
         }
     }
 
@@ -373,7 +379,9 @@ impl DownloadChapterInfo {
     }
 
     pub fn set_status(&self, status: DownloadStatus) {
-        *self.status.lock() = status;
+        let mut lock = self.status.lock();
+        *lock = status;
+        self.emit(|it| it.on_status_changed(&lock));
     }
 
     /// Get a reference to the download chapter info's title.
@@ -386,5 +394,11 @@ impl DownloadChapterInfo {
     /// Get a reference to the chapter id.
     pub fn chapter_id(&self) -> &str {
         self.chapter_id.as_ref()
+    }
+
+    fn emit(&self, f: impl Fn(&Box<dyn DownloadChapterInfoObserver>)) {
+        for it in self.observers.lock().iter() {
+            f(it);
+        }
     }
 }
