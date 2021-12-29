@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use event_listener::Event;
 use futures::{channel::mpsc, StreamExt};
-use tokio::sync::watch;
 
 use crate::{
     DownloadResumedStatus, DownloadStatus, MadoEngineState, MadoEngineStateObserver,
@@ -168,15 +168,15 @@ impl DownloadTask {
 #[derive(Debug)]
 pub struct DownloadTaskSender {
     info: Arc<crate::DownloadInfo>,
-    status: watch::Sender<()>,
+    event: Event,
 }
 
 impl DownloadTaskSender {
     pub fn connect(info: Arc<crate::DownloadInfo>) -> Arc<Self> {
-        let (status, _) = watch::channel(());
+        let event = Event::new();
         let this = Arc::new(Self {
             info: info.clone(),
-            status,
+            event,
         });
 
         info.connect(this.clone());
@@ -184,22 +184,18 @@ impl DownloadTaskSender {
     }
 
     pub async fn wait_status(&self, fun: impl Fn(&DownloadStatus) -> bool) {
-        let mut rx = self.status.subscribe();
         loop {
-            rx.borrow_and_update();
             if fun(&self.info.status()) {
                 return;
             }
 
-            if rx.changed().await.is_err() {
-                return;
-            }
+            self.event.listen().await;
         }
     }
 }
 
 impl crate::DownloadInfoObserver for DownloadTaskSender {
     fn on_status_changed(&self, _: &DownloadStatus) {
-        self.status.send_replace(());
+        self.event.notify(usize::MAX);
     }
 }
