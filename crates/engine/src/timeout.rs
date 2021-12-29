@@ -11,7 +11,7 @@ pub struct Elapsed;
 impl std::error::Error for Elapsed {}
 impl std::fmt::Display for Elapsed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        "deadline has elapsed".fmt(f)
+        "timeout reached".fmt(f)
     }
 }
 
