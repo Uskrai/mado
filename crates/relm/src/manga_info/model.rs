@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use mado_core::{url::Url, ArcMadoModule, Error, MangaInfo};
-use mado_engine::{DownloadRequest, DownloadRequestStatus};
+use mado_engine::{
+    path::{Utf8Path, Utf8PathBuf},
+    DownloadRequest, DownloadRequestStatus,
+};
 
 use crate::AbortOnDropHandle;
 
@@ -14,6 +17,7 @@ use gtk::prelude::WidgetExt;
 #[derive(Debug)]
 pub enum MangaInfoMsg {
     Download,
+    DownloadPathChanged(String),
     ShowError(mado_core::Error),
     /// Get info from string
     /// string should be convertible to URL
@@ -39,6 +43,7 @@ pub struct MangaInfoModel {
     chapters: VecChapters,
     current_handle: Option<(ArcMadoModule, Url, AbortOnDropHandle<()>)>,
     manga_info: Option<Arc<MangaInfo>>,
+    path: Utf8PathBuf,
 }
 
 impl ChapterListParentModel for MangaInfoModel {
@@ -54,6 +59,10 @@ impl Model for MangaInfoModel {
 }
 
 impl MangaInfoModel {
+    pub fn path(&self) -> &Utf8Path {
+        &self.path
+    }
+
     fn get_module(&self, link: &str) -> Result<(Url, ArcMadoModule), Error> {
         let url = mado_core::url::fill_host(link)?;
 
@@ -128,6 +137,7 @@ where
             chapters: Default::default(),
             current_handle: None,
             manga_info: None,
+            path: Utf8PathBuf::from("downloads/"),
         }
     }
 
@@ -163,7 +173,8 @@ where
                     return;
                 }
 
-                let path = manga_info.title.clone().into();
+                let path = self.path.join(&manga_info.title);
+
                 let request = DownloadRequest::new(
                     module,
                     manga_info,
@@ -187,6 +198,9 @@ where
                 for it in chapters {
                     self.chapters.push(it.clone());
                 }
+            }
+            Msg::DownloadPathChanged(path) => {
+                self.path = path.into();
             }
             Msg::Clear => {
                 self.chapters.clear();

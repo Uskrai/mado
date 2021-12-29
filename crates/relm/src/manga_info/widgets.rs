@@ -41,6 +41,12 @@ impl<T: Model> Widgets<MangaInfoModel, T> for MangaInfoWidgets {
           append: download_path = &gtk::Entry {
             set_hexpand: true,
             set_placeholder_text: Some("Enter Download Path"),
+            connect_changed(sender) => move |path| {
+              send!(
+                sender,
+                Msg::DownloadPathChanged(path.text().to_string())
+              );
+            }
           },
 
           append: download_button = &gtk::Button {
@@ -50,7 +56,6 @@ impl<T: Model> Widgets<MangaInfoModel, T> for MangaInfoWidgets {
             }
           }
         }
-        //
       }
     }
 }
