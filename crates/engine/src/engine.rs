@@ -157,7 +157,7 @@ impl DownloadTask {
             let receiver = receiver.run();
             let task = module.get_chapter_images(Box::new(task));
 
-            tokio::try_join!(task, receiver)?;
+            futures::try_join!(task, receiver)?;
             it.set_status(DownloadStatus::Finished);
         }
         self.info.set_status(DownloadStatus::Finished);
