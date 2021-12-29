@@ -89,7 +89,8 @@ impl LateBindingModule {
                     if let Some(module) = module {
                         break module;
                     }
-                    tokio::task::yield_now().await;
+
+                    futures::pending!();
                 };
 
                 *self = Self::Module(module.clone());
