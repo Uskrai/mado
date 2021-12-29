@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicU64, AtomicUsize};
 use std::{io::Write, sync::Arc, time::Duration};
 
 use futures::Future;
@@ -6,7 +7,13 @@ use mado_core::{ArcMadoModule, ChapterImageInfo};
 
 use crate::{path::Utf8PathBuf, DownloadChapterInfo};
 
-pub fn create(info: Arc<DownloadChapterInfo>) -> (ChapterTask, ChapterTaskReceiver) {
+/// retry_limit is the limit of retry each download will do until it return error.
+/// each download will be retried/canceled if timeout is reached.
+pub fn create(
+    info: Arc<DownloadChapterInfo>,
+    retry_limit: Arc<AtomicUsize>,
+    timeout: Arc<AtomicU64>,
+) -> (ChapterTask, ChapterTaskReceiver) {
     let (sender, recv) = mpsc::unbounded();
 
     let task = ChapterTask {
@@ -14,19 +21,25 @@ pub fn create(info: Arc<DownloadChapterInfo>) -> (ChapterTask, ChapterTaskReceiv
         info: info.clone(),
     };
 
-    let receiver = ChapterTaskReceiver { recv, info };
+    let receiver = ChapterTaskReceiver {
+        recv,
+        info,
+        limit: retry_limit,
+        timeout,
+    };
 
     (task, receiver)
 }
 
-/// Run future returned by fun until the future return Ok or limit reached.
-/// the future will be called once even if limit is 0.
+/// Run future returned by fun until the future return Ok or limit return true.
+/// limit will be called with retry count and after fun is awaited
 #[inline]
-pub async fn do_while_err_or_n<F, R, O, E>(limit: usize, mut fun: F) -> Result<O, E>
+pub async fn do_while_err_or_n<F, R, O, E, L>(mut limit: L, mut fun: F) -> Result<O, E>
 where
     F: FnMut() -> R,
     R: Future<Output = Result<O, E>>,
     E: std::fmt::Display,
+    L: FnMut(usize) -> bool,
 {
     let mut retry = 0;
     let mut error;
@@ -42,7 +55,7 @@ where
 
         retry += 1;
 
-        let retry_limit_reached = retry >= limit;
+        let retry_limit_reached = limit(retry);
 
         tracing::error!(
             "{}, {}",
@@ -70,11 +83,23 @@ pub struct ChapterTask {
 struct ChapterImageTask {
     module: ArcMadoModule,
     image: ChapterImageInfo,
+    limit: Arc<AtomicUsize>,
+    timeout: Arc<AtomicU64>,
 }
 
 impl ChapterImageTask {
-    fn new(module: ArcMadoModule, image: ChapterImageInfo) -> Self {
-        Self { module, image }
+    fn new(
+        module: ArcMadoModule,
+        image: ChapterImageInfo,
+        limit: Arc<AtomicUsize>,
+        timeout: Arc<AtomicU64>,
+    ) -> Self {
+        Self {
+            module,
+            image,
+            limit,
+            timeout,
+        }
     }
 
     #[tracing::instrument(
@@ -86,11 +111,14 @@ impl ChapterImageTask {
         )
     )]
     pub async fn download(&self) -> Result<Vec<u8>, mado_core::Error> {
-        do_while_err_or_n(0, || async move {
-            let mut buffer = Vec::new();
-            self.download_without_retry(&mut buffer).await?;
-            Ok(buffer)
-        })
+        do_while_err_or_n(
+            |retry| self.limit.load(atomic::Ordering::Acquire) < retry,
+            || async move {
+                let mut buffer = Vec::new();
+                self.download_without_retry(&mut buffer).await?;
+                Ok(buffer)
+            },
+        )
         .await
     }
 
@@ -137,9 +165,8 @@ impl ChapterImageTask {
         const BUFFER_SIZE: usize = 1024;
         let mut total = 0;
 
-        // TODO: make timeout dynamic
-        const TIMEOUT: u64 = 10;
-        let timeout = Duration::from_secs(TIMEOUT);
+        let timeout = self.timeout.load(atomic::Ordering::Acquire);
+        let timeout = Duration::from_secs(timeout.into());
 
         loop {
             let mut buf = vec![0u8; BUFFER_SIZE];
@@ -167,6 +194,8 @@ impl ChapterImageTask {
 pub struct ChapterTaskReceiver {
     info: Arc<DownloadChapterInfo>,
     recv: mpsc::UnboundedReceiver<mado_core::ChapterImageInfo>,
+    limit: Arc<AtomicUsize>,
+    timeout: Arc<AtomicU64>,
 }
 
 impl ChapterTaskReceiver {
@@ -197,12 +226,15 @@ impl ChapterTaskReceiver {
         image: ChapterImageInfo,
     ) -> impl Future<Output = Result<(), mado_core::Error>> {
         let mut module = self.info.module();
+        let limit = self.limit.clone();
+        let timeout = self.timeout.clone();
+
         async move {
             let module = module.wait().await;
             let exists = path.exists();
 
             if !exists {
-                let task = ChapterImageTask::new(module.clone(), image.clone());
+                let task = ChapterImageTask::new(module.clone(), image.clone(), limit, timeout);
 
                 tracing::trace!("Start downloading {} {:?}", path, image);
 

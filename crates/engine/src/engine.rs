@@ -155,7 +155,12 @@ impl DownloadTask {
                 continue;
             }
 
-            let (task, receiver) = crate::chapter::create(it.clone());
+            const RETRY_LIMIT: usize = 10;
+            const TIMEOUT: u64 = 10;
+            let retry = Arc::new(RETRY_LIMIT.into());
+            let timeout = Arc::new(TIMEOUT.into());
+
+            let (task, receiver) = crate::chapter::create(it.clone(), retry, timeout);
 
             let receiver = receiver.run();
             let task = module.get_chapter_images(Box::new(task));
