@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use event_listener::Event;
-use futures::{channel::mpsc, StreamExt};
+use futures::{channel::mpsc, FutureExt, StreamExt};
 
 use crate::{
     DownloadResumedStatus, DownloadStatus, MadoEngineState, MadoEngineStateObserver,
@@ -119,9 +119,12 @@ impl DownloadTask {
         loop {
             status.wait_status(DownloadStatus::is_resumed).await;
 
-            let paused = status.wait_status(DownloadStatus::is_paused);
-            let dl = self.download();
-            let result = tokio::select! {
+            let paused = status.wait_status(DownloadStatus::is_paused).fuse();
+            let dl = self.download().fuse();
+
+            futures::pin_mut!(dl, paused);
+
+            let result = futures::select! {
                 _ = paused => {
                     continue;
                 }
