@@ -5,11 +5,11 @@ use crate::Error;
 
 #[derive(Any, Debug, Clone)]
 pub struct Url {
-    inner: reqwest::Url,
+    inner: mado_core::Url,
 }
 
 impl Url {
-    pub fn new(url: reqwest::Url) -> Self {
+    pub fn new(url: mado_core::Url) -> Self {
         Self { inner: url }
     }
     pub fn parse(input: &str) -> Result<Self, Error> {
@@ -22,12 +22,12 @@ impl Url {
 
     pub fn parse_resolve_domain(input: &str) -> Result<Self, Error> {
         use ::url::ParseError;
-        // parsing as reqwest::Url because runes::Error will complicate the process
-        let url = reqwest::Url::parse(input);
+        // parsing as mado_core::Url because runes::Error will complicate the process
+        let url = mado_core::Url::parse(input);
         url.or_else(|err| match err {
             ParseError::RelativeUrlWithoutBase => {
                 let input = "https://".to_owned() + input;
-                reqwest::Url::parse(&input)
+                mado_core::Url::parse(&input)
                     // we should return the first error here.
                     .map_err(|_| Error::url_parse_error(input.to_string(), err))
             }
@@ -73,8 +73,8 @@ impl From<Url> for mado_core::Url {
     }
 }
 
-impl From<reqwest::Url> for Url {
-    fn from(v: reqwest::Url) -> Self {
+impl From<mado_core::Url> for Url {
+    fn from(v: mado_core::Url) -> Self {
         Self::new(v)
     }
 }

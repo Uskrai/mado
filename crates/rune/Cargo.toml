@@ -19,7 +19,7 @@ serde_path_to_error = "0.1"
 rune = "0.10"
 rune-modules = "0.10"
 
-reqwest = { version = "0.11", features = ["json", "stream"] }
+# reqwest = { version = "0.11", features = ["json", "stream"] }
 
 thiserror = "1.0"
 

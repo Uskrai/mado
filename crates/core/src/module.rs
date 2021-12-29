@@ -1,13 +1,14 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
-    pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
 };
 
 use bytes::Bytes;
 
-use crate::{ChapterImageInfo, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid};
+use crate::{
+    ChapterImageInfo, Client, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid,
+};
 
 pub trait ChapterTask: Send {
     fn add(&mut self, image: ChapterImageInfo);
@@ -26,6 +27,8 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
     /// Get module's user readable name.
     fn name(&self) -> &str;
 
+    fn client(&self) -> &Client;
+
     fn domain(&self) -> &crate::url::Url;
 
     /// Get Manga information from `url`
@@ -38,7 +41,7 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
     async fn download_image(
         &self,
         image: ChapterImageInfo,
-    ) -> Result<Pin<Box<dyn BytesStream>>, crate::Error>;
+    ) -> Result<crate::BodyStream, crate::Error>;
 }
 
 pub type ArcMadoModule = Arc<dyn MadoModule + Sync>;
@@ -162,9 +165,9 @@ impl<Map: MadoModuleMap> MutMadoModuleMap for MutexMadoModuleMap<Map> {
 
 #[cfg(test)]
 mod test {
-    use std::{pin::Pin, sync::Arc};
+    use std::sync::Arc;
 
-    use crate::{url::Url, BytesStream, DefaultMadoModuleMap, MadoModuleMap};
+    use crate::{url::Url, Client, DefaultMadoModuleMap, MadoModuleMap};
 
     #[derive(Clone, Debug)]
     pub struct MockMadoModule {
@@ -188,6 +191,10 @@ mod test {
             &self.url
         }
 
+        fn client(&self) -> &Client {
+            todo!();
+        }
+
         async fn get_info(&self, _: Url) -> Result<crate::MangaInfo, crate::Error> {
             todo!()
         }
@@ -206,7 +213,7 @@ mod test {
         async fn download_image(
             &self,
             _: crate::ChapterImageInfo,
-        ) -> Result<Pin<Box<dyn BytesStream>>, crate::Error> {
+        ) -> Result<crate::BodyStream, crate::Error> {
             todo!()
         }
     }

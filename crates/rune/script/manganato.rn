@@ -46,9 +46,14 @@ impl MadoModule {
         }
     }
 
-    pub fn to_module(id,name,domain) {
+    pub fn to_module(uuid,name,domain) {
+        let this = Self::new(uuid, name, domain);
+        let client = this.client.clone();
         module::new(
-            id, name, domain, Self::new(id, name, domain),
+            #{
+                uuid, name, domain
+            },
+            this,
             #{
                 get_info: Self::get_info,
                 get_chapter_images: Self::get_chapter_images,
@@ -230,7 +235,7 @@ mod test {
     mod mock;
 
     pub fn create_module() {
-        super::load_module()[0].data
+        super::load_module()[0].module
     }
 
     #[test]

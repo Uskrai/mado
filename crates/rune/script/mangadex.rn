@@ -57,15 +57,21 @@ impl MadoModule {
         };
     }
 
-    pub fn to_module(id, name, domain) {
+    pub fn to_module(uuid, name, domain) {
         let data = Self::new();
+        let metadata = #{
+            uuid,
+            name,
+            domain,
+        };
+
         let method = #{
             get_info: Self::get_info,
             get_chapter_images: Self::get_chapter_images,
             download_image: Self::download_image,
         };
 
-        module::new(id, name, domain, data, method)
+        module::new(metadata, data, method)
 
     }
 
@@ -199,7 +205,8 @@ impl MadoModule {
             let url = `${API_URL}/manga/${id}/feed?${API_PARAMS}&offset=${offset}&limit=500`
                 +"&contentRating[]=safe&contentRating[]=suggestive"
                 + "&contentRating[]=erotica&contentRating[]=pornographic"
-                + "&includes[]=scanlation_group&order[volume]=asc&order[chapter]=asc";
+                + "&includes[]=scanlation_group&order[volume]=asc&order[chapter]=asc"
+                + "&translatedLanguage[]=en";
 
 
             let url = mado::http::Url::parse(url)?;
@@ -334,7 +341,7 @@ mod test {
     use super::*;
 
     fn create_module() {
-        super::load_module().data
+        super::load_module().module
     }
 
     fn create_client() {

@@ -1,6 +1,5 @@
-use std::time::Duration;
-
-use reqwest::header::SET_COOKIE;
+use mado_core::http::{RequestBuilder as HttpRequestBuilder, Response as HttpResponse};
+// use reqwest::header::SET_COOKIE;
 use rune::{Any, ContextError, Module};
 
 mod client;
@@ -9,40 +8,25 @@ mod url;
 pub use self::url::Url;
 pub use client::Client;
 
-macro_rules! wrapper_fun {
-  ($name:ident, $( $param:ident : $type:ty ),*) => {
-    pub fn $name(self, $($param : $type),*) -> Self {
-      Self {
-        inner: self.inner.$name($($param),*)
-      }
-    }
-  };
-}
-
 #[derive(Any, Debug)]
 pub struct RequestBuilder {
-    inner: reqwest::RequestBuilder,
+    inner: HttpRequestBuilder,
 }
 
 impl RequestBuilder {
-    pub fn query(self, name: String, value: String) -> Self {
-        RequestBuilder {
-            inner: self.inner.query(&[(name, value)]),
-        }
-    }
+    // pub fn query(self, name: String, value: String) -> Self {
+    //     RequestBuilder {
+    //         inner: self.inner.query(&[(name, value)]),
+    //     }
+    // }
 
-    wrapper_fun!(basic_auth, username: String, password: Option<String>);
-    wrapper_fun!(bearer_auth, token: String);
-    wrapper_fun!(timeout, timeout: Duration);
+    // wrapper_fun!(basic_auth, username: String, password: Option<String>);
+    // wrapper_fun!(bearer_auth, token: String);
+    // wrapper_fun!(timeout, timeout: Duration);
 
-    pub fn header(self, name: String, value: String) -> Self {
-        RequestBuilder {
-            inner: self.inner.header(name, value),
-        }
-    }
-
-    pub fn cookie(self, name: String, value: String) -> Self {
-        self.header(SET_COOKIE.to_string(), format!("{}={}", name, value))
+    pub fn header(mut self, name: String, value: String) -> Self {
+        self.inner = self.inner.header(name, value);
+        self
     }
 
     pub async fn send(self) -> Result<Response, crate::Error> {
@@ -50,20 +34,17 @@ impl RequestBuilder {
             .send()
             .await
             .map(|inner| Response { inner })
-            .map_err(|err| crate::Error::RequestError {
-                url: err.url().unwrap().clone().into(),
-                message: err.to_string(),
-            })
+            .map_err(Into::into)
     }
 }
 
 #[derive(Any, Debug)]
 pub struct Response {
-    inner: reqwest::Response,
+    inner: HttpResponse,
 }
 
 #[derive(Any, Debug)]
-pub struct StatusCode(reqwest::StatusCode);
+pub struct StatusCode(mado_core::http::StatusCode);
 
 impl StatusCode {
     pub fn as_string(&self) -> String {
@@ -112,69 +93,83 @@ impl Response {
     }
 
     pub fn bytes_stream(self) -> BytesStream {
-        BytesStream(Box::pin(self.inner.bytes_stream()))
+        BytesStream(self.inner.stream())
     }
 }
 
 #[derive(Any)]
-pub struct BytesStream(futures_core::stream::BoxStream<'static, reqwest::Result<bytes::Bytes>>);
+pub struct BytesStream(mado_core::http::ResponseStream);
 
-impl futures_core::stream::Stream for BytesStream {
-    type Item = Result<bytes::Bytes, mado_core::Error>;
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let poll = self.0.as_mut().poll_next(cx);
-        poll.map(|option| option.map(|result| result.map_err(|err| crate::Error::from(err).into())))
+impl BytesStream {
+    pub fn into_inner(self) -> mado_core::http::ResponseStream {
+        self.0
     }
 }
+
+// impl futures_core::stream::Stream for BytesStream {
+//     type Item = Result<bytes::Bytes, mado_core::Error>;
+//     fn poll_next(
+//         mut self: std::pin::Pin<&mut Self>,
+//         cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<Option<Self::Item>> {
+//         self.0
+//             .as_mut()
+//             .poll_next(cx)
+//             .map_err(|err| mado_core::Error::ExternalError(err.into()))
+//     }
+// }
 
 pub fn load_module() -> Result<Module, ContextError> {
     let module = Module::with_crate_item("mado", &["http"]);
 
     mado_rune_macros::register_module! {
-      (Client) => {
-        inst => {
-          get, post, put, delete, head
-        }
-        associated => {
-          default: default_
-        }
-      },
-      (RequestBuilder) => {
-        inst => {
-          query, cookie, header
+        (Client) => {
+            inst => {
+                get, clone
+            }
+            // inst => {
+            //   get, post, put, delete, head
+            // }
+            associated => {
+                default: default_
+            }
         },
-        async_inst => {
-          send
-        }
-      },
-      (Response) => {
-        inst => {
-          url, status, bytes_stream
+        (RequestBuilder) => {
+            inst => {
+                header
+            }
+            // inst => {
+            //   query, cookie, header
+            // },
+            async_inst => {
+                send
+            }
         },
-        async_inst => {
-          text, json
+        (Response) => {
+            inst => {
+                url, status, bytes_stream
+            },
+            async_inst => {
+                text, json
+            }
+        },
+        (Url) => {
+            associated => {
+                parse
+            }
+            inst => {
+                to_string, query, clone, path, extension
+            }
+            protocol => {
+                to_string_debug: STRING_DEBUG
+            }
+        },
+        (StatusCode) => {
+            inst => {
+                as_string, as_u16, is_success, is_redirection,
+                is_client_error, is_server_error
+            }
         }
-      },
-      (Url) => {
-        associated => {
-          parse
-        }
-        inst => {
-          to_string, query, clone, path, extension
-        }
-        protocol => {
-          to_string_debug: STRING_DEBUG
-        }
-      },
-      (StatusCode) => {
-        inst => {
-          as_string, as_u16, is_success, is_redirection,
-          is_client_error, is_server_error
-        }
-      }
     }
 
     load_module_with(module)

@@ -21,5 +21,8 @@ pub enum Error {
     IOError(#[from] std::io::Error),
 
     #[error(transparent)]
+    HttpClientError(#[from] crate::http::Error),
+
+    #[error(transparent)]
     ExternalError(#[from] anyhow::Error),
 }

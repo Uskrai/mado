@@ -115,30 +115,51 @@ impl ChapterImageTask {
     where
         W: Write,
     {
-        let mut stream = self
+        let stream = self
             .module
             .download_image(self.image.clone())
             .await
             .unwrap();
 
+        match stream {
+            mado_core::BodyStream::Http(stream) => self.download_http(stream, buffer).await,
+        }
+    }
+
+    pub async fn download_http<W>(
+        &self,
+        mut stream: mado_core::http::ResponseStream,
+        buffer: &mut W,
+    ) -> Result<(), mado_core::Error>
+    where
+        W: Write,
+    {
+        const BUFFER_SIZE: usize = 1024;
+        let mut total = 0;
+
         // TODO: make timeout dynamic
         const TIMEOUT: u64 = 10;
         let timeout = Duration::from_secs(TIMEOUT);
 
-        let mut total = 0;
-        while let Some(bytes) = self.wait_timeout(stream.next(), timeout).await? {
-            let bytes = bytes?;
-            total += bytes.len();
+        loop {
+            let mut buf = vec![0u8; BUFFER_SIZE];
+            let size = self.wait_timeout(stream.read(&mut buf), timeout).await??;
+
+            let (buf, _) = buf.split_at(size);
+
+            if buf.is_empty() {
+                return Ok(());
+            }
+
+            total += size;
             tracing::trace!(
                 "Writing {} bytes to buffer, total: {} bytes",
-                bytes.len(),
+                buf.len(),
                 total
             );
 
-            buffer.write_all(&bytes)?;
+            buffer.write_all(buf)?;
         }
-
-        Ok(())
     }
 }
 

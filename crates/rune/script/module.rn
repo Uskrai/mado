@@ -1,15 +1,18 @@
 
 
 struct MadoModule {
-  uuid, name, domain,
+    uuid, 
+    name,
+    domain,
+    client,
 
-  data,
+    module,
 
-  get_info,
-  get_chapter_images,
-  download_image,
+    get_info,
+    get_chapter_images,
+    download_image,
 
-  from_rust
+    from_rust
 }
 
 // Name of the website, e.g MangaDex.
@@ -17,27 +20,29 @@ struct MadoModule {
 // Domain of the website, e.g https://mangadex.org, https://mangakakalot.com
 // the domain should always contain 'https://' or 'http://, not doing so 
 // will result in error. this is used to search which module should be used.
-pub fn new(uuid, name, domain, data, method) {
-  let domain = mado::http::Url::parse(domain).unwrap();
-  let uuid = mado::Uuid::parse_str(uuid);
+pub fn new(metadata, module, method) {
+    let domain = mado::http::Url::parse(metadata["domain"]).unwrap();
 
-  MadoModule {
-    uuid, name, domain,
-    data,
-    get_info: method
-      .get("get_info")
-      .expect("get_info not found"),
+    let uuid = metadata["uuid"];
+    let uuid = mado::Uuid::parse_str(metadata["uuid"]);
 
-    get_chapter_images: method
-      .get("get_chapter_images")
-      .expect("get_chapter_images not found"),
+    let client = module.client.clone();
 
-    download_image: method
-        .get("download_image")
-        .expect("download_image not found"),
+    MadoModule {
+        name: metadata["name"],
+        domain,
+        module,
+        uuid,
+        client: module.client.clone(),
 
-    // this value wont be passed back to rune so 
-    // we just make dummy function here
-    from_rust: || {}
-  }
+        get_info: method["get_info"],
+
+        get_chapter_images: method["get_chapter_images"],
+
+        download_image: method["download_image"],
+
+        // this value wont be passed back to rune so
+        // we just make dummy function here
+        from_rust: || {}
+    }
 }

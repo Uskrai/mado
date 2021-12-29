@@ -1,4 +1,6 @@
+mod client;
 mod error;
+pub mod http;
 mod http_error;
 #[allow(dead_code)]
 mod manga;
@@ -16,3 +18,5 @@ pub use uuid::Uuid;
 
 mod module;
 pub use module::*;
+
+pub use client::*;

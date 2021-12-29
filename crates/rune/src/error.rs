@@ -116,6 +116,9 @@ pub enum Error {
         source: deserializer::Error,
     },
 
+    #[error(transparent)]
+    HttpError(#[from] mado_core::http::Error),
+
     #[error("{0}")]
     ExternalError(
         #[source]
@@ -138,11 +141,7 @@ pub enum Error {
     ),
 
     #[error("{0}")]
-    ReqwestError(
-        #[source]
-        #[from]
-        reqwest::Error,
-    ),
+    MadoError(#[from] mado_core::Error),
 }
 
 impl From<Error> for mado_core::Error {
@@ -162,11 +161,12 @@ impl From<Error> for mado_core::Error {
                 url: url.into(),
                 message,
             },
+            Error::MadoError(err) => err,
             Error::DeserializeError { .. }
+            | Error::HttpError(..)
             | Error::ExternalError(..)
             | Error::JsonPathError(..)
-            | Error::SerdeJsonError(..)
-            | Error::ReqwestError(..) => Self::ExternalError(err.into()),
+            | Error::SerdeJsonError(..) => Self::ExternalError(err.into()),
         }
     }
 }
@@ -211,7 +211,7 @@ impl Error {
         write!(s, "{}", self)
     }
 
-    pub fn to_string_variant(&self) -> String {
+    pub fn to_string_variant(&self) -> &str {
         macro_rules! match_var {
             ($id:ident (..)) => {
                 Self::$id(..)
@@ -225,7 +225,7 @@ impl Error {
       ($($name:ident $tt:tt),+) => {
         match self {
           $(match_var!($name $tt) => {
-            stringify!($name).to_string()
+            stringify!($name)
           }),+
         }
       };
@@ -235,7 +235,8 @@ impl Error {
           RuneError(..), ExternalError(..),
           UrlParseError{..}, InvalidUrl{..}, UnexpectedError{..},
           RequestError{..}, DeserializeError{..},
-          JsonPathError(..), SerdeJsonError(..), ReqwestError(..)
+          JsonPathError(..), SerdeJsonError(..),
+          HttpError(..), MadoError(..)
         }
     }
 }

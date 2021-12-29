@@ -1,5 +1,3 @@
-use std::pin::Pin;
-
 use crate::chapter_task::RuneChapterTask;
 use crate::function::RuneFunction;
 use crate::uuid::Uuid as RuneUuid;
@@ -13,7 +11,6 @@ use mado_core::Url;
 use super::Error;
 
 use async_trait::async_trait;
-use derivative::Derivative;
 use mado_core::ChapterTask;
 use mado_core::MangaInfo;
 use mado_core::Uuid;
@@ -21,12 +18,13 @@ use rune::runtime::VmError as RuneVmError;
 use rune::FromValue;
 use rune::ToValue;
 
-#[derive(Clone, Derivative)]
+#[derive(Clone, derivative::Derivative)]
 #[derivative(Debug)]
 pub struct RuneMadoModule {
     #[derivative(Debug = "ignore")]
     #[allow(dead_code)]
     rune: Rune,
+    client: mado_core::Client,
 
     uuid: Uuid,
     name: String,
@@ -57,16 +55,16 @@ impl RuneMadoModule {
     pub async fn download_image(
         &self,
         image: ChapterImageInfo,
-    ) -> Result<crate::http::BytesStream, Error> {
+    ) -> Result<mado_core::BodyStream, Error> {
         let value = crate::serializer::for_async_call(image);
         let fut = self
             .download_image
             .async_call::<_, Result<crate::http::BytesStream, Error>>((self.data.clone(), value))
             .await?;
 
-        let stream = fut?;
+        let stream = fut?.into_inner();
 
-        Ok(stream)
+        Ok(mado_core::BodyStream::Http(stream))
     }
 }
 
@@ -78,6 +76,10 @@ impl MadoModule for RuneMadoModule {
 
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn client(&self) -> &mado_core::Client {
+        &self.client
     }
 
     fn domain(&self) -> &Url {
@@ -97,10 +99,8 @@ impl MadoModule for RuneMadoModule {
     async fn download_image(
         &self,
         image: mado_core::ChapterImageInfo,
-    ) -> Result<Pin<Box<dyn mado_core::BytesStream>>, mado_core::Error> {
-        let stream = self.download_image(image).await?;
-
-        Ok(Box::pin(stream))
+    ) -> Result<mado_core::BodyStream, mado_core::Error> {
+        self.download_image(image).await.map_err(Into::into)
     }
 }
 
@@ -122,7 +122,10 @@ impl RuneMadoModule {
 
         let uuid = from_value::<RuneUuid, _>(obj["uuid"].clone())?.into();
         let name = from_value(obj["name"].clone())?;
-        let domain = from_value::<super::http::Url, _>(obj["domain"].clone())?.into_inner();
+        let domain = from_value::<crate::http::Url, _>(obj["domain"].clone())?.into_inner();
+
+        let client = from_value::<crate::http::Client, _>(obj["client"].clone())?.clone();
+        let client = mado_core::Client::Http(client.clone().into_inner());
 
         macro_rules! get_function {
             ($name:literal) => {
@@ -134,13 +137,14 @@ impl RuneMadoModule {
         let get_chapter_images = get_function!("get_chapter_images");
         let download_image = get_function!("download_image");
 
-        let data = obj.get("data").expect("cannot find data").clone();
+        let data = obj["module"].clone();
 
         Ok(Self {
             rune,
             uuid,
             name,
             domain,
+            client,
             get_info,
             get_chapter_images,
             download_image,
