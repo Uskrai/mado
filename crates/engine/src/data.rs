@@ -1,4 +1,5 @@
 use crate::path::Utf8PathBuf;
+use futures::lock::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -110,7 +111,7 @@ impl LateBindingModule {
 #[derive(Debug)]
 pub struct ModuleInfo {
     uuid: Uuid,
-    module: tokio::sync::Mutex<LateBindingModule>,
+    module: AsyncMutex<LateBindingModule>,
 }
 
 impl ModuleInfo {
@@ -118,11 +119,11 @@ impl ModuleInfo {
         let uuid = module.uuid();
         Self {
             uuid,
-            module: tokio::sync::Mutex::new(module),
+            module: AsyncMutex::new(module),
         }
     }
 
-    pub async fn lock(&self) -> tokio::sync::MutexGuard<'_, LateBindingModule> {
+    pub async fn lock(&self) -> AsyncMutexGuard<'_, LateBindingModule> {
         self.module.lock().await
     }
 }

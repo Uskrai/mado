@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use tokio::sync::{
-    mpsc::{UnboundedReceiver, UnboundedSender},
-    watch,
-};
+use futures::{channel::mpsc, StreamExt};
+use tokio::sync::watch;
 
 use crate::{
     DownloadResumedStatus, DownloadStatus, MadoEngineState, MadoEngineStateObserver,
@@ -39,31 +37,32 @@ impl MadoEngine {
     }
 
     pub async fn run(self) {
-        let mut rx = self.connect_state();
+        let rx = self.connect_state();
 
-        while let Some(msg) = rx.recv().await {
+        rx.for_each(|msg| async {
             match msg {
                 MadoEngineMsg::Download(info) => {
                     tokio::spawn(self.download(info));
                 }
             }
-        }
+        })
+        .await;
     }
 
-    pub fn connect_state(&self) -> UnboundedReceiver<MadoEngineMsg> {
-        pub struct MadoEngineSender(UnboundedSender<MadoEngineMsg>);
+    pub fn connect_state(&self) -> mpsc::UnboundedReceiver<MadoEngineMsg> {
+        pub struct MadoEngineSender(mpsc::UnboundedSender<MadoEngineMsg>);
 
         impl MadoEngineStateObserver for MadoEngineSender {
             fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
 
             fn on_download(&self, info: Arc<crate::DownloadInfo>) {
-                self.0.send(MadoEngineMsg::Download(info)).unwrap();
+                self.0.unbounded_send(MadoEngineMsg::Download(info)).ok();
             }
         }
 
-        let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
-        self.state.connect(MadoEngineSender(sender));
-        recv
+        let (tx, rx) = mpsc::unbounded();
+        self.state.connect(MadoEngineSender(tx));
+        rx
     }
 
     pub fn load_module(

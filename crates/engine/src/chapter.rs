@@ -1,13 +1,13 @@
 use std::{io::Write, sync::Arc, time::Duration};
 
-use futures::{Future, StreamExt};
+use futures::Future;
+use futures::{channel::mpsc, StreamExt};
 use mado_core::{ArcMadoModule, ChapterImageInfo};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::{path::Utf8PathBuf, DownloadChapterInfo};
 
 pub fn create(info: Arc<DownloadChapterInfo>) -> (ChapterTask, ChapterTaskReceiver) {
-    let (sender, recv) = tokio::sync::mpsc::unbounded_channel();
+    let (sender, recv) = mpsc::unbounded();
 
     let task = ChapterTask {
         sender,
@@ -63,7 +63,7 @@ where
 
 #[derive(Debug)]
 pub struct ChapterTask {
-    sender: UnboundedSender<mado_core::ChapterImageInfo>,
+    sender: mpsc::UnboundedSender<mado_core::ChapterImageInfo>,
     info: Arc<DownloadChapterInfo>,
 }
 
@@ -145,7 +145,7 @@ impl ChapterImageTask {
 #[derive(Debug)]
 pub struct ChapterTaskReceiver {
     info: Arc<DownloadChapterInfo>,
-    recv: UnboundedReceiver<mado_core::ChapterImageInfo>,
+    recv: mpsc::UnboundedReceiver<mado_core::ChapterImageInfo>,
 }
 
 impl ChapterTaskReceiver {
@@ -155,8 +155,8 @@ impl ChapterTaskReceiver {
 
         std::fs::create_dir_all(&chapter_path).unwrap();
 
-        let mut i = 0;
-        while let Some(image) = self.recv.recv().await {
+        let mut i = 1;
+        while let Some(image) = self.recv.next().await {
             let filename = format!("{:0>5}.{}", i, image.extension.clone());
             let path = chapter_path.join(filename);
 
@@ -202,7 +202,7 @@ impl ChapterTaskReceiver {
 impl mado_core::ChapterTask for ChapterTask {
     fn add(&mut self, image: mado_core::ChapterImageInfo) {
         tracing::trace!("Sending image info {:?}", image);
-        self.sender.send(image).unwrap();
+        self.sender.unbounded_send(image).ok();
     }
 
     fn get_chapter_id(&self) -> &str {
