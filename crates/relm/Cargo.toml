@@ -14,7 +14,7 @@ gio = { version = "0.14" }
 # relm4-macros = "0.2"
 # relm4-components = "0.2"
 
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "fs"] }
 futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
