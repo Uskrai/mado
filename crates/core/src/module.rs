@@ -12,7 +12,6 @@ use crate::{
 
 pub trait ChapterTask: Send {
     fn add(&mut self, image: ChapterImageInfo);
-    fn get_chapter_id(&self) -> &str;
 }
 
 pub trait BytesStream: futures_core::stream::Stream<Item = Result<Bytes, Error>> + Send {}
@@ -36,7 +35,7 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
 
     /// Get Image of Chapter from `task::get_chapter`
     /// for each image `task::add` should be called
-    async fn get_chapter_images(&self, task: Box<dyn ChapterTask>) -> Result<(), Error>;
+    async fn get_chapter_images(&self, id: &str, task: Box<dyn ChapterTask>) -> Result<(), Error>;
 
     async fn download_image(
         &self,
@@ -201,6 +200,7 @@ mod test {
 
         async fn get_chapter_images(
             &self,
+            _: &str,
             _: Box<dyn crate::ChapterTask>,
         ) -> Result<(), crate::Error> {
             todo!()

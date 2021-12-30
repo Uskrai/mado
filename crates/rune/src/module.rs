@@ -46,9 +46,9 @@ impl RuneMadoModule {
         fut?.get()
     }
 
-    pub async fn get_chapter_images(&self, task: RuneChapterTask) -> Result<(), Error> {
+    pub async fn get_chapter_images(&self, id: &str, task: RuneChapterTask) -> Result<(), Error> {
         self.get_chapter_images
-            .async_call((self.data.clone(), task))
+            .async_call((self.data.clone(), id, task))
             .await?
     }
 
@@ -90,8 +90,12 @@ impl MadoModule for RuneMadoModule {
         self.get_info(url.into()).await.map_err(Into::into)
     }
 
-    async fn get_chapter_images(&self, task: Box<dyn ChapterTask>) -> Result<(), mado_core::Error> {
-        self.get_chapter_images(RuneChapterTask::new(task))
+    async fn get_chapter_images(
+        &self,
+        id: &str,
+        task: Box<dyn ChapterTask>,
+    ) -> Result<(), mado_core::Error> {
+        self.get_chapter_images(id, RuneChapterTask::new(task))
             .await
             .map_err(Into::into)
     }

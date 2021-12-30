@@ -264,10 +264,9 @@ impl MadoModule {
         Some(Ok(info))
     }
 
-    async fn get_chapter_images(self, task) {
-        let id = task.get_chapter_id();
-
+    async fn get_chapter_images(self, id, task) {
         use mado::http::Url;
+
         let url = Url::parse(`${API_URL}/chapter/${id}`).unwrap();
 
         let id_request = self.get_chapter_images_id(id);
@@ -413,8 +412,9 @@ mod test {
         let info = module.get_info(url).await.unwrap();
         let chapter = info.chapters.get(0).unwrap();
 
+        let id = chapter.id.clone();
         let task = mado::MockChapterTask::new(chapter);
-        let result = module.get_chapter_images(task).await?;
+        let result = module.get_chapter_images(id, task).await?;
         Ok(task)
     }
 

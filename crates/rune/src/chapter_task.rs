@@ -25,10 +25,6 @@ impl RuneChapterTask {
         self.inner.add(value);
         Ok(())
     }
-
-    pub fn get_chapter_id(&self) -> String {
-        self.inner.get_chapter_id().to_string()
-    }
 }
 
 #[derive(Default, rune::Any)]
@@ -59,7 +55,7 @@ pub fn load_module() -> Result<rune::Module, rune::ContextError> {
     mado_rune_macros::register_module! {
       (RuneChapterTask) => {
         inst => {
-          add, get_chapter_id
+          add
         }
       },
       (MockChapterTask) => {

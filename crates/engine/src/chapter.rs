@@ -16,10 +16,7 @@ pub fn create(
 ) -> (ChapterTask, ChapterTaskReceiver) {
     let (sender, recv) = mpsc::unbounded();
 
-    let task = ChapterTask {
-        sender,
-        info: info.clone(),
-    };
+    let task = ChapterTask { sender };
 
     let receiver = ChapterTaskReceiver {
         recv,
@@ -77,7 +74,6 @@ where
 #[derive(Debug)]
 pub struct ChapterTask {
     sender: mpsc::UnboundedSender<mado_core::ChapterImageInfo>,
-    info: Arc<DownloadChapterInfo>,
 }
 
 struct ChapterImageTask {
@@ -256,9 +252,5 @@ impl mado_core::ChapterTask for ChapterTask {
     fn add(&mut self, image: mado_core::ChapterImageInfo) {
         tracing::trace!("Sending image info {:?}", image);
         self.sender.unbounded_send(image).ok();
-    }
-
-    fn get_chapter_id(&self) -> &str {
-        self.info.chapter_id()
     }
 }

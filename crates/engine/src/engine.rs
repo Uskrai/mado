@@ -178,7 +178,7 @@ impl DownloadTask {
             let (task, receiver) = crate::chapter::create(it.clone(), retry, timeout);
 
             let receiver = receiver.run();
-            let task = module.get_chapter_images(Box::new(task));
+            let task = module.get_chapter_images(it.chapter_id(), Box::new(task));
 
             futures::try_join!(task, receiver)?;
             it.set_status(DownloadStatus::Finished);
