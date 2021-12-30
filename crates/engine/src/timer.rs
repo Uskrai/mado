@@ -24,6 +24,14 @@ where
     Timeout { timer, future: f }
 }
 
+pub async fn sleep(duration: Duration) {
+    Timer::after(duration).await;
+}
+
+pub async fn sleep_secs(secs: u64) {
+    sleep(Duration::from_secs(secs)).await
+}
+
 #[pin_project::pin_project]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Timeout<F>
@@ -54,5 +62,22 @@ where
         }
 
         Poll::Pending
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timeout_test() {
+        let secs = Duration::from_secs(1);
+        let nanos = Duration::from_nanos(1);
+        futures::executor::block_on(async move {
+            timeout(secs, async { sleep(nanos).await }).await.unwrap();
+            timeout(nanos, async { sleep(secs).await })
+                .await
+                .unwrap_err();
+        });
     }
 }

@@ -130,7 +130,7 @@ impl ChapterImageTask {
     where
         F: Future,
     {
-        let timeout = crate::timeout::timeout(duration, future);
+        let timeout = crate::timer::timeout(duration, future);
 
         let result = timeout
             .await

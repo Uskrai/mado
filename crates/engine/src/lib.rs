@@ -1,6 +1,6 @@
 pub mod chapter;
 mod data;
-pub mod timeout;
+pub mod timer;
 pub use data::*;
 mod engine;
 pub use engine::*;
