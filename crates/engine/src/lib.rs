@@ -29,7 +29,7 @@ pub trait MadoModuleLoader: Send + Sync {
     ) -> Result<Vec<ArcMadoModule>, crate::ModuleLoadError>;
 }
 
-pub use mado_core;
+pub use mado_core as core;
 
 pub mod path {
     pub use camino::Utf8Path;
