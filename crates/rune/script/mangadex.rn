@@ -107,7 +107,7 @@ impl MadoModule {
     /// return Result<MangaInfo, crate::Error>
     pub async fn get_info(self, url) {
         let id = self.id_regex.find(url.to_string()).get_match().ok_or_else(||{
-            Err(mado::error::Error::invalid_url(url))
+            mado::error::Error::invalid_url(url)
         })?;
 
         let manga_info_req = self.get_manga_info(id);

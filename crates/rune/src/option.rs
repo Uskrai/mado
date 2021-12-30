@@ -1,5 +1,5 @@
 use rune::{
-    runtime::{Function, Shared, Value, VmError},
+    runtime::{Function, Value, VmError},
     ContextError, Module,
 };
 
@@ -12,11 +12,12 @@ pub fn load_module() -> Result<Module, ContextError> {
     Ok(module)
 }
 
-fn ok_or_else(option: &Option<Value>, then: Function) -> Result<Value, VmError> {
+fn ok_or_else(option: &Option<Value>, then: Function) -> Result<Result<Value, Value>, VmError> {
     if let Some(v) = option {
-        Ok(Value::Result(Shared::new(Ok(v.clone()))))
+        Ok(Ok(v.clone()))
     } else {
-        then.call(())
+        let err = then.call(())?;
+        Ok(Err(err))
     }
 }
 
