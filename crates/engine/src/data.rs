@@ -91,7 +91,7 @@ impl LateBindingModule {
                         break module;
                     }
 
-                    futures::pending!();
+                    crate::timer::sleep_secs(1).await;
                 };
 
                 *self = Self::Module(module.clone());
