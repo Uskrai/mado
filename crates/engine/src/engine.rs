@@ -96,7 +96,22 @@ impl MadoEngine {
         &self,
         info: Arc<crate::DownloadInfo>,
     ) -> impl std::future::Future<Output = impl Send> + Send + 'static {
-        DownloadTask::new(info).run()
+        async move {
+            let task = DownloadTask::new(info.clone());
+            let it = std::panic::AssertUnwindSafe(task.run())
+                .catch_unwind()
+                .await;
+
+            if let Err(e) = it {
+                if let Some(e) = e.downcast_ref::<&str>() {
+                    info.set_status(DownloadStatus::error(e));
+                } else if let Some(e) = e.downcast_ref::<String>() {
+                    info.set_status(DownloadStatus::error(e));
+                } else {
+                    info.set_status(DownloadStatus::error("Cannot dechiper panic error!"));
+                }
+            }
+        }
     }
 }
 
