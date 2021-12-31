@@ -1,11 +1,15 @@
-pub mod chapter;
+mod chapter_downloader;
 mod data;
+mod image_downloader;
+mod task_downloader;
 pub mod timer;
 pub use data::*;
 mod engine;
 pub use engine::*;
 
-use mado_core::ArcMadoModule;
+pub use chapter_downloader::ChapterDownloader;
+pub use image_downloader::ImageDownloader;
+pub use task_downloader::TaskDownloader;
 
 mod state;
 pub use state::{MadoEngineState, MadoEngineStateObserver};
@@ -29,6 +33,7 @@ pub trait MadoModuleLoader: Send + Sync {
     ) -> Result<Vec<ArcMadoModule>, crate::ModuleLoadError>;
 }
 
+use crate::core::ArcMadoModule;
 pub use mado_core as core;
 
 pub mod path {
