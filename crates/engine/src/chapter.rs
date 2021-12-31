@@ -5,27 +5,78 @@ use futures::Future;
 use futures::{channel::mpsc, StreamExt};
 use mado_core::{ArcMadoModule, ChapterImageInfo};
 
-use crate::{path::Utf8PathBuf, DownloadChapterInfo};
+use crate::{DownloadChapterImageInfo, DownloadChapterInfo};
 
-/// retry_limit is the limit of retry each download will do until it return error.
-/// each download will be retried/canceled if timeout is reached.
-pub fn create(
+pub struct ChapterDownloader {
+    rx: mpsc::Receiver<Arc<DownloadChapterImageInfo>>,
     info: Arc<DownloadChapterInfo>,
     retry_limit: Arc<AtomicUsize>,
     timeout: Arc<AtomicU64>,
-) -> (ChapterTask, ChapterTaskReceiver) {
-    let (sender, recv) = mpsc::unbounded();
+}
 
-    let task = ChapterTask { sender };
+impl ChapterDownloader {
+    pub fn new(
+        rx: mpsc::Receiver<Arc<DownloadChapterImageInfo>>,
+        info: Arc<DownloadChapterInfo>,
+        retry_limit: Arc<AtomicUsize>,
+        timeout: Arc<AtomicU64>,
+    ) -> Self {
+        Self {
+            rx,
+            info,
+            retry_limit,
+            timeout,
+        }
+    }
 
-    let receiver = ChapterTaskReceiver {
-        recv,
-        info,
-        limit: retry_limit,
-        timeout,
-    };
+    pub async fn run(mut self) -> Result<(), mado_core::Error> {
+        tracing::trace!("Start downloading chapter {:?}", self.info);
+        let chapter_path = self.info.path();
 
-    (task, receiver)
+        std::fs::create_dir_all(&chapter_path).unwrap();
+
+        while let Some(image) = self.rx.next().await {
+            self.download_image(image).await?;
+        }
+
+        self.info.set_status(crate::DownloadStatus::Finished);
+        tracing::trace!("Finished downloading chapter {:?}", self.info);
+
+        Ok(())
+    }
+
+    fn download_image(
+        &self,
+        image: Arc<DownloadChapterImageInfo>,
+    ) -> impl Future<Output = Result<(), mado_core::Error>> {
+        let mut module = self.info.module();
+        let limit = self.retry_limit.clone();
+        let timeout = self.timeout.clone();
+
+        async move {
+            let path = image.path();
+            let image = image.image();
+
+            let module = module.wait().await;
+            let exists = path.exists();
+
+            if !exists {
+                let task = ChapterImageTask::new(module.clone(), image.clone(), limit, timeout);
+
+                tracing::trace!("Start downloading {} {:?}", path, image);
+
+                let buffer = task.download().await?;
+
+                tracing::trace!("Finished downloading {} {:?}", path, image);
+                let mut file = std::fs::File::create(&path).unwrap();
+                file.write_all(&buffer)?;
+                tracing::trace!("Finished writing to {}", path);
+            } else {
+                tracing::trace!("File {} already exists, skipping...", path);
+            }
+            Ok(())
+        }
+    }
 }
 
 /// Run future returned by fun until the future return Ok or limit return true.
@@ -69,11 +120,6 @@ where
             break Err(error);
         }
     }
-}
-
-#[derive(Debug)]
-pub struct ChapterTask {
-    sender: mpsc::UnboundedSender<mado_core::ChapterImageInfo>,
 }
 
 struct ChapterImageTask {
@@ -183,74 +229,5 @@ impl ChapterImageTask {
 
             buffer.write_all(buf)?;
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct ChapterTaskReceiver {
-    info: Arc<DownloadChapterInfo>,
-    recv: mpsc::UnboundedReceiver<mado_core::ChapterImageInfo>,
-    limit: Arc<AtomicUsize>,
-    timeout: Arc<AtomicU64>,
-}
-
-impl ChapterTaskReceiver {
-    pub async fn run(mut self) -> Result<(), mado_core::Error> {
-        tracing::trace!("Start downloading chapter {:?}", self.info);
-        let chapter_path = self.info.path();
-
-        std::fs::create_dir_all(&chapter_path).unwrap();
-
-        let mut i = 1;
-        while let Some(image) = self.recv.next().await {
-            let filename = format!("{:0>5}.{}", i, image.extension.clone());
-            let path = chapter_path.join(filename);
-
-            self.download_image(path, image).await?;
-
-            i += 1;
-        }
-        self.info.set_status(crate::DownloadStatus::Finished);
-        tracing::trace!("Finished downloading chapter {:?}", self.info);
-
-        Ok(())
-    }
-
-    fn download_image(
-        &self,
-        path: Utf8PathBuf,
-        image: ChapterImageInfo,
-    ) -> impl Future<Output = Result<(), mado_core::Error>> {
-        let mut module = self.info.module();
-        let limit = self.limit.clone();
-        let timeout = self.timeout.clone();
-
-        async move {
-            let module = module.wait().await;
-            let exists = path.exists();
-
-            if !exists {
-                let task = ChapterImageTask::new(module.clone(), image.clone(), limit, timeout);
-
-                tracing::trace!("Start downloading {} {:?}", path, image);
-
-                let buffer = task.download().await?;
-
-                tracing::trace!("Finished downloading {} {:?}", path, image);
-                let mut file = std::fs::File::create(&path).unwrap();
-                file.write_all(&buffer)?;
-                tracing::trace!("Finished writing to {}", path);
-            } else {
-                tracing::trace!("File {} already exists, skipping...", path);
-            }
-            Ok(())
-        }
-    }
-}
-
-impl mado_core::ChapterTask for ChapterTask {
-    fn add(&mut self, image: mado_core::ChapterImageInfo) {
-        tracing::trace!("Sending image info {:?}", image);
-        self.sender.unbounded_send(image).ok();
     }
 }

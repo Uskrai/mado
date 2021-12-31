@@ -3,7 +3,9 @@ use futures::lock::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use mado_core::{ArcMadoModule, ArcMadoModuleMap, ChapterInfo, MangaInfo, Url, Uuid};
+use mado_core::{
+    ArcMadoModule, ArcMadoModuleMap, ChapterImageInfo, ChapterInfo, MangaInfo, Url, Uuid,
+};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum DownloadResumedStatus {
@@ -402,5 +404,25 @@ impl DownloadChapterInfo {
         for it in self.observers.lock().iter() {
             f(it);
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct DownloadChapterImageInfo {
+    image: ChapterImageInfo,
+    path: Utf8PathBuf,
+}
+
+impl DownloadChapterImageInfo {
+    pub fn new(image: ChapterImageInfo, path: Utf8PathBuf) -> Self {
+        Self { image, path }
+    }
+
+    pub fn image(&self) -> &ChapterImageInfo {
+        &self.image
+    }
+
+    pub fn path(&self) -> &crate::path::Utf8Path {
+        &self.path
     }
 }
