@@ -111,25 +111,28 @@ where
         &self,
         buffer: &mut C::Buffer,
     ) -> Result<(), mado_core::Error> {
-        let stream = self
+        let request = self
             .module
             .download_image(self.image.clone())
             .await
             .unwrap();
 
-        match stream {
-            mado_core::BodyStream::Http(stream) => self.download_http(stream, buffer).await,
+        match request {
+            mado_core::RequestBuilder::Http(request) => self.download_http(request, buffer).await,
         }
     }
 
     pub async fn download_http(
         &self,
-        mut stream: mado_core::http::ResponseStream,
+        request: mado_core::http::RequestBuilder,
         buffer: &mut C::Buffer,
     ) -> Result<(), mado_core::Error> {
         const BUFFER_SIZE: usize = 1024;
         let mut total = 0;
         let timeout = self.config.timeout();
+
+        let response = request.send().await?;
+        let mut stream = response.stream();
 
         loop {
             let mut buf = vec![0u8; BUFFER_SIZE];

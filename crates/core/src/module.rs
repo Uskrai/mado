@@ -40,7 +40,7 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
     async fn download_image(
         &self,
         image: ChapterImageInfo,
-    ) -> Result<crate::BodyStream, crate::Error>;
+    ) -> Result<crate::RequestBuilder, crate::Error>;
 }
 
 pub type ArcMadoModule = Arc<dyn MadoModule + Sync>;
@@ -213,7 +213,7 @@ mod test {
         async fn download_image(
             &self,
             _: crate::ChapterImageInfo,
-        ) -> Result<crate::BodyStream, crate::Error> {
+        ) -> Result<crate::RequestBuilder, crate::Error> {
             todo!()
         }
     }

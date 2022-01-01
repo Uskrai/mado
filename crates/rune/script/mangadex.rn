@@ -331,8 +331,7 @@ impl MadoModule {
 
     async fn download_image(self, image) {
         let url = Url::parse(image.id).unwrap();
-        let response = self.client.get(url).send().await?;
-        Ok(response.bytes_stream())
+        Ok(self.client.get(url))
     }
 }
 

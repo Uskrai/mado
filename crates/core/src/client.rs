@@ -6,3 +6,7 @@ pub enum Client {
 pub enum BodyStream {
     Http(crate::http::ResponseStream),
 }
+
+pub enum RequestBuilder {
+    Http(crate::http::RequestBuilder),
+}

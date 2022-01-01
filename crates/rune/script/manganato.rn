@@ -210,21 +210,10 @@ impl MadoModule {
 
     async fn download_image(self, image) {
         let url = Url::parse(image.id).unwrap();
-        let response = self.client
+        Ok(self.client
             .get(url.clone())
             .header("Referer", self.domain)
-            .send()
-            .await?;
-
-        let status = response.status();
-        if status.is_client_error() || status.is_server_error() {
-            return Err(mado::error::Error::request_error(
-                url, 
-                response.text().await
-            ));
-        }
-
-        Ok(response.bytes_stream())
+        )
     }
 
 }

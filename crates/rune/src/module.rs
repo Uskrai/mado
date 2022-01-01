@@ -55,16 +55,17 @@ impl RuneMadoModule {
     pub async fn download_image(
         &self,
         image: ChapterImageInfo,
-    ) -> Result<mado_core::BodyStream, Error> {
+    ) -> Result<mado_core::RequestBuilder, Error> {
         let value = crate::serializer::for_async_call(image);
-        let fut = self
+
+        let request = self
             .download_image
-            .async_call::<_, Result<crate::http::BytesStream, Error>>((self.data.clone(), value))
-            .await?;
+            .async_call::<_, Result<crate::http::RequestBuilder, Error>>((self.data.clone(), value))
+            .await??;
 
-        let stream = fut?.into_inner();
+        let request = request.into_inner();
 
-        Ok(mado_core::BodyStream::Http(stream))
+        Ok(mado_core::RequestBuilder::Http(request))
     }
 }
 
@@ -103,7 +104,7 @@ impl MadoModule for RuneMadoModule {
     async fn download_image(
         &self,
         image: mado_core::ChapterImageInfo,
-    ) -> Result<mado_core::BodyStream, mado_core::Error> {
+    ) -> Result<mado_core::RequestBuilder, mado_core::Error> {
         self.download_image(image).await.map_err(Into::into)
     }
 }

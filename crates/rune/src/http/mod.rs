@@ -36,6 +36,10 @@ impl RequestBuilder {
             .map(|inner| Response { inner })
             .map_err(Into::into)
     }
+
+    pub fn into_inner(self) -> HttpRequestBuilder {
+        self.inner
+    }
 }
 
 #[derive(Any, Debug)]

@@ -177,7 +177,7 @@ async fn call_test(rune: Rune, name: String, hash: rune::Hash) -> Result<(), (St
     match_last! {
       "get_info" => OkDeserilizeValue<mado_core::MangaInfo>,
       "get_chapter_images" => OkAnyValue<MockChapterTask>,
-      "download_image" => mado_rune::http::BytesStream,
+      "download_image" => mado_rune::http::RequestBuilder,
       _ => rune::Value
     }
 }
