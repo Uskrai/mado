@@ -8,7 +8,7 @@ mod engine;
 pub use engine::*;
 
 pub use chapter_downloader::ChapterDownloader;
-pub use image_downloader::ImageDownloader;
+pub use image_downloader::{ImageDownloader, ImageDownloaderConfig};
 pub use task_downloader::TaskDownloader;
 
 mod state;

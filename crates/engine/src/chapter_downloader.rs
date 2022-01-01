@@ -57,6 +57,23 @@ impl ChapterDownloader {
         let limit = self.retry_limit.clone();
         let timeout = self.timeout.clone();
 
+        struct Config(Arc<AtomicUsize>, Arc<AtomicU64>);
+        impl crate::ImageDownloaderConfig for Config {
+            type Buffer = Vec<u8>;
+
+            fn should_retry(&self, retry_count: usize) -> bool {
+                retry_count < self.0.load(atomic::Ordering::Relaxed)
+            }
+
+            fn timeout(&self) -> std::time::Duration {
+                std::time::Duration::from_secs(self.1.load(atomic::Ordering::Relaxed))
+            }
+
+            fn buffer(&self) -> Self::Buffer {
+                Vec::new()
+            }
+        }
+
         async move {
             let path = image.path();
             let image = image.image();
@@ -65,7 +82,8 @@ impl ChapterDownloader {
             let exists = path.exists();
 
             if !exists {
-                let task = ImageDownloader::new(module.clone(), image.clone(), limit, timeout);
+                let task =
+                    ImageDownloader::new(module.clone(), image.clone(), Config(limit, timeout));
 
                 tracing::trace!("Start downloading {} {:?}", path, image);
 

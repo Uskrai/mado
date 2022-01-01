@@ -1,15 +1,21 @@
-use std::sync::atomic::{AtomicU64, AtomicUsize};
-use std::sync::Arc;
 use std::{future::Future, time::Duration};
 
-use std::io::Write;
-
+use futures::{AsyncWrite, AsyncWriteExt};
 use mado_core::{ArcMadoModule, ChapterImageInfo};
 
-/// Run future returned by fun until the future return Ok or limit return true.
+pub trait ImageDownloaderConfig {
+    type Buffer: AsyncWrite + Unpin;
+
+    fn should_retry(&self, retry_count: usize) -> bool;
+    fn timeout(&self) -> Duration;
+
+    fn buffer(&self) -> Self::Buffer;
+}
+
+/// Run future returned by fun until the future return Ok or should_retry return false.
 /// limit will be called with retry count and after fun is awaited
 #[inline]
-pub async fn do_while_err_or_n<F, R, O, E, L>(mut limit: L, mut fun: F) -> Result<O, E>
+pub async fn do_while_err_or<F, R, O, E, L>(mut fun: F, mut should_retry: L) -> Result<O, E>
 where
     F: FnMut() -> R,
     R: Future<Output = Result<O, E>>,
@@ -24,50 +30,41 @@ where
         let result = fun().await;
 
         error = match result {
-            Ok(ok) => return Ok(ok),
+            Ok(ok) => break Ok(ok),
             Err(err) => err,
         };
 
         retry += 1;
 
-        let retry_limit_reached = limit(retry);
+        let stop = should_retry(retry);
 
         tracing::error!(
             "{}, {}",
             error,
-            if retry_limit_reached {
-                "Stopping..."
-            } else {
-                "Retrying..."
-            }
+            if stop { "Stopping..." } else { "Retrying..." }
         );
 
-        // return last error if retry limit reached.
-        if retry_limit_reached {
+        if stop {
             break Err(error);
         }
     }
 }
 
-pub struct ImageDownloader {
+pub struct ImageDownloader<C> {
     module: ArcMadoModule,
     image: ChapterImageInfo,
-    limit: Arc<AtomicUsize>,
-    timeout: Arc<AtomicU64>,
+    config: C,
 }
 
-impl ImageDownloader {
-    pub fn new(
-        module: ArcMadoModule,
-        image: ChapterImageInfo,
-        limit: Arc<AtomicUsize>,
-        timeout: Arc<AtomicU64>,
-    ) -> Self {
+impl<C> ImageDownloader<C>
+where
+    C: ImageDownloaderConfig,
+{
+    pub fn new(module: ArcMadoModule, image: ChapterImageInfo, config: C) -> Self {
         Self {
             module,
             image,
-            limit,
-            timeout,
+            config,
         }
     }
 
@@ -79,14 +76,16 @@ impl ImageDownloader {
             self.module = %self.module.uuid()
         )
     )]
-    pub async fn download(&self) -> Result<Vec<u8>, mado_core::Error> {
-        do_while_err_or_n(
-            |retry| self.limit.load(atomic::Ordering::Acquire) < retry,
-            || async move {
-                let mut buffer = Vec::new();
+    pub async fn download(self) -> Result<C::Buffer, mado_core::Error> {
+        do_while_err_or(
+            || async {
+                let mut buffer = self.config.buffer();
+
                 self.download_without_retry(&mut buffer).await?;
+
                 Ok(buffer)
             },
+            |retry| self.config.should_retry(retry),
         )
         .await
     }
@@ -108,10 +107,10 @@ impl ImageDownloader {
         Ok(result)
     }
 
-    pub async fn download_without_retry<W>(&self, buffer: &mut W) -> Result<(), mado_core::Error>
-    where
-        W: Write,
-    {
+    pub async fn download_without_retry(
+        &self,
+        buffer: &mut C::Buffer,
+    ) -> Result<(), mado_core::Error> {
         let stream = self
             .module
             .download_image(self.image.clone())
@@ -123,19 +122,14 @@ impl ImageDownloader {
         }
     }
 
-    pub async fn download_http<W>(
+    pub async fn download_http(
         &self,
         mut stream: mado_core::http::ResponseStream,
-        buffer: &mut W,
-    ) -> Result<(), mado_core::Error>
-    where
-        W: Write,
-    {
+        buffer: &mut C::Buffer,
+    ) -> Result<(), mado_core::Error> {
         const BUFFER_SIZE: usize = 1024;
         let mut total = 0;
-
-        let timeout = self.timeout.load(atomic::Ordering::Acquire);
-        let timeout = Duration::from_secs(timeout.into());
+        let timeout = self.config.timeout();
 
         loop {
             let mut buf = vec![0u8; BUFFER_SIZE];
@@ -154,7 +148,7 @@ impl ImageDownloader {
                 total
             );
 
-            buffer.write_all(buf)?;
+            buffer.write_all(buf).await?;
         }
     }
 }
