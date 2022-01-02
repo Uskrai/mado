@@ -1,7 +1,9 @@
 mod chapter_downloader;
 mod image_downloader;
 mod info;
+mod observer;
 pub use info::*;
+pub use observer::{ObserverHandle, Observers};
 mod engine;
 mod task_downloader;
 pub mod timer;

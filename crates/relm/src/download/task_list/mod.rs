@@ -249,7 +249,7 @@ impl DownloadViewController {
             gtk::glib::Continue(true)
         });
 
-        download.info.connect(Arc::new(this.clone()));
+        download.info.connect(this.clone());
 
         this
     }

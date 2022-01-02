@@ -122,19 +122,18 @@ impl TaskDownloader {
 #[derive(Debug)]
 pub struct DownloadTaskSender {
     info: Arc<crate::DownloadInfo>,
-    event: Event,
+    event: Arc<Event>,
 }
 
 impl DownloadTaskSender {
-    pub fn connect(info: Arc<crate::DownloadInfo>) -> Arc<Self> {
-        let event = Event::new();
-        let this = Arc::new(Self {
-            info: info.clone(),
-            event,
-        });
+    pub fn connect(info: Arc<crate::DownloadInfo>) -> Self {
+        let event = Arc::new(Event::new());
 
-        info.connect(this.clone());
-        this
+        info.connect(DownloadTaskNotifier(event.clone()));
+        Self {
+            info: info.clone(),
+            event: event.clone(),
+        }
     }
 
     pub async fn wait_status(&self, fun: impl Fn(&DownloadStatus) -> bool) {
@@ -148,9 +147,11 @@ impl DownloadTaskSender {
     }
 }
 
-impl crate::DownloadInfoObserver for DownloadTaskSender {
+#[derive(Debug)]
+pub struct DownloadTaskNotifier(Arc<Event>);
+impl crate::DownloadInfoObserver for DownloadTaskNotifier {
     fn on_status_changed(&self, _: &DownloadStatus) {
-        self.event.notify(usize::MAX);
+        self.0.notify(usize::MAX);
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{path::Utf8PathBuf, DownloadStatus, LateBindingModule};
+use crate::{path::Utf8PathBuf, DownloadStatus, LateBindingModule, ObserverHandle, Observers};
 use parking_lot::Mutex;
 
 #[derive(Debug)]
@@ -8,10 +8,10 @@ pub struct DownloadChapterInfo {
     chapter_id: String,
     path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
-    observers: Mutex<Vec<Box<dyn DownloadChapterInfoObserver>>>,
+    observers: Observers<Box<dyn DownloadChapterInfoObserver>>,
 }
 
-pub trait DownloadChapterInfoObserver: std::fmt::Debug + Send + Sync {
+pub trait DownloadChapterInfoObserver: std::fmt::Debug + Send + Sync + 'static {
     fn on_status_changed(&self, status: &DownloadStatus);
 }
 
@@ -51,7 +51,7 @@ impl DownloadChapterInfo {
     pub fn set_status(&self, status: DownloadStatus) {
         let mut lock = self.status.lock();
         *lock = status;
-        self.emit(|it| it.on_status_changed(&lock));
+        self.observers.emit(|it| it.on_status_changed(&lock));
     }
 
     /// Get a reference to the download chapter info's title.
@@ -66,9 +66,19 @@ impl DownloadChapterInfo {
         self.chapter_id.as_ref()
     }
 
-    fn emit(&self, f: impl Fn(&Box<dyn DownloadChapterInfoObserver>)) {
-        for it in self.observers.lock().iter() {
-            f(it);
-        }
+    pub fn connect(
+        &self,
+        observer: impl DownloadChapterInfoObserver,
+    ) -> ObserverHandle<Box<dyn DownloadChapterInfoObserver>> {
+        observer.on_status_changed(&self.status());
+
+        self.connect_only(observer)
+    }
+
+    pub fn connect_only(
+        &self,
+        observer: impl DownloadChapterInfoObserver,
+    ) -> ObserverHandle<Box<dyn DownloadChapterInfoObserver>> {
+        self.observers.connect(Box::new(observer))
     }
 }

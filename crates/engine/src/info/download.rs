@@ -2,7 +2,7 @@ use crate::{
     core::{ChapterInfo, MangaInfo, Url, Uuid},
     path::Utf8PathBuf,
     ArcMadoModule, DownloadChapterInfo, DownloadProgressStatus, DownloadResumedStatus,
-    DownloadStatus, LateBindingModule, ModuleInfo,
+    DownloadStatus, LateBindingModule, ModuleInfo, ObserverHandle, Observers,
 };
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ pub struct DownloadInfo {
     path: Utf8PathBuf,
     url: Option<Url>,
     status: Mutex<DownloadStatus>,
-    observers: Mutex<Vec<ArcDownloadInfoObserver>>,
+    observers: Observers<Box<dyn DownloadInfoObserver>>,
 }
 
 impl DownloadInfo {
@@ -35,7 +35,7 @@ impl DownloadInfo {
             path,
             url,
             status: Mutex::new(status),
-            observers: Mutex::new(Vec::new()),
+            observers: Default::default(),
         }
     }
     pub fn from_request(request: DownloadRequest) -> Self {
@@ -116,7 +116,7 @@ impl DownloadInfo {
     pub fn set_status(&self, status: DownloadStatus) {
         let mut lock = self.status.lock();
         *lock = status;
-        self.emit(|it| it.on_status_changed(&lock));
+        self.observers.emit(|it| it.on_status_changed(&lock));
     }
 
     /// Resume Download
@@ -140,23 +140,20 @@ impl DownloadInfo {
     }
 
     /// Connect and send current state.
-    pub fn connect(&self, observer: ArcDownloadInfoObserver) {
-        let mut observers = self.observers.lock();
-
+    pub fn connect(
+        &self,
+        observer: impl DownloadInfoObserver,
+    ) -> ObserverHandle<Box<dyn DownloadInfoObserver>> {
         observer.on_status_changed(&self.status());
-
-        observers.push(observer);
+        self.connect_only(observer)
     }
 
     /// Connect without sending current state
-    pub fn connect_only(&self, observer: ArcDownloadInfoObserver) {
-        self.observers.lock().push(observer);
-    }
-
-    fn emit(&self, fun: impl Fn(ArcDownloadInfoObserver)) {
-        for it in self.observers.lock().iter() {
-            fun(it.clone());
-        }
+    pub fn connect_only(
+        &self,
+        observer: impl DownloadInfoObserver,
+    ) -> ObserverHandle<Box<dyn DownloadInfoObserver>> {
+        self.observers.connect(Box::new(observer))
     }
 }
 
@@ -207,11 +204,9 @@ impl DownloadRequest {
 }
 
 #[cfg_attr(test, mockall::automock)]
-pub trait DownloadInfoObserver: std::fmt::Debug {
+pub trait DownloadInfoObserver: std::fmt::Debug + Send + Sync + 'static {
     fn on_status_changed(&self, status: &DownloadStatus);
 }
-
-type ArcDownloadInfoObserver = Arc<dyn DownloadInfoObserver + Send + Sync>;
 
 #[cfg(test)]
 mod tests {
@@ -240,9 +235,7 @@ mod tests {
                 .with(predicate::eq(DownloadStatus::paused()))
                 .returning(|_| ());
 
-            mock.expect_on_status_changed().times(..).returning(|_| ());
-
-            info.connect(Arc::new(mock));
+            info.connect(mock).disconnect().unwrap();
         }
 
         {
@@ -254,18 +247,22 @@ mod tests {
 
             mock.expect_on_status_changed()
                 .once()
-                .with(predicate::eq(DownloadStatus::finished()))
+                .with(predicate::eq(DownloadStatus::resumed(
+                    DownloadResumedStatus::Waiting,
+                )))
                 .returning(|_| ());
 
-            info.connect(Arc::new(mock));
+            let handle = info.connect(mock);
 
+            info.set_status(DownloadStatus::resumed(DownloadResumedStatus::Waiting));
+            handle.disconnect().unwrap();
             info.set_status(DownloadStatus::finished());
         }
 
         {
             let mut mock = MockDownloadInfoObserver::new();
             mock.expect_on_status_changed().never();
-            info.connect_only(Arc::new(mock));
+            info.connect_only(mock).disconnect().unwrap();
         }
     }
 }
