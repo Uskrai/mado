@@ -1,10 +1,10 @@
 mod chapter_downloader;
-mod data;
 mod image_downloader;
+mod info;
+pub use info::*;
+mod engine;
 mod task_downloader;
 pub mod timer;
-pub use data::*;
-mod engine;
 pub use engine::*;
 
 pub use chapter_downloader::ChapterDownloader;
