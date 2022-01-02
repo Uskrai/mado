@@ -36,7 +36,7 @@ where
 
         retry += 1;
 
-        let stop = should_retry(retry);
+        let stop = !should_retry(retry);
 
         tracing::error!(
             "{}, {}",
@@ -153,5 +153,58 @@ where
 
             buffer.write_all(buf).await?;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::{atomic::AtomicUsize, Arc};
+
+    use super::*;
+
+    #[test]
+    fn retry_test() {
+        futures::executor::block_on(async {
+            let i = Arc::new(AtomicUsize::new(0));
+            let set = |val| {
+                i.store(val, atomic::Ordering::Relaxed);
+            };
+            let get = || i.load(atomic::Ordering::Relaxed);
+
+            do_while_err_or(
+                || async move {
+                    if get() == 1 {
+                        Ok(())
+                    } else {
+                        set(1);
+                        Err("")
+                    }
+                },
+                |retry| retry <= 1,
+            )
+            .await
+            .unwrap();
+            assert_eq!(get(), 1);
+
+            set(0);
+            const RETRY: usize = 10;
+
+            do_while_err_or(
+                || async {
+                    set(get() + 1);
+                    Result::<(), &str>::Err("")
+                },
+                |retry| retry < RETRY,
+            )
+            .await
+            .unwrap_err();
+
+            assert_eq!(get(), RETRY);
+
+            do_while_err_or(|| async { Ok::<_, &str>(()) }, |_| unreachable!())
+                .await
+                .unwrap();
+        });
     }
 }
