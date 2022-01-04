@@ -35,15 +35,9 @@ impl TaskDownloader {
                 }
             };
 
-            match result {
-                Ok(_) => {
-                    self.info.set_status(DownloadStatus::Finished);
-                    continue;
-                }
-                Err(err) => {
-                    tracing::error!("{}", err);
-                    self.info.set_status(DownloadStatus::error(err));
-                }
+            if let Err(err) = result {
+                tracing::error!("{}", err);
+                self.info.set_status(DownloadStatus::error(err));
             }
         }
     }
