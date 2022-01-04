@@ -17,7 +17,7 @@ impl TaskDownloader {
     }
 
     pub async fn run(self) {
-        let status = DownloadTaskSender::connect(self.info.clone());
+        let status = DownloadInfoWatcher::connect(self.info.clone());
         loop {
             status.wait_status(DownloadStatus::is_resumed).await;
 
@@ -114,16 +114,16 @@ impl TaskDownloader {
 }
 
 #[derive(Debug)]
-pub struct DownloadTaskSender {
+struct DownloadInfoWatcher {
     info: Arc<crate::DownloadInfo>,
     event: Arc<Event>,
 }
 
-impl DownloadTaskSender {
+impl DownloadInfoWatcher {
     pub fn connect(info: Arc<crate::DownloadInfo>) -> Self {
         let event = Arc::new(Event::new());
 
-        info.connect(DownloadTaskNotifier(event.clone()));
+        info.connect(DownloadInfoNotifier(event.clone()));
         Self {
             info: info.clone(),
             event: event.clone(),
@@ -142,8 +142,8 @@ impl DownloadTaskSender {
 }
 
 #[derive(Debug)]
-pub struct DownloadTaskNotifier(Arc<Event>);
-impl crate::DownloadInfoObserver for DownloadTaskNotifier {
+struct DownloadInfoNotifier(Arc<Event>);
+impl crate::DownloadInfoObserver for DownloadInfoNotifier {
     fn on_status_changed(&self, _: &DownloadStatus) {
         self.0.notify(usize::MAX);
     }
