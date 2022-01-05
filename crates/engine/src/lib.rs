@@ -1,4 +1,3 @@
-mod chapter_downloader;
 mod image_downloader;
 mod info;
 mod observer;
@@ -9,7 +8,6 @@ mod task_downloader;
 pub mod timer;
 pub use engine::*;
 
-pub use chapter_downloader::ChapterDownloader;
 pub use image_downloader::{ImageDownloader, ImageDownloaderConfig};
 pub use task_downloader::TaskDownloader;
 

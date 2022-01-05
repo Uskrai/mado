@@ -1,4 +1,10 @@
-use std::sync::Arc;
+use std::{
+    io::Write,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize},
+        Arc,
+    },
+};
 
 use event_listener::Event;
 use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
@@ -58,17 +64,19 @@ impl TaskDownloader {
             return Ok(());
         }
 
-        const RETRY_LIMIT: usize = 10;
-        const TIMEOUT: u64 = 10;
-        let retry = Arc::new(RETRY_LIMIT.into());
-        let timeout = Arc::new(TIMEOUT.into());
+        let (download_tx, mut download_rx) = mpsc::channel(1);
 
-        let (download_tx, download_rx) = mpsc::channel(1);
-        let downloader = ChapterDownloader::new(download_rx, it.clone(), retry, timeout);
+        let image_downloader = async {
+            while let Some(image) = download_rx.next().await {
+                self.download_image(image).await?;
+            }
+
+            Ok(())
+        };
 
         let get_images = self.get_chapter_images(&it, download_tx);
 
-        futures::try_join!(get_images, downloader.run())?;
+        futures::try_join!(get_images, image_downloader)?;
 
         it.set_status(DownloadStatus::Finished);
 
@@ -109,6 +117,58 @@ impl TaskDownloader {
 
         futures::try_join!(get_images, receiver)?;
 
+        Ok(())
+    }
+
+    pub async fn download_image(
+        &self,
+        image: Arc<DownloadChapterImageInfo>,
+    ) -> Result<(), mado_core::Error> {
+        let module = self.info.wait_module().await;
+        let path = image.path();
+        let image = image.image();
+        let exists = path.exists();
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        const RETRY_LIMIT: usize = 10;
+        const TIMEOUT: u64 = 10;
+        let retry = Arc::new(RETRY_LIMIT.into());
+        let timeout = Arc::new(TIMEOUT.into());
+
+        struct Config(Arc<AtomicUsize>, Arc<AtomicU64>);
+        impl crate::ImageDownloaderConfig for Config {
+            type Buffer = Vec<u8>;
+
+            fn should_retry(&self, retry_count: usize) -> bool {
+                retry_count < self.0.load(atomic::Ordering::Relaxed)
+            }
+
+            fn timeout(&self) -> std::time::Duration {
+                std::time::Duration::from_secs(self.1.load(atomic::Ordering::Relaxed))
+            }
+
+            fn buffer(&self) -> Self::Buffer {
+                Vec::new()
+            }
+        }
+
+        if !exists {
+            let task = ImageDownloader::new(module.clone(), image.clone(), Config(retry, timeout));
+
+            tracing::trace!("Start downloading {} {:?}", path, image);
+
+            let buffer = task.download().await?;
+
+            tracing::trace!("Finished downloading {} {:?}", path, image);
+            let mut file = std::fs::File::create(&path).unwrap();
+            file.write_all(&buffer)?;
+            tracing::trace!("Finished writing to {}", path);
+        } else {
+            tracing::trace!("File {} already exists, skipping...", path);
+        }
         Ok(())
     }
 }
