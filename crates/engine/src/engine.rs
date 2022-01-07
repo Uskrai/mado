@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::{channel::mpsc, FutureExt, StreamExt};
 
-use crate::{DownloadStatus, MadoEngineState, MadoEngineStateObserver, MadoModuleLoader};
+use crate::{DownloadStatus, MadoEngineState, MadoEngineStateMsg, MadoModuleLoader};
 
 pub struct MadoEngine {
     state: Arc<MadoEngineState>,
@@ -46,18 +46,17 @@ impl MadoEngine {
     }
 
     pub fn connect_state(&self) -> mpsc::UnboundedReceiver<MadoEngineMsg> {
-        pub struct MadoEngineSender(mpsc::UnboundedSender<MadoEngineMsg>);
-
-        impl MadoEngineStateObserver for MadoEngineSender {
-            fn on_push_module(&self, _: mado_core::ArcMadoModule) {}
-
-            fn on_download(&self, info: Arc<crate::DownloadInfo>) {
-                self.0.unbounded_send(MadoEngineMsg::Download(info)).ok();
-            }
-        }
-
         let (tx, rx) = mpsc::unbounded();
-        self.state.connect(MadoEngineSender(tx));
+
+        self.state.connect({
+            move |msg| match msg {
+                MadoEngineStateMsg::Download(info) => {
+                    tx.unbounded_send(MadoEngineMsg::Download(info.clone()))
+                        .ok();
+                }
+                MadoEngineStateMsg::PushModule(_) => {}
+            }
+        });
         rx
     }
 

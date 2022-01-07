@@ -7,6 +7,15 @@ use crate::{
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+macro_rules! ImplObserver {
+    () => {
+        impl FnMut(DownloadInfoMsg) + Send + 'static
+
+    }
+}
+
+pub type BoxObserver = Box<dyn FnMut(DownloadInfoMsg) + Send + 'static>;
+
 #[derive(Debug)]
 pub struct DownloadInfo {
     module: ModuleInfo,
@@ -15,7 +24,11 @@ pub struct DownloadInfo {
     path: Utf8PathBuf,
     url: Option<Url>,
     status: Mutex<DownloadStatus>,
-    observers: Observers<Box<dyn DownloadInfoObserver>>,
+    observers: Observers<BoxObserver>,
+}
+
+pub enum DownloadInfoMsg<'a> {
+    StatusChanged(&'a DownloadStatus),
 }
 
 impl DownloadInfo {
@@ -116,7 +129,8 @@ impl DownloadInfo {
     pub fn set_status(&self, status: DownloadStatus) {
         let mut lock = self.status.lock();
         *lock = status;
-        self.observers.emit(|it| it.on_status_changed(&lock));
+        self.observers
+            .emit(|it| it(DownloadInfoMsg::StatusChanged(&lock)));
     }
 
     /// Resume Download
@@ -140,19 +154,14 @@ impl DownloadInfo {
     }
 
     /// Connect and send current state.
-    pub fn connect(
-        &self,
-        observer: impl DownloadInfoObserver,
-    ) -> ObserverHandle<Box<dyn DownloadInfoObserver>> {
-        observer.on_status_changed(&self.status());
+    pub fn connect(&self, mut observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
+        observer(DownloadInfoMsg::StatusChanged(&self.status()));
+
         self.connect_only(observer)
     }
 
     /// Connect without sending current state
-    pub fn connect_only(
-        &self,
-        observer: impl DownloadInfoObserver,
-    ) -> ObserverHandle<Box<dyn DownloadInfoObserver>> {
+    pub fn connect_only(&self, observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
         self.observers.connect(Box::new(observer))
     }
 }
@@ -203,17 +212,31 @@ impl DownloadRequest {
     }
 }
 
-#[cfg_attr(test, mockall::automock)]
-pub trait DownloadInfoObserver: std::fmt::Debug + Send + Sync + 'static {
-    fn on_status_changed(&self, status: &DownloadStatus);
-}
-
 #[cfg(test)]
 mod tests {
     use mado_core::DefaultMadoModuleMap;
     use mockall::predicate;
 
     use super::*;
+
+    mockall::mock! {
+        pub Thing {
+            fn on_status_changed(&self, status: &DownloadStatus);
+            fn on_download(&self, info: &DownloadStatus);
+        }
+    }
+
+    impl MockThing {
+        fn handle(&self, msg: DownloadInfoMsg<'_>) {
+            match msg {
+                DownloadInfoMsg::StatusChanged(status) => self.on_status_changed(status),
+            }
+        }
+
+        fn handler(self) -> impl FnMut(DownloadInfoMsg<'_>) + Send + 'static {
+            move |msg: DownloadInfoMsg<'_>| self.handle(msg)
+        }
+    }
 
     #[test]
     fn download_observer() {
@@ -228,18 +251,19 @@ mod tests {
             None,
             DownloadStatus::paused(),
         );
+
         {
-            let mut mock = MockDownloadInfoObserver::new();
+            let mut mock = MockThing::default();
             mock.expect_on_status_changed()
                 .once()
                 .with(predicate::eq(DownloadStatus::paused()))
                 .returning(|_| ());
 
-            info.connect(mock).disconnect().unwrap();
+            let _ = info.connect(mock.handler()).disconnect().unwrap();
         }
 
         {
-            let mut mock = MockDownloadInfoObserver::new();
+            let mut mock = MockThing::new();
             mock.expect_on_status_changed()
                 .once()
                 .with(predicate::eq(DownloadStatus::paused()))
@@ -252,17 +276,17 @@ mod tests {
                 )))
                 .returning(|_| ());
 
-            let handle = info.connect(mock);
+            let handle = info.connect(mock.handler());
 
             info.set_status(DownloadStatus::resumed(DownloadResumedStatus::Waiting));
-            handle.disconnect().unwrap();
+            let _ = handle.disconnect().unwrap();
             info.set_status(DownloadStatus::finished());
         }
 
         {
-            let mut mock = MockDownloadInfoObserver::new();
+            let mut mock = MockThing::new();
             mock.expect_on_status_changed().never();
-            info.connect_only(mock).disconnect().unwrap();
+            let _ = info.connect_only(mock.handler()).disconnect().unwrap();
         }
     }
 }

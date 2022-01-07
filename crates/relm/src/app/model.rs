@@ -4,7 +4,7 @@ use crate::{
     manga_info::{MangaInfoParentModel, MangaInfoParentMsg},
 };
 use mado_core::{ArcMadoModule, ArcMadoModuleMap};
-use mado_engine::{DownloadRequest, MadoEngineState, MadoEngineStateObserver};
+use mado_engine::{DownloadRequest, MadoEngineState, MadoEngineStateMsg};
 use relm4::{AppUpdate, Model};
 use std::sync::Arc;
 
@@ -85,16 +85,18 @@ impl RelmMadoEngineStateObserver {
             download_sender,
         }
     }
-}
 
-impl MadoEngineStateObserver for RelmMadoEngineStateObserver {
-    fn on_push_module(&self, module: mado_core::ArcMadoModule) {
-        self.sender.send(crate::AppMsg::PushModule(module)).unwrap();
-    }
-
-    fn on_download(&self, info: Arc<mado_engine::DownloadInfo>) {
-        self.download_sender
-            .send(DownloadMsg::CreateDownloadView(info))
-            .unwrap();
+    pub fn connect(self, state: &Arc<MadoEngineState>) {
+        state.connect(move |msg| {
+            match msg {
+                MadoEngineStateMsg::Download(info) => self
+                    .download_sender
+                    .send(DownloadMsg::CreateDownloadView(info.clone()))
+                    .ok(),
+                MadoEngineStateMsg::PushModule(module) => {
+                    self.sender.send(AppMsg::PushModule(module.clone())).ok()
+                }
+            };
+        })
     }
 }

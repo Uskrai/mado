@@ -24,7 +24,7 @@ impl Components<AppModel> for AppComponents {
             this.download.sender(),
         );
 
-        parent_model.state.connect(observer);
+        observer.connect(&parent_model.state);
 
         this
     }

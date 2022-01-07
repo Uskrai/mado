@@ -1,16 +1,24 @@
 use parking_lot::Mutex;
 use std::{
     collections::HashMap,
+    fmt::Debug,
     ops::Deref,
     sync::{atomic::AtomicUsize, Arc, Weak},
 };
 
 type ObserverMap<T> = Mutex<HashMap<usize, T>>;
 
-#[derive(Debug)]
 pub struct Observers<T> {
     observers: Arc<ObserverMap<T>>,
     last_insert_id: AtomicUsize,
+}
+
+impl<T> Debug for Observers<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Observers")
+            .field("last_insert_id", &self.last_insert_id)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<T> Default for Observers<T> {
@@ -39,9 +47,9 @@ impl<T> Observers<T> {
         handle
     }
 
-    pub fn emit(&self, mut f: impl FnMut(&T)) {
-        for (_, it) in self.observers.lock().iter() {
-            f(&it);
+    pub fn emit(&self, mut f: impl FnMut(&mut T)) {
+        for (_, mut it) in self.observers.lock().iter_mut() {
+            f(&mut it);
         }
     }
 

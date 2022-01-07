@@ -8,10 +8,22 @@ pub struct DownloadChapterInfo {
     chapter_id: String,
     path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
-    observers: Observers<Box<dyn DownloadChapterInfoObserver>>,
+    observers: Observers<BoxObserver>,
+}
+macro_rules! ImplObserver {
+    () => {
+        impl FnMut(DownloadChapterInfoMsg<'_>) + Send + 'static
+    }
 }
 
-pub trait DownloadChapterInfoObserver: std::fmt::Debug + Send + Sync + 'static {
+pub type BoxObserver = Box<dyn FnMut(DownloadChapterInfoMsg<'_>) + Send>;
+
+#[derive(Debug)]
+pub enum DownloadChapterInfoMsg<'a> {
+    StatusChanged(&'a DownloadStatus),
+}
+
+pub trait DownloadChapterInfoObserver: std::fmt::Debug + Send + 'static {
     fn on_status_changed(&self, status: &DownloadStatus);
 }
 
@@ -51,7 +63,8 @@ impl DownloadChapterInfo {
     pub fn set_status(&self, status: DownloadStatus) {
         let mut lock = self.status.lock();
         *lock = status;
-        self.observers.emit(|it| it.on_status_changed(&lock));
+        self.observers
+            .emit(|it| it(DownloadChapterInfoMsg::StatusChanged(&lock)));
     }
 
     /// Get a reference to the download chapter info's title.
@@ -66,19 +79,13 @@ impl DownloadChapterInfo {
         self.chapter_id.as_ref()
     }
 
-    pub fn connect(
-        &self,
-        observer: impl DownloadChapterInfoObserver,
-    ) -> ObserverHandle<Box<dyn DownloadChapterInfoObserver>> {
-        observer.on_status_changed(&self.status());
+    pub fn connect(&self, mut observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
+        observer(DownloadChapterInfoMsg::StatusChanged(&self.status()));
 
         self.connect_only(observer)
     }
 
-    pub fn connect_only(
-        &self,
-        observer: impl DownloadChapterInfoObserver,
-    ) -> ObserverHandle<Box<dyn DownloadChapterInfoObserver>> {
+    pub fn connect_only(&self, observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
         self.observers.connect(Box::new(observer))
     }
 }

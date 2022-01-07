@@ -183,7 +183,14 @@ impl DownloadInfoWatcher {
     pub fn connect(info: Arc<crate::DownloadInfo>) -> Self {
         let event = Arc::new(Event::new());
 
-        info.connect(DownloadInfoNotifier(event.clone()));
+        info.connect({
+            let event = event.clone();
+
+            move |_| {
+                event.notify(usize::MAX);
+            }
+        });
+
         Self {
             info: info.clone(),
             event: event.clone(),
@@ -198,14 +205,6 @@ impl DownloadInfoWatcher {
 
             self.event.listen().await;
         }
-    }
-}
-
-#[derive(Debug)]
-struct DownloadInfoNotifier(Arc<Event>);
-impl crate::DownloadInfoObserver for DownloadInfoNotifier {
-    fn on_status_changed(&self, _: &DownloadStatus) {
-        self.0.notify(usize::MAX);
     }
 }
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use gtk::prelude::*;
-use mado_engine::{DownloadInfo, DownloadInfoObserver, DownloadStatus};
+use mado_engine::{DownloadInfo, DownloadInfoMsg, DownloadStatus};
 
 #[derive(Debug)]
 pub struct DownloadItem {
@@ -249,14 +249,11 @@ impl DownloadViewController {
             gtk::glib::Continue(true)
         });
 
-        download.info.connect(this.clone());
+        let sender = this.sender.clone();
+        download.info.connect(move |msg| match msg {
+            DownloadInfoMsg::StatusChanged(_) => sender.send(DownloadMsg::StatusChanged).unwrap(),
+        });
 
         this
-    }
-}
-
-impl DownloadInfoObserver for DownloadViewController {
-    fn on_status_changed(&self, _: &DownloadStatus) {
-        self.sender.send(DownloadMsg::StatusChanged).unwrap();
     }
 }

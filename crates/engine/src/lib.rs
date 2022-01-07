@@ -12,7 +12,7 @@ pub use image_downloader::{ImageDownloader, ImageDownloaderConfig};
 pub use task_downloader::TaskDownloader;
 
 mod state;
-pub use state::{MadoEngineState, MadoEngineStateObserver};
+pub use state::{MadoEngineState, MadoEngineStateMsg};
 
 /// Error happen when Loading Module.
 #[derive(Debug, thiserror::Error)]
