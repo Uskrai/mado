@@ -1,5 +1,5 @@
 use anyhow::Context;
-use mado_core::ArcMadoModule;
+use mado_core::{ArcMadoModule, DefaultMadoModuleMap, MutexMadoModuleMap};
 use mado_engine::{
     path::Utf8PathBuf, MadoEngine, MadoEngineState, MadoModuleLoader, ModuleLoadError,
 };
@@ -82,12 +82,24 @@ pub fn main() {
         .unwrap();
     let _guard = runtime.enter();
 
-    let state = MadoEngineState::new(Default::default(), Vec::new());
+    let db = mado_sqlite::Database::open("data.db").unwrap();
+    let channel = mado_sqlite::channel(db);
+
+    let map = Arc::new(MutexMadoModuleMap::new(DefaultMadoModuleMap::new()));
+    let downloads = channel.load_connect(map.clone()).unwrap();
+
+    let state = MadoEngineState::new(map, downloads);
+    channel.connect_only(&state);
+
     let mado = MadoEngine::new(state);
     let model = mado_relm::AppModel::new(mado.state());
 
     tokio::spawn(mado.load_module(Loader));
     tokio::spawn(mado.run());
+    tokio::spawn(async {
+        let mut channel = channel;
+        channel.run().await.unwrap();
+    });
 
     let app = RelmApp::new(model);
     app.run();

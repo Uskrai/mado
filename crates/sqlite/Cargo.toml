@@ -1,0 +1,16 @@
+[package]
+name = "mado-sqlite"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+mado-engine = { path = "../engine" }
+futures = "0.3.0"
+
+[dependencies.rusqlite]
+version = "0.26.0"
+features = [
+    "uuid",
+    "url",
+]

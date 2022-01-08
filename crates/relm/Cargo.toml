@@ -23,6 +23,7 @@ mado-engine = { path = "../engine" }
 mado-core = { path = "../core" }
 
 mado-rune = { path = "../rune" }
+mado-sqlite = { path = "../sqlite" }
 
 [dependencies.relm4]
 git = "https://github.com/AaronErhardt/relm4"
