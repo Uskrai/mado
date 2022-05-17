@@ -110,7 +110,7 @@ impl ChapterInfo {
 impl Display for ChapterInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(val) = self.index {
-            write!(f, "{:0>5}. ", val)?;
+            write!(f, "{:0>4}. ", val)?;
         }
 
         self.fmt_without_index(f)

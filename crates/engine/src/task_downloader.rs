@@ -98,7 +98,7 @@ impl TaskDownloader {
 
         let receiver = async {
             while let Some(image) = image_rx.next().await {
-                let filename = format!("{:0>5}.{}", i, image.extension);
+                let filename = format!("{:0>4}.{}", i, image.extension);
                 let path = it.path().join(filename);
 
                 let image = DownloadChapterImageInfo::new(image, path);
