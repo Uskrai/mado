@@ -267,35 +267,16 @@ impl MadoModule {
     async fn get_chapter_images(self, id, task) {
         use mado::http::Url;
 
-        let url = Url::parse(`${API_URL}/chapter/${id}`).unwrap();
-
-        let id_request = self.get_chapter_images_id(id);
-        let server_request = self.get_chapter_image_server(id);
-
-        let json = [];
-        let server = "";
-        loop {
-            let val = select {
-                res = id_request => {
-                    json = res?;
-                    Ok(())
-                }
-                res = server_request => {
-                    server = res?;
-                    Ok(())
-                }
-            };
-
-            match val {
-                () => break,
-            }
-        }
-
+        let url = Url::parse(`${API_URL}/at-home/server/${id}`).unwrap();
+        let json = self.client.get(url.clone()).send().await?.json().await?;
+        let json = self.parse_response(url, json)?;
 
         let pointer = create_pointer_function(url, json);
-        let hash = pointer("/data/attributes/hash")?;
 
-        for it in pointer("/data/attributes/data")? {
+        let server = pointer("/baseUrl")?;
+        let hash = pointer("/chapter/hash")?;
+
+        for it in pointer("/chapter/data")? {
             let images = `${server}/data/${hash}/${it}`;
             task.add(#{
                 id: images,
