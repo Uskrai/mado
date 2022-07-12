@@ -17,8 +17,13 @@ impl Default for Client {
 
 impl Client {
     pub fn get(&self, url: crate::Url) -> RequestBuilder {
+        let builder = http::request::Request::get(url.as_str());
+        self.builder(url, builder)
+    }
+
+    pub fn builder(&self, url: crate::Url, request: http::request::Builder) -> RequestBuilder {
         RequestBuilder {
-            request: http::request::Request::get(url.as_str()),
+            request,
             client: self.client.clone(),
             url,
         }
