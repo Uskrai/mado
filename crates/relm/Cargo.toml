@@ -6,8 +6,8 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1"
-gtk = { version = "0.3", package = "gtk4" }
-gio = { version = "0.14" }
+gtk = { version = "0.4", package = "gtk4" }
+gio = { version = "0.15" }
 
 tokio = { version = "1", features = ["rt-multi-thread", "fs"] }
 futures = "0.3"
@@ -26,13 +26,16 @@ mado-rune = { path = "../rune" }
 mado-sqlite = { path = "../sqlite" }
 
 [dependencies.relm4]
-git = "https://github.com/AaronErhardt/relm4"
-rev = "01212ccd9e6e246e622e0492734ad4b302e1f1ee"
+version = "0.4.4"
+# git = "https://github.com/AaronErhardt/relm4"
+# rev = "01212ccd9e6e246e622e0492734ad4b302e1f1ee"
 
 [dependencies.relm4-macros]
-git = "https://github.com/AaronErhardt/relm4"
-rev = "01212ccd9e6e246e622e0492734ad4b302e1f1ee"
+version = "0.4.4"
+# git = "https://github.com/AaronErhardt/relm4"
+# rev = "01212ccd9e6e246e622e0492734ad4b302e1f1ee"
 
 [dependencies.relm4-components]
-git = "https://github.com/AaronErhardt/relm4"
-rev = "01212ccd9e6e246e622e0492734ad4b302e1f1ee"
+version = "0.4.4"
+# git = "https://github.com/AaronErhardt/relm4"
+# rev = "01212ccd9e6e246e622e0492734ad4b302e1f1ee"
