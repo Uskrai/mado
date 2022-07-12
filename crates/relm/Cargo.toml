@@ -18,12 +18,12 @@ tracing-log = "0.1"
 thiserror = "1.0"
 async-trait = "0.1"
 
-mado-engine = { path = "../engine" }
-
-mado-core = { path = "../core" }
-
-mado-rune = { path = "../rune" }
-mado-sqlite = { path = "../sqlite" }
+mado = { path = "../mado" }
+# mado-engine = { path = "../engine" }
+# mado-core = { path = "../core" }
+# mado-rune = { path = "../rune" }
+# mado-sqlite = { path = "../sqlite" }
+# mado-dylib = { path = "../dylib" }
 
 [dependencies.relm4]
 version = "0.4.4"

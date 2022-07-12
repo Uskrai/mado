@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 pub use gtk::prelude::*;
 pub use gtk::subclass::prelude::*;
-use mado_core::ChapterInfo;
+use mado::core::ChapterInfo;
 
 mod model;
 mod widgets;

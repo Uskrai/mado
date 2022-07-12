@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use mado_core::{url::Url, ArcMadoModule, Error, MangaInfo};
-use mado_engine::{
+use mado::core::{url::Url, ArcMadoModule, Error, MangaInfo};
+use mado::engine::{
     path::{Utf8Path, Utf8PathBuf},
     DownloadRequest, DownloadRequestStatus,
 };
@@ -18,11 +18,11 @@ use gtk::prelude::WidgetExt;
 pub enum MangaInfoMsg {
     Download,
     DownloadPathChanged(String),
-    ShowError(mado_core::Error),
+    ShowError(mado::core::Error),
     /// Get info from string
     /// string should be convertible to URL
     GetInfo(String),
-    Update(mado_core::MangaInfo),
+    Update(mado::core::MangaInfo),
     Clear,
 }
 
@@ -64,7 +64,7 @@ impl MangaInfoModel {
     }
 
     fn get_module(&self, link: &str) -> Result<(Url, ArcMadoModule), Error> {
-        let url = mado_core::url::fill_host(link)?;
+        let url = mado::core::url::fill_host(link)?;
 
         let module = self.modules.get_by_url(url.clone());
 

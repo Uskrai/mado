@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use gtk::prelude::*;
-use mado_engine::{DownloadInfo, DownloadInfoMsg, DownloadStatus};
+use mado::engine::{DownloadInfo, DownloadInfoMsg, DownloadStatus};
 
 #[derive(Debug)]
 pub struct DownloadItem {
@@ -198,22 +198,22 @@ impl DownloadView {
             }
 
             DownloadStatus::InProgress(progress) => match progress {
-                mado_engine::DownloadProgressStatus::Resumed(v) => {
+                mado::engine::DownloadProgressStatus::Resumed(v) => {
                     add_css(DOWNLOAD_RESUMED_CSS);
                     match v {
-                        mado_engine::DownloadResumedStatus::Waiting => {
+                        mado::engine::DownloadResumedStatus::Waiting => {
                             set_text("Waiting");
                         }
-                        mado_engine::DownloadResumedStatus::Downloading => {
+                        mado::engine::DownloadResumedStatus::Downloading => {
                             set_text("Downloading");
                         }
                     }
                 }
-                mado_engine::DownloadProgressStatus::Paused => {
+                mado::engine::DownloadProgressStatus::Paused => {
                     add_css(DOWNLOAD_PAUSED_CSS);
                     set_text("Paused");
                 }
-                mado_engine::DownloadProgressStatus::Error(error) => {
+                mado::engine::DownloadProgressStatus::Error(error) => {
                     add_css(DOWNLOAD_ERROR_CSS);
                     set_text(error);
                 }

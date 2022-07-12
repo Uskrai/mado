@@ -3,8 +3,8 @@ use crate::{
     download::DownloadMsg,
     manga_info::{MangaInfoParentModel, MangaInfoParentMsg},
 };
-use mado_core::{ArcMadoModule, ArcMadoModuleMap};
-use mado_engine::{DownloadRequest, MadoEngineState, MadoEngineStateMsg};
+use mado::core::{ArcMadoModule, ArcMadoModuleMap};
+use mado::engine::{DownloadRequest, MadoEngineState, MadoEngineStateMsg};
 use relm4::{AppUpdate, Model};
 use std::sync::Arc;
 
@@ -14,7 +14,7 @@ pub enum AppMsg {
 }
 
 impl MangaInfoParentMsg for AppMsg {
-    fn download_request(request: mado_engine::DownloadRequest) -> Self {
+    fn download_request(request: mado::engine::DownloadRequest) -> Self {
         AppMsg::DownloadRequest(request)
     }
 }

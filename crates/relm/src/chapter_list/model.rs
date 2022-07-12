@@ -1,6 +1,6 @@
 use gio::{prelude::Cast, traits::ListModelExt};
 use gtk::prelude::{CheckButtonExt, GridExt, SelectionModelExt};
-use mado_core::ChapterInfo;
+use mado::core::ChapterInfo;
 use relm4::{ComponentUpdate, Model};
 
 use super::{ChapterListWidgets, GChapterInfo, GChapterInfoItem, VecChapters};
@@ -32,9 +32,11 @@ const CHECK_BUTTON_COLUMN: i32 = 0;
 
 impl ChapterListModel {
     /// Create gtk::Grid from ChapterInfo
-    pub fn create_chapter_info(chapter: &ChapterInfo) -> gtk::Grid {
+    pub fn create_chapter_info(chapter: GChapterInfo) -> gtk::Grid {
         let check = gtk::CheckButton::default();
-        let label = gtk::Label::builder().label(&format!("{}", chapter)).build();
+        let label = gtk::Label::builder()
+            .label(&format!("{}", chapter.borrow().info))
+            .build();
 
         let grid = gtk::Grid::builder()
             .orientation(gtk::Orientation::Horizontal)
@@ -43,6 +45,11 @@ impl ChapterListModel {
         grid.attach(&check, CHECK_BUTTON_COLUMN, CHECK_BUTTON_ROW, 1, 1);
         grid.attach(&label, 2, 0, 1, 1);
         grid.set_column_spacing(5);
+
+        check.connect_toggled(move |it| {
+            chapter.borrow().active.set(it.is_active());
+            // chapter.borrow().active.update(|_| it.is_active());
+        });
 
         grid
     }
@@ -76,8 +83,7 @@ where
         match msg {
             // Initialize Children
             ChapterListMsg::Setup(item) => {
-                let chapter = item.data();
-                let grid = Self::create_chapter_info(&chapter.borrow().info);
+                let grid = Self::create_chapter_info(item.data());
                 item.set_child(Some(&grid));
             }
 
