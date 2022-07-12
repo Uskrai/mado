@@ -257,7 +257,7 @@ impl MadoModule {
 
         info.scanlator = json
             .select_as_value("$.relationships[?(@.type=='scanlation_group')]..name")
-            .unwrap().get(0);
+            .unwrap_or([]);
 
         info.id = if_empty(json.pointer("/id").expect("chapter id doesn't exist"));
 

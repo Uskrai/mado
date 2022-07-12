@@ -60,7 +60,7 @@ pub struct ChapterInfo {
     pub title: Option<String>,
     pub chapter: Option<String>,
     pub volume: Option<String>,
-    pub scanlator: Option<String>,
+    pub scanlator: Vec<String>,
     pub language: String,
 }
 
@@ -99,7 +99,9 @@ impl ChapterInfo {
             write!(f, ": ")?;
         }
         write_if!("{} ", title);
-        write_if!("[{}] ", scanlator);
+        if !self.scanlator.is_empty() {
+            write!(f, "[{}]", self.scanlator.join(","))?;
+        }
         write!(f, "[{}]", self.language)?;
 
         Ok(())

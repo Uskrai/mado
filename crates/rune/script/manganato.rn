@@ -139,6 +139,7 @@ impl MadoModule {
         info.volume = None;
         info.chapter = None;
         info.language = "en";
+        info.scanlator = [];
 
         let cap = self.name_regex.captures(info.title.clone());
         if let Some(cap) = cap {
