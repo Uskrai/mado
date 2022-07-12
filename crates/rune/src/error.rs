@@ -150,15 +150,15 @@ impl From<Error> for mado_core::Error {
             Error::RuneError(_) => Self::ExternalError(err.into()),
             Error::UrlParseError { input, source } => Self::UrlParseError { input, source },
             Error::InvalidUrl { url } => Self::RequestError {
-                url: url.into(),
+                url: url.to_string(),
                 message: "Invalid Link".into(),
             },
             Error::UnexpectedError { url, message } => Self::RequestError {
-                url: url.into(),
+                url: url.to_string(),
                 message,
             },
             Error::RequestError { url, message } => Self::RequestError {
-                url: url.into(),
+                url: url.to_string(),
                 message,
             },
             Error::MadoError(err) => err,

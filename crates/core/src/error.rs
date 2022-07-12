@@ -9,10 +9,7 @@ pub enum Error {
     },
 
     #[error("Request error from {url}: {message}")]
-    RequestError {
-        url: crate::url::Url,
-        message: String,
-    },
+    RequestError { url: String, message: String },
 
     #[error("\"{0}\" are not supported")]
     UnsupportedUrl(String),
