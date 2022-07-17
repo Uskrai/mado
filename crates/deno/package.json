@@ -1,0 +1,39 @@
+{
+  "name": "mado-deno",
+  "version": "0.0.1",
+  "description": "typescript dependency for mado-deno",
+  "main": "script/deps/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "cargo test script_test -- --nocapture"
+  },
+  "author": {
+    "name": "Muhammad Fathurrohim",
+    "email": "m.faturrohim13@gmail.com",
+    "url": "https://github.com/uskrai/"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.2",
+    "jsonpath-plus": "^7.0.0",
+    "verbose-regexp": "^2.0.0",
+    "xpath-ts": "^1.3.13"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^22.0.1",
+    "@rollup/plugin-node-resolve": "^13.3.0",
+    "@rollup/plugin-typescript": "^8.3.3",
+    "@types/jsdom": "^16.2.14",
+    "@types/node": "^18.0.3",
+    "@types/xmldom": "^0.1.31",
+    "chokidar": "^3.5.3",
+    "rollup": "^2.76.0",
+    "rollup-plugin-multi-input": "^1.3.1",
+    "rollup-plugin-polyfill-node": "^0.10.1",
+    "rollup-plugin-rename": "^1.0.1",
+    "rollup-plugin-ts": "^3.0.2",
+    "rollup-plugin-typescript2": "^0.32.1",
+    "tslib": "^2.4.0",
+    "typescript": "^4.7.4"
+  }
+}
