@@ -1,4 +1,6 @@
 use std::fmt::Display;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::sync::Arc;
 
 use serde::Deserialize;
@@ -14,43 +16,68 @@ pub struct MangaInfo {
     pub cover_link: Option<String>,
     pub genres: Vec<String>,
     pub types: MangaType,
-    #[serde(deserialize_with = "deserialize_chapter_info")]
-    pub chapters: Vec<Arc<ChapterInfo>>,
 }
 
-pub fn deserialize_chapter_info<'de, D>(deserializer: D) -> Result<Vec<Arc<ChapterInfo>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct Visitor;
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+pub struct MangaAndChaptersInfo {
+    pub manga: Arc<MangaInfo>,
+    pub chapters: Arc<ChaptersInfo>,
+}
 
-    impl<'de> serde::de::Visitor<'de> for Visitor {
-        type Value = Vec<Arc<ChapterInfo>>;
+#[derive(Serialize, Debug, Default, Clone)]
+pub struct ChaptersInfo(pub Vec<Arc<ChapterInfo>>);
 
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            std::write!(formatter, "a sequence")
-        }
+impl Deref for ChaptersInfo {
+    type Target = Vec<Arc<ChapterInfo>>;
 
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: serde::de::SeqAccess<'de>,
-        {
-            let mut vec = Vec::new();
-            if let Some(reserve) = seq.size_hint() {
-                vec.reserve(reserve);
-            }
-
-            while let Some(mut it) = seq.next_element::<ChapterInfo>()? {
-                // index started from 1, so len() + 1
-                it.index = Some(vec.len() + 1);
-                vec.push(Arc::new(it));
-            }
-            vec.shrink_to_fit();
-            Ok(vec)
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
+}
 
-    deserializer.deserialize_seq(Visitor)
+impl DerefMut for ChaptersInfo {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ChaptersInfo {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = Vec<Arc<ChapterInfo>>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                std::write!(formatter, "a sequence")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+                if let Some(reserve) = seq.size_hint() {
+                    vec.reserve(reserve);
+                }
+
+                while let Some(mut it) = seq.next_element::<ChapterInfo>()? {
+                    // index started from 1, so len() + 1
+                    it.index = Some(vec.len() + 1);
+                    vec.push(Arc::new(it));
+                }
+                vec.shrink_to_fit();
+                Ok(vec)
+            }
+        }
+
+        let it = deserializer.deserialize_seq(Visitor)?;
+
+        Ok(Self(it))
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]

@@ -132,8 +132,10 @@ impl MadoModule {
             }
         }
 
-        manga_info.chapters = manga_chapters;
-        Ok(manga_info)
+        Ok(#{
+            manga: manga_info,
+            chapters: manga_chapters
+        })
     }
 
     async fn get_manga_info(self, id) {

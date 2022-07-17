@@ -78,14 +78,17 @@ impl MadoModule {
 
         let info = self.parse_info(url, doc)?;
 
-        info.chapters = [];
-        let chapters = doc.find("ul.row-content-chapter>li");
-        for it in chapters.iter() {
-            info.chapters.push(self.parse_chapter(it));
+        let chapters = [];
+        let chapters_doc = doc.find("ul.row-content-chapter>li");
+        for it in chapters_doc.iter() {
+            chapters.push(self.parse_chapter(it));
         }
-        info.chapters.reverse();
+        chapters.reverse();
 
-        Ok(info)
+        Ok(#{
+            manga: info,
+            chapters: chapters
+        })
     }
 
     pub fn parse_info(self, url, doc) {

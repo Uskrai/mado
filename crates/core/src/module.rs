@@ -7,7 +7,8 @@ use std::{
 use bytes::Bytes;
 
 use crate::{
-    ChapterImageInfo, Client, DuplicateUUIDError, Error, MadoModuleMapError, MangaInfo, Uuid,
+    ChapterImageInfo, Client, DuplicateUUIDError, Error, MadoModuleMapError, MangaAndChaptersInfo,
+    Uuid,
 };
 
 pub trait ChapterTask: Send {
@@ -31,7 +32,7 @@ pub trait MadoModule: Send + Sync + Debug + 'static {
     fn domain(&self) -> &crate::url::Url;
 
     /// Get Manga information from `url`
-    async fn get_info(&self, url: crate::url::Url) -> Result<MangaInfo, Error>;
+    async fn get_info(&self, url: crate::url::Url) -> Result<MangaAndChaptersInfo, Error>;
 
     /// Get Image of Chapter from `task::get_chapter`
     /// for each image `task::add` should be called
@@ -194,7 +195,7 @@ mod test {
             todo!();
         }
 
-        async fn get_info(&self, _: Url) -> Result<crate::MangaInfo, crate::Error> {
+        async fn get_info(&self, _: Url) -> Result<crate::MangaAndChaptersInfo, crate::Error> {
             todo!()
         }
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mado::core::{url::Url, ArcMadoModule, Error, MangaInfo};
+use mado::core::{url::Url, ArcMadoModule, Error, MangaAndChaptersInfo};
 use mado::engine::{
     path::{Utf8Path, Utf8PathBuf},
     DownloadRequest, DownloadRequestStatus,
@@ -22,7 +22,7 @@ pub enum MangaInfoMsg {
     /// Get info from string
     /// string should be convertible to URL
     GetInfo(String),
-    Update(mado::core::MangaInfo),
+    Update(MangaAndChaptersInfo),
     Clear,
 }
 
@@ -42,7 +42,7 @@ pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
     chapters: VecChapters,
     current_handle: Option<(ArcMadoModule, Url, AbortOnDropHandle<()>)>,
-    manga_info: Option<Arc<MangaInfo>>,
+    manga_info: Option<Arc<MangaAndChaptersInfo>>,
     path: Utf8PathBuf,
 }
 
@@ -173,11 +173,11 @@ where
                     return;
                 }
 
-                let path = self.path.join(&manga_info.title);
+                let path = self.path.join(&manga_info.manga.title);
 
                 let request = DownloadRequest::new(
                     module,
-                    manga_info,
+                    manga_info.manga.clone(),
                     selected,
                     path,
                     Some(url),
@@ -195,7 +195,7 @@ where
                 let manga = Arc::new(manga);
                 self.manga_info.replace(manga);
                 let chapters = &self.manga_info.as_ref().unwrap().chapters;
-                for it in chapters {
+                for it in chapters.iter() {
                     self.chapters.push(it.clone());
                 }
             }

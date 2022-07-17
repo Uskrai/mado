@@ -1,6 +1,5 @@
 use gio::{prelude::Cast, traits::ListModelExt};
 use gtk::prelude::{CheckButtonExt, GridExt, SelectionModelExt};
-use mado::core::ChapterInfo;
 use relm4::{ComponentUpdate, Model};
 
 use super::{ChapterListWidgets, GChapterInfo, GChapterInfoItem, VecChapters};

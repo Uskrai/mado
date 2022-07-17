@@ -6,13 +6,13 @@ use crate::Rune;
 use crate::SendValue;
 use mado_core::ChapterImageInfo;
 use mado_core::MadoModule;
+use mado_core::MangaAndChaptersInfo;
 use mado_core::Url;
 
 use super::Error;
 
 use async_trait::async_trait;
 use mado_core::ChapterTask;
-use mado_core::MangaInfo;
 use mado_core::Uuid;
 use rune::runtime::VmError as RuneVmError;
 use rune::FromValue;
@@ -37,7 +37,7 @@ pub struct RuneMadoModule {
     data: SendValue,
 }
 impl RuneMadoModule {
-    async fn get_info(&self, url: super::http::Url) -> Result<MangaInfo, Error> {
+    async fn get_info(&self, url: super::http::Url) -> Result<MangaAndChaptersInfo, Error> {
         let fut = self
             .get_info
             .async_call::<_, DeserializeResult<_>>((self.data.clone(), url))
@@ -87,7 +87,7 @@ impl MadoModule for RuneMadoModule {
         &self.domain
     }
 
-    async fn get_info(&self, url: Url) -> Result<MangaInfo, mado_core::Error> {
+    async fn get_info(&self, url: Url) -> Result<MangaAndChaptersInfo, mado_core::Error> {
         self.get_info(url.into()).await.map_err(Into::into)
     }
 
