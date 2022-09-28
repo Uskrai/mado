@@ -21,8 +21,8 @@ async-trait = "0.1"
 mado = { path = "../mado" }
 # mado-engine = { path = "../engine" }
 # mado-core = { path = "../core" }
-# mado-rune = { path = "../rune" }
-# mado-sqlite = { path = "../sqlite" }
+mado-rune = { path = "../rune" }
+mado-sqlite = { path = "../sqlite" }
 # mado-dylib = { path = "../dylib" }
 
 [dependencies.relm4]

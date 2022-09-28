@@ -53,7 +53,7 @@ impl MadoModuleLoader for Loader {
 }
 
 pub fn load_module(path: &Utf8PathBuf) -> Result<Vec<ArcMadoModule>, ModuleLoadError> {
-    let build = mado::rune::Build::default().with_path(path.as_std_path())?;
+    let build = mado_rune::Build::default().with_path(path.as_std_path())?;
 
     let vec = build
         .build_for_module()
@@ -82,8 +82,8 @@ pub fn main() {
         .unwrap();
     let _guard = runtime.enter();
 
-    let db = mado::sqlite::Database::open("data.db").unwrap();
-    let channel = mado::sqlite::channel(db);
+    let db = mado_sqlite::Database::open("data.db").unwrap();
+    let channel = mado_sqlite::channel(db);
 
     let map = Arc::new(MutexMadoModuleMap::new(DefaultMadoModuleMap::new()));
     let downloads = channel.load_connect(map.clone()).unwrap();
