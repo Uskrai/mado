@@ -54,6 +54,8 @@ pub fn load_download_info_join(
     conn: &Connection,
     module_map: ArcMadoModuleMap,
 ) -> Result<Vec<DownloadInfoJoin>, Error> {
+    let module = crate::module::load_map(conn)?;
+
     let joins = load_download_join(conn)?;
     let mut downloads = Vec::new();
 
@@ -63,15 +65,15 @@ pub fn load_download_info_join(
 
         let chapters = join.chapters;
 
-        let module = LateBindingModule::WaitModule(module_map.clone(), download.module_id);
+        let module =
+            LateBindingModule::WaitModule(module_map.clone(), module[&download.module_pk].uuid);
 
         let chapters_join: Vec<_> = chapters
             .into_iter()
             .map(|chapter| {
                 let pk = chapter.pk;
-                let module = module.clone();
                 let chapter = Arc::new(DownloadChapterInfo::new(
-                    module,
+                    module.clone(),
                     chapter.chapter_id,
                     chapter.title,
                     chapter.path,
@@ -85,7 +87,7 @@ pub fn load_download_info_join(
         let chapters: Vec<_> = chapters_join.iter().map(|it| it.chapter.clone()).collect();
 
         let info = Arc::new(DownloadInfo::new(
-            LateBindingModule::WaitModule(module_map.clone(), download.module_id),
+            module.clone(),
             download.title,
             chapters,
             download.path,
@@ -107,17 +109,27 @@ pub fn load_download_info_join(
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use crate::{downloads::DownloadPK, tests::*};
+    use crate::{downloads::DownloadPK, module::InsertModule, tests::*};
 
     #[test]
     fn insert_test() {
         let mut db = connection();
 
+        let module = crate::module::insert_pk(
+            &mut db,
+            InsertModule {
+                uuid: &Default::default(),
+                name: "Default",
+            },
+        )
+        .unwrap();
+
         const CHAPTER_LENGTH: u8 = u8::MAX;
         let info = setup_info(CHAPTER_LENGTH);
 
-        let insert = crate::downloads::insert_info(&mut db, &info).unwrap();
+        let insert = crate::downloads::insert_info(&mut db, module, &info).unwrap();
         assert_eq!(insert.pk, DownloadPK::new(1));
 
         let count: i64 = db

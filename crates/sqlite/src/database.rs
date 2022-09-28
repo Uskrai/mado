@@ -6,6 +6,7 @@ use rusqlite::{Connection, Error};
 use crate::{
     download_chapters::DownloadChapterPK,
     downloads::DownloadPK,
+    module::{InsertModule, Module, ModulePK},
     query::{DownloadInfoJoin, DownloadJoin},
     status::DownloadStatus,
 };
@@ -29,9 +30,20 @@ impl Database {
     /// Insert download into database and return the id of inserted download
     pub fn insert_download(
         &mut self,
+        module: ModulePK,
         download: &Arc<DownloadInfo>,
     ) -> Result<DownloadInfoJoin, Error> {
-        crate::downloads::insert_info(&mut self.conn, download)
+        crate::downloads::insert_info(&mut self.conn, module, download)
+    }
+
+    pub fn insert_module(&mut self, module: InsertModule<'_>) -> Result<Module, Error> {
+        let pk = crate::module::insert_pk(&mut self.conn, module.clone())?;
+
+        Ok(Module {
+            pk,
+            name: module.name.to_string(),
+            uuid: module.uuid.to_owned(),
+        })
     }
 
     pub fn update_download_status(
@@ -49,6 +61,14 @@ impl Database {
     ) -> Result<usize, Error> {
         crate::download_chapters::update_status(&self.conn, pk, status)
     }
+
+    // pub fn insert_download_chapter_image(
+    //     &self,
+    //     pk: DownloadChapterPK,
+    //     image: Arc<DownloadChapterImageInfo>
+    // ) -> Result<usize, Error> {
+    //     crate::download_chapters::insert_image(pk, image)
+    // }
 
     pub fn load_download(&self) -> Result<Vec<DownloadJoin>, Error> {
         crate::query::load_download_join(&self.conn)

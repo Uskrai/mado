@@ -23,15 +23,31 @@ fn create_migration(conn: &Connection) -> Result<i64, Error> {
     Ok(rows.unwrap_or(0))
 }
 
+fn v1_module() -> &'static str {
+    r#"
+        CREATE TABLE modules (
+            id INTEGER PRIMARY KEY,
+            uuid TEXT(36) NOT NULL,
+            name TEXT NOT NULL
+        );
+    "#
+}
+
 fn v1_download() -> &'static str {
     r#"
         CREATE TABLE downloads (
-            id INTEGER PRIMARY KEY NOT NULL,
-            module_id TEXT(36) NOT NULL,
+            id INTEGER PRIMARY KEY,
+            module_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             url TEXT,
             status TEXT NOT NULL,
-            path TEXT NOT NULL
+            path TEXT NOT NULL,
+
+            FOREIGN KEY (module_id)
+                REFERENCES modules(id)
+                ON DELETE RESTRICT
+                ON UPDATE RESTRICT
+
         );
     "#
 }
@@ -39,19 +55,15 @@ fn v1_download() -> &'static str {
 fn v1_download_chapter() -> &'static str {
     r#"
         CREATE TABLE download_chapters (
-            id INTEGER NOT NULL,
+            id INTEGER PRIMARY KEY,
             download_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             chapter_id TEXT NOT NULL,
             status TEXT NOT NULL,
             path TEXT NOT NULL,
-            PRIMARY KEY 
-                (id, download_id)
 
-            FOREIGN KEY 
-                    (download_id) 
-                REFERENCES 
-                    downloads(id)
+            FOREIGN KEY (download_id) 
+                REFERENCES downloads(id)
                 ON DELETE CASCADE
                 ON UPDATE CASCADE
         );
@@ -63,6 +75,7 @@ fn insert_migration_version(conn: &Connection, version: i64) -> Result<usize, Er
 }
 
 fn v1_schema(conn: &Connection) -> Result<(), Error> {
+    conn.execute(v1_module(), []).unwrap();
     conn.execute(v1_download(), []).unwrap();
     conn.execute(v1_download_chapter(), []).unwrap();
 

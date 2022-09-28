@@ -1,21 +1,28 @@
 use futures::{channel::mpsc, StreamExt};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use mado_engine::{
-    core::ArcMadoModuleMap, DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
+    core::{ArcMadoModule, ArcMadoModuleMap, Uuid},
+    DownloadChapterImageInfo, DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
     MadoEngineState, MadoEngineStateMsg,
 };
 
 use crate::{
-    download_chapters::DownloadChapterPK, downloads::DownloadPK, query::DownloadInfoJoin,
-    status::DownloadStatus, Database,
+    download_chapters::DownloadChapterPK,
+    downloads::DownloadPK,
+    module::{InsertModule, Module},
+    query::DownloadInfoJoin,
+    status::DownloadStatus,
+    Database,
 };
 
 #[derive(Debug)]
 pub enum DbMsg {
     NewDownload(Arc<DownloadInfo>),
+    PushModule(ArcMadoModule),
     DownloadStatusChanged(DownloadPK, DownloadStatus),
     DownloadChapterStatusChanged(DownloadChapterPK, DownloadStatus),
+    DownloadChapterImagePushed(DownloadChapterPK, Arc<DownloadChapterImageInfo>),
     Close,
 }
 
@@ -25,11 +32,17 @@ pub struct Channel {
     rx: mpsc::UnboundedReceiver<DbMsg>,
     tx: mpsc::UnboundedSender<DbMsg>,
     db: Database,
+    module: HashMap<Uuid, Module>,
 }
 
 pub fn channel(db: Database) -> Channel {
     let (tx, rx) = mpsc::unbounded();
-    Channel { db, rx, tx }
+    Channel {
+        db,
+        rx,
+        tx,
+        module: HashMap::new(),
+    }
 }
 
 impl Channel {
@@ -59,19 +72,36 @@ impl Channel {
 
     pub fn handle_msg(&mut self, msg: DbMsg) -> Result<(), rusqlite::Error> {
         match msg {
+            DbMsg::NewDownload(info) => {
+                let module = &self.module[info.module_uuid()];
+                let dl = self.db.insert_download(module.pk, &info)?;
+                self.connect_info(dl);
+            }
+            DbMsg::PushModule(module) => {
+                self.push_module(InsertModule {
+                    name: module.name(),
+                    uuid: &module.uuid(),
+                })?;
+            }
             DbMsg::DownloadStatusChanged(id, status) => {
                 self.db.update_download_status(id, status)?;
             }
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
             }
-            DbMsg::NewDownload(info) => {
-                let dl = self.db.insert_download(&info)?;
-                self.connect_info(dl);
+            DbMsg::DownloadChapterImagePushed(_, _) => {
+                println!("TODO!!!");
+                // self.db.insert_download_chapter_image(pk, image)?;
             }
             DbMsg::Close => {}
         }
 
+        Ok(())
+    }
+
+    pub fn push_module(&mut self, module: InsertModule<'_>) -> Result<(), rusqlite::Error> {
+        let info = self.db.insert_module(module)?;
+        self.module.insert(info.uuid, info);
         Ok(())
     }
 
@@ -133,7 +163,11 @@ impl Channel {
                 MadoEngineStateMsg::Download(info) => {
                     sender.unbounded_send(DbMsg::NewDownload(info.clone())).ok();
                 }
-                MadoEngineStateMsg::PushModule(_) => {}
+                MadoEngineStateMsg::PushModule(module) => {
+                    sender
+                        .unbounded_send(DbMsg::PushModule(module.clone()))
+                        .ok();
+                }
             }
         });
     }
@@ -152,6 +186,9 @@ impl Channel {
             match msg {
                 DownloadChapterInfoMsg::StatusChanged(status) => {
                     tx.unbounded_send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
+                }
+                DownloadChapterInfoMsg::ImagePushed(image) => {
+                    tx.unbounded_send(DbMsg::DownloadChapterImagePushed(pk, image.clone()))
                 }
             }
             .ok();
@@ -172,6 +209,11 @@ mod tests {
         let info = setup_info_with_state(u8::MAX, &state);
 
         let mut rx = channel(Database::new(db).unwrap());
+
+        rx.push_module(InsertModule {
+            name: "",
+            uuid: &Default::default(),
+        }).unwrap();
 
         rx.send(DbMsg::NewDownload(info.clone())).unwrap();
         rx.try_all().unwrap();
