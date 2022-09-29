@@ -61,7 +61,9 @@ pub fn script_test() -> Result<(), ErrorWrapper> {
 
         runtime.with_scope(|scope| {
             let namespace = namespace.open(scope);
-            let names = namespace.get_property_names(scope).unwrap();
+            let names = namespace
+                .get_property_names(scope, Default::default())
+                .unwrap();
             let length = names.length();
 
             for j in 0..length {

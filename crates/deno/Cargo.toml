@@ -14,10 +14,10 @@ futures-core = "0.3"
 serde = "1.0"
 serde_json = "1.0"
 serde_path_to_error = "0.1"
-serde_v8 = "0.53"
+serde_v8 = "0.64"
 
-deno_core = "0.142"
-deno_console = "0.60"
+deno_core = "0.153"
+deno_console = "0.71"
 
 event-listener = "2.5"
 
