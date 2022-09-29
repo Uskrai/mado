@@ -1,19 +1,25 @@
 use futures::{channel::mpsc, StreamExt};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use mado_engine::{
-    core::ArcMadoModuleMap, DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
+    core::{ArcMadoModule, ArcMadoModuleMap, Uuid},
+    DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
     MadoEngineState, MadoEngineStateMsg,
 };
 
 use crate::{
-    download_chapters::DownloadChapterPK, downloads::DownloadPK, query::DownloadInfoJoin,
-    status::DownloadStatus, Database,
+    download_chapters::DownloadChapterPK,
+    downloads::DownloadPK,
+    module::{InsertModule, Module},
+    query::DownloadInfoJoin,
+    status::DownloadStatus,
+    Database,
 };
 
 #[derive(Debug)]
 pub enum DbMsg {
     NewDownload(Arc<DownloadInfo>),
+    PushModule(ArcMadoModule),
     DownloadStatusChanged(DownloadPK, DownloadStatus),
     DownloadChapterStatusChanged(DownloadChapterPK, DownloadStatus),
     Close,
@@ -25,11 +31,17 @@ pub struct Channel {
     rx: mpsc::UnboundedReceiver<DbMsg>,
     tx: mpsc::UnboundedSender<DbMsg>,
     db: Database,
+    module: HashMap<Uuid, Module>,
 }
 
 pub fn channel(db: Database) -> Channel {
     let (tx, rx) = mpsc::unbounded();
-    Channel { db, rx, tx }
+    Channel {
+        db,
+        rx,
+        tx,
+        module: HashMap::new(),
+    }
 }
 
 impl Channel {
@@ -59,19 +71,34 @@ impl Channel {
 
     pub fn handle_msg(&mut self, msg: DbMsg) -> Result<(), rusqlite::Error> {
         match msg {
+            DbMsg::NewDownload(info) => {
+                let module = &self.module[info.module_uuid()];
+                let dl = self.db.insert_download(module.pk, &info)?;
+                self.connect_info(dl);
+            }
+            DbMsg::PushModule(module) => {
+                self.push_module(InsertModule {
+                    name: module.name(),
+                    uuid: &module.uuid(),
+                })?;
+            }
             DbMsg::DownloadStatusChanged(id, status) => {
                 self.db.update_download_status(id, status)?;
             }
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
             }
-            DbMsg::NewDownload(info) => {
-                let dl = self.db.insert_download(&info)?;
-                self.connect_info(dl);
+            DbMsg::Close => {
+                self.sender().close_channel();
             }
-            DbMsg::Close => {}
         }
 
+        Ok(())
+    }
+
+    pub fn push_module(&mut self, module: InsertModule<'_>) -> Result<(), rusqlite::Error> {
+        let info = self.db.insert_module(module)?;
+        self.module.insert(info.uuid, info);
         Ok(())
     }
 
@@ -133,7 +160,11 @@ impl Channel {
                 MadoEngineStateMsg::Download(info) => {
                     sender.unbounded_send(DbMsg::NewDownload(info.clone())).ok();
                 }
-                MadoEngineStateMsg::PushModule(_) => {}
+                MadoEngineStateMsg::PushModule(module) => {
+                    sender
+                        .unbounded_send(DbMsg::PushModule(module.clone()))
+                        .ok();
+                }
             }
         });
     }
@@ -161,8 +192,56 @@ impl Channel {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use mado_core::{MadoModule, MockMadoModule, Url};
+    use mado_engine::{core::MangaInfo, path::Utf8PathBuf};
+
     use super::*;
     use crate::tests::*;
+
+    fn mock_module(uuid: Uuid) -> MockMadoModule {
+        let mut module = MockMadoModule::new();
+        module.expect_name().times(0..).return_const("".to_string());
+        module.expect_uuid().times(0..).return_const(uuid);
+        module
+            .expect_domain()
+            .times(0..)
+            .return_const(Url::from_str("http://localhost").unwrap());
+
+        module
+    }
+
+    #[test]
+    fn connect_test() {
+        let db = connection();
+
+        let state = State::default();
+        // let info = setup_info_with_state(u8::MAX, &state);
+
+        let mut rx = channel(Database::new(db).unwrap());
+        rx.connect_only(&state.engine);
+
+        let module = Arc::new(mock_module(Uuid::default()));
+
+        state.engine.push_module(module.clone()).unwrap();
+        rx.try_all().unwrap();
+        assert!(rx.module.get(&module.uuid()).is_some());
+
+        let req = mado_engine::DownloadRequest::new(
+            module,
+            Arc::new(MangaInfo::default()),
+            vec![],
+            Utf8PathBuf::from_str("./path").unwrap(),
+            None,
+            mado_engine::DownloadRequestStatus::Pause,
+        );
+
+        state.engine.download_request(req);
+        rx.try_all().unwrap();
+        let dl = rx.db.load_download().unwrap();
+        assert_eq!(dl.len(), 1);
+    }
 
     #[test]
     fn run_test() {
@@ -172,6 +251,11 @@ mod tests {
         let info = setup_info_with_state(u8::MAX, &state);
 
         let mut rx = channel(Database::new(db).unwrap());
+        rx.connect_only(&state.engine);
+
+        let module = Arc::new(mock_module(Uuid::default()));
+
+        state.engine.push_module(module).unwrap();
 
         rx.send(DbMsg::NewDownload(info.clone())).unwrap();
         rx.try_all().unwrap();
@@ -196,6 +280,15 @@ mod tests {
             assert_eq!(status, DownloadStatus::Finished);
         }
 
+        info.chapters()[0].set_status(mado_engine::DownloadStatus::Finished);
+        rx.try_all().unwrap();
+
+        {
+            let it = rx.db.load_download().unwrap();
+            let ch = &it[0].chapters[0];
+            assert_eq!(ch.status, DownloadStatus::Finished);
+        }
+
         {
             // test that it is connected
             let it = rx.load_connect(state.map.clone()).unwrap();
@@ -211,5 +304,21 @@ mod tests {
             let status = it[0].status().clone();
             assert_eq!(DownloadStatus::Paused, status.into());
         }
+    }
+
+    #[test]
+    #[ntest::timeout(1000)]
+    pub fn close_test() {
+        futures::executor::block_on(async {
+            let db = connection();
+
+            let state = State::default();
+
+            let mut rx = channel(Database::new(db).unwrap());
+            rx.connect_only(&state.engine);
+
+            rx.send(DbMsg::Close).unwrap();
+            rx.run().await.unwrap();
+        });
     }
 }

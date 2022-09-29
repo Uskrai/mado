@@ -6,6 +6,7 @@ mod status;
 
 pub mod download_chapters;
 pub mod downloads;
+pub mod module;
 
 pub use channel::{channel, Channel, DbMsg, Sender};
 pub use database::Database;
@@ -57,15 +58,17 @@ mod tests {
     pub struct State {
         pub module: LateBindingModule,
         pub map: ArcMadoModuleMap,
+        pub engine: Arc<MadoEngineState>,
     }
 
     impl Default for State {
         fn default() -> Self {
             let uuid = Default::default();
-            let state: MadoEngineState = Default::default();
+            let engine: MadoEngineState = Default::default();
             Self {
-                module: LateBindingModule::WaitModule(state.modules(), uuid),
-                map: state.modules(),
+                module: LateBindingModule::WaitModule(engine.modules(), uuid),
+                map: engine.modules(),
+                engine: Arc::new(engine),
             }
         }
     }

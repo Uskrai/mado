@@ -1,21 +1,18 @@
 use std::sync::Arc;
 
-use mado_engine::{
-    core::{Url, Uuid},
-    path::Utf8PathBuf,
-    DownloadInfo,
-};
+use mado_engine::{core::Url, path::Utf8PathBuf, DownloadInfo};
 use rusqlite::{params, Connection, Error};
 
 use crate::{
     download_chapters::DownloadChapterPK,
+    module::ModulePK,
     query::{DownloadChapterInfoJoin, DownloadInfoJoin},
     status::DownloadStatus,
 };
 
 pub struct InsertDownload<'a> {
     pub title: &'a str,
-    pub module_id: &'a Uuid,
+    pub module_id: &'a i64,
     pub path: &'a str,
     pub url: Option<&'a Url>,
     pub status: DownloadStatus,
@@ -53,13 +50,14 @@ pub struct InsertDownloadPK {
 
 pub fn insert_info(
     conn: &mut Connection,
+    module: ModulePK,
     info: &Arc<DownloadInfo>,
 ) -> Result<DownloadInfoJoin, Error> {
     let transaction = conn.transaction()?;
 
     let model = InsertDownload {
         title: info.manga(),
-        module_id: info.module_uuid(),
+        module_id: &module.id,
         path: info.path().as_str(),
         url: info.url(),
         status: From::from(&*info.status()),
@@ -69,18 +67,14 @@ pub fn insert_info(
     let download_id = transaction.last_insert_rowid();
     let dl_pk = DownloadPK::new(download_id);
 
-    let mut id = 1;
-
     let mut chapters = Vec::new();
     for it in info.chapters() {
-        let pk = DownloadChapterPK::new(dl_pk, id);
-        crate::download_chapters::insert_info(&transaction, pk, it).unwrap();
+        let pk = crate::download_chapters::insert_info(&transaction, dl_pk, it).unwrap();
 
         chapters.push(DownloadChapterInfoJoin {
             pk,
             chapter: it.clone(),
         });
-        id += 1;
     }
 
     transaction.commit()?;
@@ -96,7 +90,7 @@ pub fn insert_info(
 pub struct Download {
     pub pk: DownloadPK,
     pub title: String,
-    pub module_id: Uuid,
+    pub module_pk: ModulePK,
     pub path: Utf8PathBuf,
     pub url: Option<Url>,
     pub status: DownloadStatus,
@@ -112,12 +106,13 @@ pub fn load(conn: &Connection) -> Result<Vec<Download>, Error> {
         let download = Download {
             pk: DownloadPK::new(row.get("id")?),
             title: row.get("title")?,
-            module_id: row.get("module_id")?,
+            module_pk: ModulePK {
+                id: row.get("module_id")?,
+            },
             path: row.get::<_, String>("path")?.into(),
             url: row
                 .get::<_, Option<String>>("url")?
-                .map(|it| it.parse().ok())
-                .flatten(),
+                .and_then(|it| it.parse().ok()),
             status: row.get("status")?,
         };
 
@@ -164,7 +159,7 @@ mod tests {
         assert_eq!(vec.len(), 1);
         let it = &vec[0];
         assert_eq!(it.title, "title");
-        assert_eq!(it.module_id, Default::default());
+        assert_eq!(it.module_pk, Default::default());
         assert_eq!(it.path, "path");
         assert_eq!(it.url, None);
         assert_eq!(it.status, "Paused".into());
@@ -185,7 +180,7 @@ mod tests {
         assert_eq!(vec.len(), 2);
         let it = &vec[1];
         assert_eq!(it.title, "title");
-        assert_eq!(it.module_id, Default::default());
+        assert_eq!(it.module_pk, Default::default());
         assert_eq!(it.path, "path");
         assert_eq!(it.url, Some("https://url.com".parse().unwrap()));
         assert_eq!(it.status, "Finished".into());
@@ -195,8 +190,18 @@ mod tests {
     fn update_status_test() {
         let mut db = connection();
 
+        let module = crate::module::insert_pk(
+            &mut db,
+            crate::module::InsertModule {
+                uuid: &Default::default(),
+                name: "Default",
+            },
+        )
+        .unwrap();
+
         let info = setup_info(1);
-        let insert = crate::downloads::insert_info(&mut db, &info).unwrap();
+
+        let insert = crate::downloads::insert_info(&mut db, module, &info).unwrap();
 
         let get_status = |id: i64| {
             db.query_row::<DownloadStatus, _, _>(
