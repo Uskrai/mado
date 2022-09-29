@@ -69,18 +69,14 @@ pub fn insert_info(
     let download_id = transaction.last_insert_rowid();
     let dl_pk = DownloadPK::new(download_id);
 
-    let mut id = 1;
-
     let mut chapters = Vec::new();
     for it in info.chapters() {
-        let pk = DownloadChapterPK::new(dl_pk, id);
-        crate::download_chapters::insert_info(&transaction, pk, it).unwrap();
+        let pk = crate::download_chapters::insert_info(&transaction, dl_pk, it).unwrap();
 
         chapters.push(DownloadChapterInfoJoin {
             pk,
             chapter: it.clone(),
         });
-        id += 1;
     }
 
     transaction.commit()?;

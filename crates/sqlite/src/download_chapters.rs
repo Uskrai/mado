@@ -27,7 +27,6 @@ impl DownloadChapterPK {
 }
 
 pub struct InsertDownloadChapter<'a> {
-    pub id: i64,
     pub download_id: i64,
     pub title: &'a str,
     pub chapter_id: &'a str,
@@ -37,10 +36,9 @@ pub struct InsertDownloadChapter<'a> {
 
 pub fn insert(conn: &Connection, model: InsertDownloadChapter<'_>) -> Result<usize, Error> {
     conn.execute(
-        "INSERT INTO download_chapters (id, download_id, title, chapter_id, path, status)
-        VALUES (:id, :download_id, :title, :chapter_id, :path, :status)",
+        "INSERT INTO download_chapters (download_id, title, chapter_id, path, status)
+        VALUES (:download_id, :title, :chapter_id, :path, :status)",
         rusqlite::named_params! {
-            ":id": model.id,
             ":download_id": model.download_id,
             ":title": model.title,
             ":chapter_id": model.chapter_id,
@@ -52,19 +50,21 @@ pub fn insert(conn: &Connection, model: InsertDownloadChapter<'_>) -> Result<usi
 
 pub fn insert_info(
     conn: &Connection,
-    pk: DownloadChapterPK,
+    dl_pk: DownloadPK,
     it: &DownloadChapterInfo,
-) -> Result<usize, Error> {
+) -> Result<DownloadChapterPK, Error> {
     let model = InsertDownloadChapter {
-        id: pk.id,
-        download_id: pk.dl_pk.id,
+        download_id: dl_pk.id,
         title: it.title(),
         chapter_id: it.chapter_id(),
         path: it.path().as_str(),
         status: From::from(&*it.status()),
     };
 
-    insert(conn, model)
+    insert(conn, model)?;
+    let id = conn.last_insert_rowid();
+
+    Ok(DownloadChapterPK { id, dl_pk })
 }
 
 pub fn load(conn: &Connection) -> Result<HashMap<DownloadPK, Vec<DownloadChapter>>, Error> {
@@ -130,7 +130,6 @@ mod tests {
         insert(
             &db,
             InsertDownloadChapter {
-                id: 1,
                 download_id: 1,
                 title: "title",
                 chapter_id: "chapter-id",

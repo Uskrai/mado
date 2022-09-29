@@ -69,9 +69,8 @@ pub fn load_download_info_join(
             .into_iter()
             .map(|chapter| {
                 let pk = chapter.pk;
-                let module = module.clone();
                 let chapter = Arc::new(DownloadChapterInfo::new(
-                    module,
+                    module.clone(),
                     chapter.chapter_id,
                     chapter.title,
                     chapter.path,
@@ -85,7 +84,7 @@ pub fn load_download_info_join(
         let chapters: Vec<_> = chapters_join.iter().map(|it| it.chapter.clone()).collect();
 
         let info = Arc::new(DownloadInfo::new(
-            LateBindingModule::WaitModule(module_map.clone(), download.module_id),
+            module.clone(),
             download.title,
             chapters,
             download.path,
