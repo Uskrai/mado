@@ -32,12 +32,16 @@ jobs:
     - name: Dependency
       run: sudo apt-get install libgtk-4-dev
 
-    - name: Install latest nightly
+    - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
       with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
+        toolchain: stable
+        override: true
+
+    - name: Run cargo-tarpaulin
+      uses: actions-rs/tarpaulin@v0.1
+      with:
+        version: '0.15.0'
 
     - name: Generate code coverage
       run: |
