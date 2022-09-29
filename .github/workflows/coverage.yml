@@ -40,8 +40,8 @@ jobs:
 
     - name: Generate code coverage
       run: |
-        cargo install cargo-tarpaulin --force
-        cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml,Html
+        cargo install cargo-tarpaulin
+        cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
 
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v2
