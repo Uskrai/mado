@@ -88,7 +88,9 @@ impl Channel {
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
             }
-            DbMsg::Close => {}
+            DbMsg::Close => {
+                self.sender().close_channel();
+            }
         }
 
         Ok(())
@@ -190,6 +192,10 @@ impl Channel {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use mado_core::{MockMadoModule, Url};
+
     use super::*;
     use crate::tests::*;
 
@@ -201,11 +207,15 @@ mod tests {
         let info = setup_info_with_state(u8::MAX, &state);
 
         let mut rx = channel(Database::new(db).unwrap());
+        rx.connect_only(&state.engine);
 
-        rx.push_module(InsertModule {
-            name: "",
-            uuid: &Default::default(),
-        }).unwrap();
+        let mut module = MockMadoModule::new();
+        module.expect_name().times(0..).return_const("".to_string());
+        module.expect_uuid().times(0..).return_const(Uuid::default());
+        module.expect_domain().times(0..).return_const(Url::from_str("http://localhost").unwrap());
+        let module = Arc::new(module);
+
+        state.engine.push_module(module).unwrap();
 
         rx.send(DbMsg::NewDownload(info.clone())).unwrap();
         rx.try_all().unwrap();
@@ -230,6 +240,15 @@ mod tests {
             assert_eq!(status, DownloadStatus::Finished);
         }
 
+        info.chapters()[0].set_status(mado_engine::DownloadStatus::Finished);
+        rx.try_all().unwrap();
+
+        {
+            let it = rx.db.load_download().unwrap();
+            let ch = &it[0].chapters[0];
+            assert_eq!(ch.status, DownloadStatus::Finished);
+        }
+
         {
             // test that it is connected
             let it = rx.load_connect(state.map.clone()).unwrap();
@@ -245,5 +264,20 @@ mod tests {
             let status = it[0].status().clone();
             assert_eq!(DownloadStatus::Paused, status.into());
         }
+    }
+
+    #[test]
+    pub fn close_test() {
+        futures::executor::block_on(async {
+            let db = connection();
+
+            let state = State::default();
+
+            let mut rx = channel(Database::new(db).unwrap());
+            rx.connect_only(&state.engine);
+
+            rx.send(DbMsg::Close).unwrap();
+            rx.run().await.unwrap();
+        });
     }
 }

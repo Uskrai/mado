@@ -85,63 +85,19 @@ pub fn load_map(conn: &Connection) -> Result<HashMap<ModulePK, Module>, Error> {
 
 #[cfg(test)]
 mod tests {
-    use mado_engine::core::MadoModule;
+    use mado_engine::core::{MadoModule, MockMadoModule};
 
     use super::*;
     use crate::tests::connection;
     use std::sync::Arc;
 
-    #[derive(Debug)]
-    pub struct MockModule {
-        uuid: Uuid,
-        name: String,
-    }
-
-    #[async_trait::async_trait]
-    impl MadoModule for MockModule {
-        fn uuid(&self) -> Uuid {
-            self.uuid
-        }
-
-        fn name(&self) -> &str {
-            &self.name
-        }
-
-        fn client(&self) -> &mado_engine::core::Client {
-            todo!()
-        }
-
-        fn domain(&self) -> &mado_engine::core::url::Url {
-            todo!()
-        }
-
-        async fn get_info(
-            &self,
-            _: mado_engine::core::url::Url,
-        ) -> Result<mado_engine::core::MangaAndChaptersInfo, mado_engine::core::Error> {
-            todo!();
-        }
-
-        async fn get_chapter_images(
-            &self,
-            _: &str,
-            _: Box<dyn mado_engine::core::ChapterTask>,
-        ) -> Result<(), mado_engine::core::Error> {
-            todo!()
-        }
-
-        async fn download_image(
-            &self,
-            _: mado_engine::core::ChapterImageInfo,
-        ) -> Result<mado_engine::core::RequestBuilder, mado_engine::core::Error> {
-            todo!()
-        }
-        //
-    }
-
     #[test]
     pub fn insert_test() {
         let mut conn = connection();
+        let mut module = MockMadoModule::new();
+        module.expect_name().times(0..).return_const("Module".to_string());
+        module.expect_uuid().times(0..).return_const(Uuid::new_v4());
+        let module = Arc::new(module);
 
         insert(
             &conn,
@@ -167,11 +123,6 @@ mod tests {
             },
         )
         .unwrap_err();
-
-        let module = Arc::new(MockModule {
-            name: "Names".to_string(),
-            uuid: Uuid::new_v4(),
-        });
 
         let it = insert_info(&mut conn, module.clone()).unwrap();
         assert_eq!(it.name, module.name().to_string());
