@@ -267,6 +267,7 @@ mod tests {
     }
 
     #[test]
+    #[ntest::timeout(1000)]
     pub fn close_test() {
         futures::executor::block_on(async {
             let db = connection();
