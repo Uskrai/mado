@@ -38,10 +38,14 @@ jobs:
         toolchain: stable
         override: true
 
+    - uses: actions-rs/install@v0.1
+      with:
+        crate: cargo-tarpaulin
+        version: latest
+        use-tool-cache: true
+
     - name: Generate code coverage
       run: |
-        cargo --version
-        cargo install cargo-tarpaulin
         cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
 
     - name: Upload to codecov.io
