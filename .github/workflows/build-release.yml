@@ -38,13 +38,6 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
-        name: build-debug
-        path: |
-          target/debug/mado-relm
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
         name: build-release
         path: |
           target/release/mado-relm
