@@ -15,7 +15,7 @@ pub struct DownloadJoin {
 }
 
 pub fn load_download_join(conn: &Connection) -> Result<Vec<DownloadJoin>, Error> {
-    let downloads = crate::downloads::load(&conn)?;
+    let downloads = crate::downloads::load(conn)?;
     let mut index_map = HashMap::new();
 
     let mut download_joins = Vec::new();
@@ -27,7 +27,7 @@ pub fn load_download_join(conn: &Connection) -> Result<Vec<DownloadJoin>, Error>
         });
     }
 
-    let chapters = crate::download_chapters::load(&conn)?;
+    let chapters = crate::download_chapters::load(conn)?;
 
     for (download_id, it) in chapters {
         let index = index_map[&download_id];
@@ -54,6 +54,8 @@ pub fn load_download_info_join(
     conn: &Connection,
     module_map: ArcMadoModuleMap,
 ) -> Result<Vec<DownloadInfoJoin>, Error> {
+    let module = crate::module::load_map(conn)?;
+
     let joins = load_download_join(conn)?;
     let mut downloads = Vec::new();
 
@@ -63,7 +65,8 @@ pub fn load_download_info_join(
 
         let chapters = join.chapters;
 
-        let module = LateBindingModule::WaitModule(module_map.clone(), download.module_id);
+        let module =
+            LateBindingModule::WaitModule(module_map.clone(), module[&download.module_pk].uuid);
 
         let chapters_join: Vec<_> = chapters
             .into_iter()
@@ -107,16 +110,25 @@ pub fn load_download_info_join(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{downloads::DownloadPK, tests::*};
+    use crate::{downloads::DownloadPK, module::InsertModule, tests::*};
 
     #[test]
     fn insert_test() {
         let mut db = connection();
 
+        let module = crate::module::insert_pk(
+            &mut db,
+            InsertModule {
+                uuid: &Default::default(),
+                name: "Default",
+            },
+        )
+        .unwrap();
+
         const CHAPTER_LENGTH: u8 = u8::MAX;
         let info = setup_info(CHAPTER_LENGTH);
 
-        let insert = crate::downloads::insert_info(&mut db, &info).unwrap();
+        let insert = crate::downloads::insert_info(&mut db, module, &info).unwrap();
         assert_eq!(insert.pk, DownloadPK::new(1));
 
         let count: i64 = db

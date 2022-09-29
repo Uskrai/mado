@@ -6,6 +6,7 @@ mod status;
 
 pub mod download_chapters;
 pub mod downloads;
+pub mod module;
 
 pub use channel::{channel, Channel, DbMsg, Sender};
 pub use database::Database;
