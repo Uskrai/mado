@@ -194,10 +194,54 @@ impl Channel {
 mod tests {
     use std::str::FromStr;
 
-    use mado_core::{MockMadoModule, Url};
+    use mado_core::{MadoModule, MockMadoModule, Url};
+    use mado_engine::{core::MangaInfo, path::Utf8PathBuf};
 
     use super::*;
     use crate::tests::*;
+
+    fn mock_module(uuid: Uuid) -> MockMadoModule {
+        let mut module = MockMadoModule::new();
+        module.expect_name().times(0..).return_const("".to_string());
+        module.expect_uuid().times(0..).return_const(uuid);
+        module
+            .expect_domain()
+            .times(0..)
+            .return_const(Url::from_str("http://localhost").unwrap());
+
+        module
+    }
+
+    #[test]
+    fn connect_test() {
+        let db = connection();
+
+        let state = State::default();
+        // let info = setup_info_with_state(u8::MAX, &state);
+
+        let mut rx = channel(Database::new(db).unwrap());
+        rx.connect_only(&state.engine);
+
+        let module = Arc::new(mock_module(Uuid::default()));
+
+        state.engine.push_module(module.clone()).unwrap();
+        rx.try_all().unwrap();
+        assert!(rx.module.get(&module.uuid()).is_some());
+
+        let req = mado_engine::DownloadRequest::new(
+            module,
+            Arc::new(MangaInfo::default()),
+            vec![],
+            Utf8PathBuf::from_str("./path").unwrap(),
+            None,
+            mado_engine::DownloadRequestStatus::Pause,
+        );
+
+        state.engine.download_request(req);
+        rx.try_all().unwrap();
+        let dl = rx.db.load_download().unwrap();
+        assert_eq!(dl.len(), 1);
+    }
 
     #[test]
     fn run_test() {
@@ -209,11 +253,7 @@ mod tests {
         let mut rx = channel(Database::new(db).unwrap());
         rx.connect_only(&state.engine);
 
-        let mut module = MockMadoModule::new();
-        module.expect_name().times(0..).return_const("".to_string());
-        module.expect_uuid().times(0..).return_const(Uuid::default());
-        module.expect_domain().times(0..).return_const(Url::from_str("http://localhost").unwrap());
-        let module = Arc::new(module);
+        let module = Arc::new(mock_module(Uuid::default()));
 
         state.engine.push_module(module).unwrap();
 
