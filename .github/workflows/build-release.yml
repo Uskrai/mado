@@ -1,0 +1,50 @@
+name: Build Release
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+      
+    - name: Cache Target
+      id: cache-target
+      uses: actions/cache@v3
+      with:
+        path: |
+          ./target/release
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cache-test
+
+    - name: Dependency
+      run: sudo apt-get install libgtk-4-dev
+
+    - name: Build Release
+      run: cargo build --release
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-debug
+        path: |
+          target/debug/mado-relm
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-release
+        path: |
+          target/release/mado-relm
