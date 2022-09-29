@@ -1,0 +1,10 @@
+name: 'Setup Deno'
+runs:
+  using: "composite"
+  steps:
+    - name: Setup npm
+      working-directory: ./crates/deno
+      shell: bash
+      run: |
+        npm install
+        npx rollup -c rollup.config.ts

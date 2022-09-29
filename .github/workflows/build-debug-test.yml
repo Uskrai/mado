@@ -29,6 +29,8 @@ jobs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-cache-debug-test
 
+    - uses: ./.github/actions/init-deno
+
     - name: Dependency
       run: sudo apt-get install libgtk-4-dev
     - name: Build Debug
