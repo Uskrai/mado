@@ -32,8 +32,16 @@ jobs:
     - name: Dependency
       run: sudo apt-get install libgtk-4-dev
 
+    - name: Install latest nightly
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+
     - name: Generate code coverage
       run: |
+        cargo install tarpaulin
         cargo +nightly tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml
 
 
