@@ -40,6 +40,7 @@ jobs:
 
     - name: Generate code coverage
       run: |
+        cargo --version
         cargo install cargo-tarpaulin
         cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
 
