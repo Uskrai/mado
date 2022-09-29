@@ -113,3 +113,13 @@ impl Database {
         // Ok(downloads)
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    #[test]
+    fn open_test() {
+        Database::open(":memory:").unwrap();
+    }
+}
