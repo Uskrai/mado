@@ -26,7 +26,7 @@ fn create_migration(conn: &Connection) -> Result<i64, Error> {
 fn v1_download() -> &'static str {
     r#"
         CREATE TABLE downloads (
-            id INTEGER PRIMARY KEY NOT NULL,
+            id INTEGER PRIMARY KEY,
             module_id TEXT(36) NOT NULL,
             title TEXT NOT NULL,
             url TEXT,
@@ -39,19 +39,15 @@ fn v1_download() -> &'static str {
 fn v1_download_chapter() -> &'static str {
     r#"
         CREATE TABLE download_chapters (
-            id INTEGER NOT NULL,
+            id INTEGER PRIMARY KEY,
             download_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             chapter_id TEXT NOT NULL,
             status TEXT NOT NULL,
             path TEXT NOT NULL,
-            PRIMARY KEY 
-                (id, download_id)
 
-            FOREIGN KEY 
-                    (download_id) 
-                REFERENCES 
-                    downloads(id)
+            FOREIGN KEY (download_id) 
+                REFERENCES downloads(id)
                 ON DELETE CASCADE
                 ON UPDATE CASCADE
         );
