@@ -10,9 +10,7 @@ export default {
         output: {
             dir: 'dist',
             format: 'es',
-            chunkFileNames: '[name].js',
-            // preserveModules: true,
-            // preserveModulesRoot: 'script'
+            chunkFileNames: 'chunk/[name].js', 
         },
         watch: {
             chokidar: {
