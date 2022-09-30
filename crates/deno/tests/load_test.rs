@@ -20,9 +20,8 @@ pub fn main() {
         let mut runtime = mado_deno::ModuleLoader::new(options);
 
         let mut map = HashMap::new();
-        println!("{:?}", std::env::current_dir());
 
-        for it in std::fs::read_dir("./script").unwrap() {
+        for it in std::fs::read_dir("./dist/module").unwrap() {
             let it = it.unwrap();
             let path = it.path();
 
