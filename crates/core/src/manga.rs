@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct MangaInfo {
     pub id: String,
     pub title: String,
@@ -18,13 +18,13 @@ pub struct MangaInfo {
     pub types: MangaType,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct MangaAndChaptersInfo {
     pub manga: Arc<MangaInfo>,
     pub chapters: Arc<ChaptersInfo>,
 }
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub struct ChaptersInfo(pub Vec<Arc<ChapterInfo>>);
 
 impl Deref for ChaptersInfo {
@@ -80,7 +80,7 @@ impl<'de> serde::Deserialize<'de> for ChaptersInfo {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Default, Clone)]
+#[derive(Debug, Deserialize, Serialize, Default, Clone, PartialEq)]
 pub struct ChapterInfo {
     pub index: Option<usize>,
     pub id: String,
@@ -91,7 +91,7 @@ pub struct ChapterInfo {
     pub language: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Default, Clone)]
+#[derive(Debug, Deserialize, Serialize, Default, Clone, PartialEq)]
 pub struct ChapterImageInfo {
     pub id: String,
     pub extension: String,
@@ -146,7 +146,7 @@ impl Display for ChapterInfo {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub enum MangaType {
     Series,
     Anthology,
