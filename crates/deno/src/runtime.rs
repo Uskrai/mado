@@ -6,7 +6,6 @@ use deno_core::{
     JsRuntime, RuntimeOptions,
 };
 use event_listener::{Event, EventListener};
-use futures::Future;
 use mado_core::Uuid;
 use tokio::sync::mpsc;
 
@@ -20,6 +19,13 @@ impl ModuleLoader {
     pub fn new(options: RuntimeOptions) -> Self {
         Self {
             runtime: Runtime::new(options),
+            max_module: 0,
+        }
+    }
+
+    pub fn from_runtime(runtime: Runtime) -> Self {
+        Self {
+            runtime,
             max_module: 0,
         }
     }

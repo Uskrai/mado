@@ -1,12 +1,25 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, future::Future, path::PathBuf, rc::Rc};
 
 use deno_core::v8::{self, Local};
 use mado_deno::Runtime;
 use serde::de::DeserializeOwned;
 use tokio::task::LocalSet;
 
+pub async fn with_event_loop<T>(runtime: Runtime, collect: impl Future<Output = T>) -> T {
+    futures::pin_mut!(collect);
+    let mut runtime = runtime.js().borrow_mut();
+    loop {
+        tokio::select! {
+            _ = runtime.run_event_loop(false) => {}
+            result = &mut collect => {
+                return result;
+            }
+        };
+    }
+}
+
 #[test]
-pub fn script_test() -> Result<(), ErrorWrapper> {
+pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     let tokio = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -20,8 +33,22 @@ pub fn script_test() -> Result<(), ErrorWrapper> {
 
     let local_set = LocalSet::new();
 
-    // local_set.block_on(&tokio, async {
-    let mut runtime = mado_deno::ModuleLoader::new(options);
+    let runtime = Runtime::new(options);
+    let inspector = runtime
+        .js()
+        .borrow_mut()
+        .inspector()
+        .borrow()
+        .create_local_session();
+
+    let mut coverage_collector =
+        mado_deno_coverage::CoverageCollector::new(PathBuf::from("./coverage"), inspector);
+
+    tokio.block_on(async {
+        with_event_loop(runtime.clone(), coverage_collector.start_collecting()).await
+    })?;
+
+    let mut runtime = mado_deno::ModuleLoader::from_runtime(runtime);
 
     let mut module_to_path = HashMap::new();
 
@@ -44,7 +71,6 @@ pub fn script_test() -> Result<(), ErrorWrapper> {
     }
 
     let runtime = runtime.into_runtime();
-    // let shared_runtime = runtime.into_js_runtime();
 
     let pattern = std::env::var("MADO_DENO_TEST").unwrap_or_else(|_| ".*".into());
     let pattern = regex::Regex::new(&pattern)
@@ -89,7 +115,7 @@ pub fn script_test() -> Result<(), ErrorWrapper> {
 
                 if pattern.is_match(&name_str.to_string()) {
                     let value = Local::<v8::Function>::try_from(
-                        namespace.get(scope, name.clone().into()).unwrap(),
+                        namespace.get(scope, name.into()).unwrap(),
                     );
 
                     let value = match value {
@@ -119,20 +145,37 @@ pub fn script_test() -> Result<(), ErrorWrapper> {
     }
 
     tokio.block_on(local_set);
+    tokio.block_on(async {
+        with_event_loop(runtime.clone(), coverage_collector.stop_collecting()).await
+    })?;
 
     if errors.borrow().is_empty() {
         return Ok(());
     }
 
-    return Err(ErrorWrapper(errors));
+    Err(Box::new(ErrorWrapper(errors)))
 }
 
 pub struct ErrorWrapper(Rc<RefCell<Vec<anyhow::Error>>>);
 
-impl std::fmt::Debug for ErrorWrapper {
+impl std::error::Error for ErrorWrapper {
+    //
+}
+
+impl std::fmt::Display for ErrorWrapper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for it in self.0.borrow().iter() {
             writeln!(f, "{}", it)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for ErrorWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for it in self.0.borrow().iter() {
+            writeln!(f, "{:?}", it)?;
         }
 
         Ok(())
@@ -226,35 +269,27 @@ where
 
         let split_expected = expected.split('_').collect::<Vec<_>>();
 
-        let value = mado_deno::from_v8::<mado_deno::ResultJson<T>>(scope, real_value.clone())
+        let value = mado_deno::from_v8::<mado_deno::ResultJson<T>>(scope, real_value)
             .map(|it| it.to_result(state));
 
         let mut print_error = |error: Option<anyhow::Error>| {
             use std::fmt::Write;
             let mut string = String::new();
             writeln!(string, "expected: {} at {}", expected, name).unwrap();
-            // let string = serde_v8::to_utf8(
             let actual: serde_json::Value = serde_v8::from_v8(scope, real_value).unwrap();
 
-            // match actual {
-            //     Ok(actual) => {
             writeln!(
                 string,
                 "actual: {}",
                 serde_json::to_string_pretty(&actual).unwrap()
             )
             .unwrap();
-            //     }
-            //     Err(err) => {
-            //         writeln!(string, "actual: {}", real_value.to_detail_string(scope)).unwrap()
-            //     }
-            // }
 
             if let Some(err) = error {
                 writeln!(string, "{}", err).unwrap();
             }
 
-            return Err(anyhow::anyhow!(string));
+            Err(anyhow::anyhow!(string))
         };
 
         match (split_expected[0], value) {

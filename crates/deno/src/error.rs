@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{rc::Rc};
 
 use deno_core::{op, Extension, ExtensionBuilder, OpState};
 use thiserror::Error;
