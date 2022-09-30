@@ -1,4 +1,4 @@
-use std::{rc::Rc};
+use std::rc::Rc;
 
 use deno_core::{op, Extension, ExtensionBuilder, OpState};
 use thiserror::Error;
@@ -93,17 +93,11 @@ impl From<Error> for mado_core::Error {
         match err {
             Error::UrlParseError { input, source } => Self::UrlParseError { input, source },
             Error::InvalidUrl { url } => Self::RequestError {
-                url: url.into(),
+                url,
                 message: "Invalid Link".into(),
             },
-            Error::UnexpectedError { url, message } => Self::RequestError {
-                url: url.into(),
-                message,
-            },
-            Error::RequestError { url, message } => Self::RequestError {
-                url: url.into(),
-                message,
-            },
+            Error::UnexpectedError { url, message } => Self::RequestError { url, message },
+            Error::RequestError { url, message } => Self::RequestError { url, message },
             Error::MadoError(err) => err,
             Error::ExternalError(_) | Error::ModuleLoadError(_) | Error::SerdeError(_) => {
                 Self::ExternalError(err.into())

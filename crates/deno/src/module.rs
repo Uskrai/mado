@@ -51,7 +51,9 @@ impl DenoMadoModule {
         rx.await.context("cannot await request")?
     }
 
-    fn close(self) {}
+    async fn close(self) -> Result<(), Error> {
+        self.send_message(ModuleMessage::Close).await
+    }
 }
 
 #[async_trait::async_trait]
@@ -102,7 +104,7 @@ pub enum ModuleMessage {
         ChapterImageInfo,
         oneshot::Sender<Result<mado_core::RequestBuilder, Error>>,
     ),
-    Close(oneshot::Sender<()>),
+    Close(oneshot::Sender<Result<(), Error>>),
 }
 
 pub struct ModuleLoop {
@@ -152,8 +154,7 @@ impl ModuleLoop {
                     }
                     ModuleMessage::DownloadImage(info, cx) => self.download_image(info, cx).await,
                     ModuleMessage::Close(cx) => {
-                        cx.send(()).unwrap();
-                        return;
+                        cx.send(Ok(())).unwrap();
                     }
                 };
             };
@@ -198,7 +199,7 @@ impl ModuleLoop {
             let function = Local::<Function>::try_from(it)
                 .with_context(|| format!("{} is not function", name))?;
 
-            let resource = resource(&mut op_state.borrow_mut());
+            let resource = resource(op_state.borrow_mut());
             let recv = Local::new(scope, self.object.clone());
 
             let it = args(scope, resource.as_ref(), FunctionCaller { recv, function })
@@ -223,7 +224,7 @@ impl ModuleLoop {
 
             match crate::from_v8(scope, it)? {
                 ResultJson::Ok(it) => Ok(it),
-                ResultJson::Err(err) => Err(err.take(&mut ops.borrow_mut())),
+                ResultJson::Err(err) => Err(err.take(ops.borrow_mut())),
             }
         })
     }

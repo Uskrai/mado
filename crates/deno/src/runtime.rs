@@ -84,8 +84,8 @@ impl ModuleLoader {
                             .context("initMadoModule doesn't return an array")
                     })
                     .map(|it| (it, it.length()))
-                    .and_then(|it| Ok((Global::new(scope, it.0), it.1)))
-                    .map_err(|err| ModuleLoadError::NotModule(err))
+                    .map(|it| (Global::new(scope, it.0), it.1))
+                    .map_err(ModuleLoadError::NotModule)
             })?
         };
 
