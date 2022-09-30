@@ -24,7 +24,39 @@ fn op_mado_chapter_task_add(
 ) -> Result<(), anyhow::Error> {
     let it = state.resource_table.get::<DenoChapterTask>(rid)?;
 
-    let it = it.task.borrow_mut().add(image);
+    it.task.borrow_mut().add(image);
 
-    Ok(it)
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use mado_core::MockChapterTask;
+
+    use super::*;
+
+    #[test]
+    pub fn test_task() {
+        let mut state = OpState::new(0);
+
+        let mut task = MockChapterTask::new();
+
+        let info = ChapterImageInfo {
+            id: "id-1".to_string(),
+            name: Some("id-1".to_string()),
+            extension: "jpeg".to_string(),
+        };
+
+        task.expect_add()
+            .withf({
+                let info = info.clone();
+                move |image| *image == info
+            })
+            .return_once(|_| ());
+
+        let task = DenoChapterTask::new_to_state(Box::new(task), &mut state);
+
+        op_mado_chapter_task_add::call(&mut state, task, info).unwrap();
+    }
 }
