@@ -11,6 +11,7 @@ use crate::{
     Uuid,
 };
 
+#[cfg_attr(feature = "mockall", mockall::automock)]
 pub trait ChapterTask: Send {
     fn add(&mut self, image: ChapterImageInfo);
 }
