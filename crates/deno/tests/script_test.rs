@@ -32,6 +32,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let local_set = LocalSet::new();
+    let last_set = LocalSet::new();
 
     let runtime = Runtime::new(options);
     let inspector = runtime
@@ -93,29 +94,33 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
             let length = names.length();
 
             for j in 0..length {
-                let name =
+                let name_v8 =
                     Local::<v8::String>::try_from(names.get_index(scope, j).unwrap()).unwrap();
-                let name_str = name.to_rust_string_lossy(scope);
+                let name_str = name_v8.to_rust_string_lossy(scope);
 
                 let filename = path.file_stem().unwrap().to_string_lossy().to_string();
 
-                let mut name_str = name_str.splitn(3, "__").map(|it| it.to_string());
+                let split_to_name = || {
+                    let mut name_str = name_str.splitn(3, "__").map(|it| it.to_string());
 
-                let filename = filename.to_string();
-                let testname = name_str.next().unwrap();
-                let expected = name_str.next().unwrap();
-                let unique_id = name_str.next();
+                    let filename = filename.to_string();
+                    let testname = name_str.next().unwrap();
+                    let expected = name_str.next().unwrap_or_else(|| "Any".to_string());
+                    let unique_id = name_str.next();
 
-                let name_str = Name {
-                    filename,
-                    testname,
-                    expected,
-                    unique_id,
+                    Name {
+                        filename,
+                        testname,
+                        expected,
+                        unique_id,
+                    }
                 };
 
-                if pattern.is_match(&name_str.to_string()) {
+                let name = split_to_name();
+
+                if pattern.is_match(&name.to_string()) {
                     let value = Local::<v8::Function>::try_from(
-                        namespace.get(scope, name.into()).unwrap(),
+                        namespace.get(scope, name_v8.into()).unwrap(),
                     );
 
                     let value = match value {
@@ -127,24 +132,32 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     let value = v8::Global::new(scope, value);
+                    let is_last = name.testname.starts_with("close");
 
-                    local_set.spawn_local({
+                    let spawning = || {
                         let runtime = runtime.clone();
                         let errors = errors.clone();
                         async move {
-                            let result = test_function(runtime.clone(), name_str, value).await;
+                            let result = test_function(runtime.clone(), name, value).await;
 
                             if let Err(err) = result {
                                 errors.borrow_mut().push(err);
                             }
                         }
-                    });
+                    };
+
+                    if is_last {
+                        last_set.spawn_local(spawning());
+                    } else {
+                        local_set.spawn_local(spawning());
+                    }
                 }
             }
         });
     }
 
     tokio.block_on(local_set);
+    tokio.block_on(last_set);
     tokio.block_on(async {
         with_event_loop(runtime.clone(), coverage_collector.stop_collecting()).await
     })?;
@@ -299,6 +312,7 @@ where
                     return print_error(Some(error.into()));
                 }
             }
+            ("Any", _) => {}
             (_, err) => {
                 return print_error(err.and_then(|it| it.map_err(Into::into)).err());
             }

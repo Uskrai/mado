@@ -30,3 +30,7 @@ export async function downloadImage__Ok__1() {
 
   return await module.downloadImage(image);
 }
+
+export function close() {
+  module.close();
+}

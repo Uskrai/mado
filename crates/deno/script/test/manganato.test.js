@@ -37,3 +37,7 @@ export async function downloadImage__Ok__1() {
   let images = info[0];
   return await module.downloadImage(images);
 }
+
+export function close() {
+  module.close();
+}
