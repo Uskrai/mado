@@ -23,3 +23,36 @@ pub enum Error {
     #[error(transparent)]
     ExternalError(#[from] anyhow::Error),
 }
+
+impl Error {
+    pub fn to_string_variant(&self) -> String {
+        macro_rules! match_var {
+            ($id:ident (..)) => {
+                Self::$id(..)
+            };
+            ($id:ident {..}) => {
+                Self::$id { .. }
+            };
+        }
+
+        macro_rules! variant {
+            ($($name:ident $tt:tt),+) => {
+                match self {
+                  $(match_var!($name $tt) => {
+                    stringify!($name)
+                  }),+
+                }
+          };
+        }
+
+        variant! {
+            UrlParseError { .. },
+            UnsupportedUrl { ..},
+            RequestError { .. },
+            ExternalError(..),
+            IOError(..),
+            HttpClientError(..)
+        }
+        .to_string()
+    }
+}
