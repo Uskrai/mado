@@ -135,7 +135,7 @@ impl ModuleLoader {
             crate::from_v8::<ObjectSerde>(scope, object.into()).map_err(ModuleLoadError::SerdeError)
         })?;
 
-        let client = self.runtime.with_ops(|state| {
+        let client = self.runtime.with_state(|state| {
             state
                 // .borrow_mut()
                 .resource_table
@@ -202,7 +202,7 @@ impl Runtime {
         fun(scope)
     }
 
-    pub fn with_ops<F, R>(&self, fun: F) -> R
+    pub fn with_state<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&mut deno_core::OpState) -> R,
     {
@@ -214,7 +214,7 @@ impl Runtime {
         fun(ops)
     }
 
-    pub fn with_scope_ops<F, R>(&mut self, fun: F) -> R
+    pub fn with_scope_state<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&mut v8::HandleScope, &mut deno_core::OpState) -> R,
     {

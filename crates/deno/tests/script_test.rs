@@ -274,7 +274,7 @@ fn check_type<T>(
 where
     T: DeserializeOwned,
 {
-    runtime.with_scope_ops(|scope, state| {
+    runtime.with_scope_state(|scope, state| {
         // let name = format!("{}__{}", filename, part.join("__"));
         let real_value = v8::Local::new(scope, value);
 

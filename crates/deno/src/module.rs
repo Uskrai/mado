@@ -163,18 +163,25 @@ impl ModuleLoop {
         }
     }
 
-    // fn with_scope<F, R>(&self, fun: F) -> Result<R, DenoError>
-    // where
-    //     F: FnOnce(&mut HandleScope) -> Result<R, DenoError>,
-    // {
-    //     self.runtime.with_scope(|scope| fun(scope))
-    // }
+    fn with_scope<F, R>(&self, fun: F) -> Result<R, DenoError>
+    where
+        F: FnOnce(&mut HandleScope) -> Result<R, DenoError>,
+    {
+        self.runtime.clone().with_scope(fun)
+    }
 
-    fn with_scope_ops<F, R>(&self, fun: F) -> Result<R, DenoError>
+    fn with_state<F, R>(&self, fun: F) -> Result<R, DenoError>
+    where
+        F: FnOnce(&mut OpState) -> Result<R, DenoError>,
+    {
+        self.runtime.clone().with_state(fun)
+    }
+
+    fn with_scope_state<F, R>(&self, fun: F) -> Result<R, DenoError>
     where
         F: FnOnce(&mut HandleScope, &mut OpState) -> Result<R, DenoError>,
     {
-        self.runtime.clone().with_scope_ops(fun)
+        self.runtime.clone().with_scope_state(fun)
     }
 
     async fn call_async_function<F, Resource, Ref>(
@@ -188,29 +195,37 @@ impl ModuleLoop {
         Ref: AsRef<[u32]>,
         F: for<'b> FnOnce(&mut HandleScope<'b>, &[u32], FunctionCaller) -> Option<Local<'b, Value>>,
     {
-        let it = self.with_scope_ops(|scope, op_state| {
-            let v8_name = v8::String::new(scope, name).unwrap();
-            let it = self
-                .object
-                .open(scope)
-                .get(scope, v8_name.into())
-                .with_context(|| format!("no value named {}", name))?;
+        let it = {
+            let resource = self.with_state(|state| Ok(resource(state)))?;
 
-            let function = Local::<Function>::try_from(it)
-                .with_context(|| format!("{} is not function", name))?;
+            let value = |scope: &mut HandleScope| -> Result<Global<Value>, DenoError> {
+                let v8_name = v8::String::new(scope, name).unwrap();
+                let it = self
+                    .object
+                    .open(scope)
+                    .get(scope, v8_name.into())
+                    .with_context(|| format!("no value named {}", name))?;
 
-            let resource = resource(op_state.borrow_mut());
-            let recv = Local::new(scope, self.object.clone());
+                let function = Local::<Function>::try_from(it)
+                    .with_context(|| format!("{} is not function", name))?;
+                let recv = Local::new(scope, self.object.clone());
+                let it = args(scope, resource.as_ref(), FunctionCaller { recv, function })
+                    .with_context(|| format!("{} return None", name))?;
 
-            let it = args(scope, resource.as_ref(), FunctionCaller { recv, function })
-                .with_context(|| format!("{} return None", name))?;
+                Ok(Global::new(scope, it))
+            };
 
-            for it in resource.as_ref() {
-                let _ = op_state.resource_table.close(*it);
-            }
+            let value = self.with_scope(value);
 
-            Ok(Global::new(scope, it))
-        })?;
+            self.with_state(|op_state| {
+                for it in resource.as_ref() {
+                    let _ = op_state.resource_table.close(*it);
+                }
+                Ok(())
+            })?;
+
+            value
+        }?;
 
         self.runtime.resolve_value(it).await.map_err(Into::into)
     }
@@ -219,12 +234,12 @@ impl ModuleLoop {
     where
         T: DeserializeOwned + serde::Serialize,
     {
-        self.with_scope_ops(|scope, ops| {
+        self.with_scope_state(|scope, state| {
             let it = Local::new(scope, result);
 
             match crate::from_v8(scope, it)? {
                 ResultJson::Ok(it) => Ok(it),
-                ResultJson::Err(err) => Err(err.take(ops.borrow_mut())),
+                ResultJson::Err(err) => Err(err.take(state)),
             }
         })
     }
