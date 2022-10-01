@@ -254,6 +254,7 @@ struct ValueResolver {
     event: Arc<Event>,
     prev_err: Option<anyhow::Error>,
     js: Rc<RefCell<JsRuntime>>,
+    timer: async_io::Timer,
 }
 
 impl ValueResolver {
@@ -264,6 +265,7 @@ impl ValueResolver {
             event: runtime.event.clone(),
             prev_err: None,
             js: runtime.js.clone(),
+            timer: async_io::Timer::interval(std::time::Duration::from_millis(250))
         }
     }
 }
@@ -275,6 +277,8 @@ impl std::future::Future for ValueResolver {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
+        let _ = self.timer.poll_unpin(cx);
+
         let event = self.event.clone();
         let this = &mut *self;
 
@@ -300,21 +304,32 @@ impl std::future::Future for ValueResolver {
         let waker = waker_fn::waker_fn(move || {
             event.notify(1);
         });
+        let root_cx = cx;
         let cx = &mut std::task::Context::from_waker(&waker);
 
-        let mut js = this.js.borrow_mut();
+        let mut js = match this.js.try_borrow_mut() {
+            Ok(js) => js,
+            Err(_) => {
+                root_cx.waker().wake_by_ref();
+                return std::task::Poll::Pending;
+            }
+        };
 
         let poll = js.poll_value(&this.value, cx);
 
         // notify event when poll is ready so another poller will wait instead.
         if poll.is_ready() {
-            this.event.notify(1);
+            cx.waker().wake_by_ref();
         }
 
         let result = futures::ready!(poll);
 
         match result {
-            Ok(ok) => std::task::Poll::Ready(Ok(ok)),
+            Ok(ok) => {
+                cx.waker().wake_by_ref();
+
+                std::task::Poll::Ready(Ok(ok))
+            }
             Err(err) => {
                 let it = err.downcast::<deno_core::error::JsError>();
 
@@ -322,11 +337,8 @@ impl std::future::Future for ValueResolver {
                     Ok(err) => std::task::Poll::Ready(Err(err.into())),
                     // probs related:
                     // https://github.com/denoland/deno/issues/15176
+                    // https://github.com/denoland/deno/issues/13458
                     Err(err) => {
-                        //
-                        // match this.prev_err {
-                        //     Some(_) => std::task::Poll::Ready(Err(err)),
-                        //     None => {
                         cx.waker().wake_by_ref();
                         this.prev_err = Some(err);
 
