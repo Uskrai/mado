@@ -57,3 +57,14 @@ jobs:
       uses: codecov/codecov-action@v2
       with:
           fail_ci_if_error:     true
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-release
+        path: |
+          cobertura.xml
+          deno_coverage.lcov
+          .github/workflows/coverage.yml
+          target/tarpaulin/coverage.json
+
