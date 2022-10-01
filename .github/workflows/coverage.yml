@@ -40,10 +40,12 @@ jobs:
         toolchain: stable
         override: true
 
-    - name: Run cargo-tarpaulin
-      uses: actions-rs/tarpaulin@v0.1
-      with:
-        args: '--verbose --out Html --skip-clean'
+    - name: Install Tarpaulin
+      run: cargo install cargo-tarpaulin || true
+
+    - name: Generate code coverage
+      run: |
+        cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
 
     - uses: denoland/setup-deno@v1
       with:
@@ -53,15 +55,12 @@ jobs:
       run: |
         deno coverage crates/deno/coverage --lcov --output=deno_coverage.lcov
 
-    # - uses: actions-rs/install@v0.1
-    #   with:
-    #     crate: cargo-tarpaulin
-    #     version: latest
-    #     use-tool-cache: true
+    # - name: Install sd
+    #   run: cargo install sd || true
     #
-    # - name: Generate code coverage
+    # - name: Find and Replace
     #   run: |
-    #     cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
+    #     sd $GITHUB_WORKSPACE/ "" deno_coverage.lcov
 
     - name: Upload to codecov.io
       uses: codecov/codecov-action@v2
@@ -75,6 +74,3 @@ jobs:
         path: |
           cobertura.xml
           deno_coverage.lcov
-          .github/workflows/coverage.yml
-          target/tarpaulin/coverage.json
-

@@ -1,4 +1,5 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
+// forked from https://github.com/denoland/deno/blob/5f5bbd597ad3454469b3e51a80cd7cb9be39c04d/cli/tools/coverage/mod.rs
 
 use deno_core::error::AnyError;
 use deno_core::serde_json;
