@@ -1,7 +1,10 @@
+use std::{cell::RefCell, rc::Rc};
+
 use anyhow::Context;
 use deno_core::{
+    futures::StreamExt,
     v8::{self, Function, Global, HandleScope, Local, Object, Value},
-    OpState,
+    Extension, ExtensionBuilder, OpState,
 };
 
 use mado_core::{ChapterImageInfo, ChapterTask, Error, MadoModule, MangaAndChaptersInfo, Uuid};
@@ -9,7 +12,11 @@ use serde::de::DeserializeOwned;
 use tokio::sync::{mpsc, oneshot};
 use url::Url;
 
-use crate::{error::Error as DenoError, task::DenoChapterTask, ResultJson};
+use crate::{
+    error::{error_to_deno, Error as DenoError},
+    task::DenoChapterTask,
+    try_json, ResultJson,
+};
 
 #[derive(Debug)]
 pub struct DenoMadoModule {
@@ -19,6 +26,8 @@ pub struct DenoMadoModule {
     sender: mpsc::Sender<ModuleMessage>,
     client: mado_core::Client,
 }
+
+impl deno_core::Resource for DenoMadoModule {}
 
 impl DenoMadoModule {
     pub fn new(
@@ -49,6 +58,11 @@ impl DenoMadoModule {
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         rx.await.context("cannot await request")?
+    }
+
+    async fn get_chapter_images_rid(&self, id: &str, rid: u32) -> Result<(), Error> {
+        self.send_message(|cx| ModuleMessage::GetChapterImagesRid(id.to_string(), rid, cx))
+            .await
     }
 
     async fn close(self) -> Result<(), Error> {
@@ -100,6 +114,7 @@ pub enum ModuleMessage {
         Box<dyn ChapterTask>,
         oneshot::Sender<Result<(), Error>>,
     ),
+    GetChapterImagesRid(String, u32, oneshot::Sender<Result<(), Error>>),
     DownloadImage(
         ChapterImageInfo,
         oneshot::Sender<Result<mado_core::RequestBuilder, Error>>,
@@ -109,6 +124,11 @@ pub enum ModuleMessage {
 
 pub struct ModuleLoop {
     receiver: mpsc::Receiver<ModuleMessage>,
+    handler: ModuleMessageHandler,
+}
+
+#[derive(Clone)]
+struct ModuleMessageHandler {
     runtime: crate::Runtime,
     object: Global<Object>,
     client: mado_core::http::Client,
@@ -138,29 +158,40 @@ impl ModuleLoop {
     ) -> Self {
         Self {
             receiver,
-            runtime,
-            object,
-            client,
+            handler: ModuleMessageHandler {
+                runtime,
+                object,
+                client,
+            },
         }
     }
 
     pub async fn start(mut self) {
-        while let Some(msg) = self.receiver.recv().await {
-            let future = async {
-                match msg {
-                    ModuleMessage::GetInfo(url, cx) => self.get_info(url, cx).await,
-                    ModuleMessage::GetChapterImages(id, task, cx) => {
-                        self.get_chapter_image(id, task, cx).await
-                    }
-                    ModuleMessage::DownloadImage(info, cx) => self.download_image(info, cx).await,
-                    ModuleMessage::Close(cx) => {
-                        cx.send(Ok(())).unwrap();
-                    }
-                };
-            };
+        let stream = futures::stream::poll_fn(move |cx| self.receiver.poll_recv(cx));
 
-            future.await;
-        }
+        stream
+            .for_each_concurrent(None, |msg| async {
+                self.handler.handle_msg(msg).await;
+            })
+            .await;
+    }
+}
+
+impl ModuleMessageHandler {
+    async fn handle_msg(&self, msg: ModuleMessage) {
+        match msg {
+            ModuleMessage::GetInfo(url, cx) => self.get_info(url, cx).await,
+            ModuleMessage::GetChapterImages(id, task, cx) => {
+                self.get_chapter_image(id, task, cx).await
+            }
+            ModuleMessage::GetChapterImagesRid(id, task, cx) => {
+                self.get_chapter_image_rid(id, task, cx).await
+            }
+            ModuleMessage::DownloadImage(info, cx) => self.download_image(info, cx).await,
+            ModuleMessage::Close(cx) => {
+                cx.send(Ok(())).unwrap();
+            }
+        };
     }
 
     fn with_scope<F, R>(&self, fun: F) -> Result<R, DenoError>
@@ -304,6 +335,30 @@ impl ModuleLoop {
         let _ = cx.send(it.map_err(Into::into));
     }
 
+    pub async fn get_chapter_image_rid(
+        &self,
+        id: String,
+        task: u32,
+        cx: oneshot::Sender<Result<(), Error>>,
+    ) {
+        let it = self
+            .call_async_serialize(
+                "getChapterImageRust",
+                |_| [],
+                |scope, _, call| {
+                    let args = &[
+                        v8::String::new(scope, &id).unwrap().into(),
+                        v8::BigInt::new_from_u64(scope, task.into()).into(),
+                    ];
+
+                    call.call(scope, args)
+                },
+            )
+            .await;
+
+        let _ = cx.send(it.map_err(Into::into));
+    }
+
     pub async fn download_image(
         &self,
         info: ChapterImageInfo,
@@ -325,3 +380,144 @@ impl ModuleLoop {
         let _ = cx.send(it.map(Into::into).map_err(Into::into));
     }
 }
+
+#[deno_core::op(v8)]
+fn op_mado_module_new(
+    scope: &mut v8::HandleScope,
+    state: &mut OpState,
+    value: serde_v8::Value,
+) -> Result<ResultJson<u32>, anyhow::Error> {
+    let runtime = state.borrow::<crate::Runtime>().clone();
+    let object = value
+        .v8_value
+        .to_object(scope)
+        .ok_or_else(|| anyhow::anyhow!("argument should be object"))?;
+    let object = v8::Global::new(scope, object);
+
+    let (module, looper) = match runtime.load_object_with_scope_state(scope, state, object) {
+        Ok(it) => it,
+        Err(err) => {
+            return Ok(ResultJson::Err(error_to_deno(
+                state,
+                err.into(),
+            )))
+        }
+    };
+
+    let module = state.resource_table.add(module);
+    crate::spawn_local(looper.start());
+
+    Ok(ResultJson::Ok(module))
+}
+
+fn get_module(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<Rc<DenoMadoModule>> {
+    match state
+        .borrow()
+        .resource_table
+        .get(rid)
+        .context("Module already closed")
+    {
+        Ok(it) => ResultJson::Ok(it),
+        Err(err) => ResultJson::Err(error_to_deno(&mut state.borrow_mut(), err.into())),
+    }
+}
+
+#[deno_core::op]
+async fn op_mado_module_get_info(
+    state: Rc<RefCell<OpState>>,
+    rid: u32,
+    url: Url,
+) -> ResultJson<MangaAndChaptersInfo> {
+    let module = crate::try_json!(get_module(state.clone(), rid));
+
+    match module.get_info(url).await.map_err(Into::into) {
+        Ok(it) => ResultJson::Ok(it),
+        Err(err) => ResultJson::Err(error_to_deno(&mut state.borrow_mut(), err)),
+    }
+}
+
+#[deno_core::op]
+async fn op_mado_module_get_chapter_images(
+    state: Rc<RefCell<OpState>>,
+    rid: u32,
+    id: String,
+    task_rid: u32,
+) -> ResultJson<()> {
+    let module: Rc<DenoMadoModule> = crate::try_json!(get_module(state.clone(), rid));
+
+    let it = || async {
+        module
+            .get_chapter_images_rid(&id, task_rid)
+            .await
+            .map_err(Into::into)
+    };
+
+    let it: Result<(), DenoError> = it().await;
+    let it = it.map_err(|err| error_to_deno(&mut state.borrow_mut(), err));
+
+    ResultJson::from(it)
+}
+
+#[deno_core::op]
+async fn op_mado_module_close(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<()> {
+    let it: Rc<DenoMadoModule> = {
+        let state = &mut state.borrow_mut();
+
+        try_json!(state
+            .resource_table
+            .take(rid)
+            .map_err(|_| DenoError::ResourceError(rid, "Module Already Closed".to_string()))
+            .map_err(|err| error_to_deno(state, err))
+            .into())
+    };
+
+    let it = match Rc::try_unwrap(it) {
+        Ok(it) => it,
+        Err(_) => return ResultJson::Ok(()),
+    };
+
+    it.close()
+        .await
+        .map_err(|err| error_to_deno(&mut state.borrow_mut(), err.into()))
+        .into()
+}
+
+pub struct MadoCoreRequestBuilderResource(mado_core::RequestBuilder);
+impl deno_core::Resource for MadoCoreRequestBuilderResource {}
+
+#[deno_core::op]
+async fn op_mado_module_download_image(
+    state: Rc<RefCell<OpState>>,
+    rid: u32,
+    chapter: ChapterImageInfo,
+) -> ResultJson<u32> {
+    let module = try_json!(get_module(state.clone(), rid));
+
+    let it = try_json!(module
+        .download_image(chapter)
+        .await
+        .map_err(|err| error_to_deno(&mut state.borrow_mut(), err.into()))
+        .into());
+
+    let it = state
+        .borrow_mut()
+        .resource_table
+        .add(MadoCoreRequestBuilderResource(it));
+
+    ResultJson::Ok(it)
+}
+
+pub fn init() -> Extension {
+    ExtensionBuilder::default()
+        .ops(vec![
+            op_mado_module_new::decl(),
+            op_mado_module_get_info::decl(),
+            op_mado_module_get_chapter_images::decl(),
+            op_mado_module_download_image::decl(),
+            op_mado_module_close::decl(),
+        ])
+        .build()
+}
+
+#[cfg(test)]
+mod tests {}

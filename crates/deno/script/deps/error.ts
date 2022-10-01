@@ -1,5 +1,5 @@
-export abstract class ResultBase<O, E> {
-  content: O | E;
+export abstract class ResultBase<O> {
+  content: O | Errors;
 
   isError(): boolean {
     return !this.isOk();
@@ -8,6 +8,18 @@ export abstract class ResultBase<O, E> {
 
   abstract throw(): O;
   abstract throwDebug(): O;
+
+  or(val: O): O {
+    return this.isOk() ? this.data : val;
+  }
+
+  map<T>(val: T): ResultBase<T> {
+    if (this.isOk()) {
+      return Ok(val)
+    } else {
+      return Err(this.content as Errors)
+    }
+  }
 
   okOrNull(): this | null {
     if (this.isOk()) {
@@ -21,17 +33,17 @@ export abstract class ResultBase<O, E> {
   }
 }
 
-export type Result<T, E> = ResultBase<T, E> | ResultBase<T, E>;
+export type Result<T> = ResultBase<T>;
 
-const Ok = <T>(data: T): Result<T, never> => {
+export const Ok = <T>(data: T): Result<T> => {
   return new ResultOk(data);
 };
 
-const Err = (error: Errors): Result<never, Errors> => {
+export const Err = (error: Errors): Result<never> => {
   return new ResultError<never>(error);
 };
 
-export class ResultError<T> extends ResultBase<T, Errors> {
+export class ResultError<T> extends ResultBase<T> {
   type = "Err";
   constructor(public content: Errors) {
     super();
@@ -52,7 +64,7 @@ export class ResultError<T> extends ResultBase<T, Errors> {
   }
 }
 
-export class ResultOk<T, E> extends ResultBase<T, E> {
+export class ResultOk<T> extends ResultBase<T> {
   type = "Ok";
   constructor(public content: T) {
     super();
@@ -70,7 +82,7 @@ export class ResultOk<T, E> extends ResultBase<T, E> {
 
 export async function catchAndReturn<T>(
   action: () => Promise<T>
-): Promise<Result<T, Errors>> {
+): Promise<Result<T>> {
   return await action()
     .then((it) => Ok(it))
     .catch((it) => {
@@ -94,7 +106,7 @@ interface ResultJson {
   type: "Ok" | "Err";
 }
 
-export function ResultFromJson(json: any): Result<any, Errors> {
+export function ResultFromJson(json: any): Result<any> {
   if (json.type == "Ok") {
     return Ok(json.content);
   } else if (json.type == "Err") {

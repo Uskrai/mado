@@ -3,7 +3,7 @@ import { nodePolyfills } from "esbuild-plugin-polyfill-node";
 import fastglob from "fast-glob";
 
 esbuild.build({
-  entryPoints: [...await fastglob("script/deps/*.ts"), ... await fastglob("script/module/*.ts")],
+  entryPoints: [...await fastglob("script/deps/*.ts"), ... await fastglob("script/module/*.ts"), ...await fastglob("script/test/*.ts")],
   format: "esm",
   platform: "browser",
   outdir: "dist",

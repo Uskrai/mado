@@ -14,6 +14,13 @@ pub enum Resource {
 
 impl deno_core::Resource for Resource {}
 
+pub fn spawn_local<F>(future: F)
+where
+    F: std::future::Future + 'static,
+{
+    tokio::task::spawn_local(future);
+}
+
 #[deno_core::op]
 async fn op_tokio_sleep(mili: u64) {
     tokio::time::sleep(std::time::Duration::from_millis(mili)).await;
@@ -31,6 +38,8 @@ pub fn extensions() -> Vec<deno_core::Extension> {
         deno_console::init(),
         crate::http::init(),
         crate::error::init(),
+        crate::module::init(),
+        crate::task::init(),
         deno_core::ExtensionBuilder::default()
             .ops(vec![op_tokio_sleep::decl()])
             .build(),
@@ -64,6 +73,18 @@ where
 pub enum ResultJson<T> {
     Ok(T),
     Err(self::error::ErrorJson),
+}
+
+#[macro_export]
+macro_rules! try_json {
+    ($expr:expr $(,)?) => {
+        match $expr {
+            $crate::ResultJson::Ok(val) => val,
+            $crate::ResultJson::Err(err) => {
+                return $crate::ResultJson::Err(std::convert::From::from(err));
+            }
+        }
+    };
 }
 
 impl<T> ResultJson<T> {

@@ -1,4 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, future::Future, path::PathBuf, rc::Rc};
+use std::{
+    any::type_name, cell::RefCell, collections::HashMap, future::Future, path::PathBuf, rc::Rc,
+};
 
 use deno_core::v8::{self, Local};
 use mado_deno::Runtime;
@@ -32,6 +34,9 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let local_set = LocalSet::new();
+    let _local_set_guard = local_set.enter();
+
+    let test_set = LocalSet::new();
     let last_set = LocalSet::new();
 
     let runtime = Runtime::new(options);
@@ -53,7 +58,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut module_to_path = HashMap::new();
 
-    for it in std::fs::read_dir("./script/test/").unwrap() {
+    for it in std::fs::read_dir("./dist/test/").unwrap() {
         let it = it.unwrap();
         let path = it.path();
 
@@ -71,7 +76,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    let runtime = runtime.into_runtime();
+    let mut runtime = runtime.into_runtime();
 
     let pattern = std::env::var("MADO_DENO_TEST").unwrap_or_else(|_| ".*".into());
     let pattern = regex::Regex::new(&pattern)
@@ -86,7 +91,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
             .get_module_namespace(*index)
             .unwrap();
 
-        runtime.with_scope(|scope| {
+        runtime.with_runtime_scope(|runtime, scope| {
             let namespace = namespace.open(scope);
             let names = namespace
                 .get_property_names(scope, Default::default())
@@ -149,16 +154,16 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
                     if is_last {
                         last_set.spawn_local(spawning());
                     } else {
-                        local_set.spawn_local(spawning());
+                        test_set.spawn_local(spawning());
                     }
                 }
             }
         });
     }
 
-    tokio.block_on(local_set);
-    tokio.block_on(last_set);
-    tokio.block_on(async {
+    local_set.block_on(&tokio, test_set);
+    local_set.block_on(&tokio, last_set);
+    local_set.block_on(&tokio, async {
         with_event_loop(runtime.clone(), coverage_collector.stop_collecting()).await
     })?;
 
@@ -178,7 +183,7 @@ impl std::error::Error for ErrorWrapper {
 impl std::fmt::Display for ErrorWrapper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for it in self.0.borrow().iter() {
-            writeln!(f, "{}", it)?;
+            writeln!(f, "{:?}", it)?;
         }
 
         Ok(())
@@ -216,7 +221,7 @@ impl std::fmt::Display for Name {
 }
 
 async fn test_function(
-    runtime: Runtime,
+    mut runtime: Runtime,
     name: Name,
     function: v8::Global<v8::Function>,
 ) -> Result<bool, anyhow::Error> {
@@ -248,29 +253,86 @@ async fn test_function(
         }
     };
 
-    macro_rules! match_first {
-        ($($name:pat => $ex:ty)*) => {
+    fn result<T>(it: Result<ResultTest<T>, anyhow::Error>) -> Result<bool, anyhow::Error> {
+        it.and_then(|it| match it {
+            ResultTest::Error(err) => Err(err),
+            _ => Ok(true),
+        })
+    }
+
+    fn test_state<T: deno_core::Resource + 'static>(
+        state: &mut deno_core::OpState,
+        rid: u32,
+    ) -> Result<bool, anyhow::Error> {
+        let it = state.resource_table.get_any(rid)?;
+
+        if it.downcast_rc::<T>().is_none() {
+            let ty = type_name::<T>();
+
+            Err(anyhow::anyhow!(
+                "Bad resource type {}, expected: {:?}",
+                rid,
+                ty
+            ))
+        } else {
+            Ok(true)
+        }
+    }
+
+    macro_rules! match_first1 {
+        ($variable:ident, $type:ty, $name:pat,  $expr:expr) => {
+            {
+                let $variable = check_type::<$type>(runtime.clone(), &name, value);
+                $expr
+            }
+        };
+        ($variable:ident, $type:ty, $name:pat) => {
+            {
+                let $variable = check_type::<$type>(runtime, &name, value);
+                result($variable)
+            }
+        };
+        ($variable:ident, $($name:pat = $type:ty $(=> $expr:expr)?)*) => {
             match (name.testname.as_str()) {
-                $($name => { check_type::<$ex>(runtime, &name, value) })*
+                $(
+                    $name => {
+                        match_first1!($variable, $type, $name $(, $expr)?)
+                    }
+                )*
             }
         };
     }
 
-    match_first! {
-        "getInfo" => mado_core::MangaAndChaptersInfo
-        "getChapterImage" => Vec<mado_core::ChapterImageInfo>
-        "downloadImage" => mado_deno::http::RequestBuilder
-        _ => serde_json::Value
+    match_first1! {
+        it,
+        "getInfo" = mado_core::MangaAndChaptersInfo
+        "getChapterImage" = Vec<mado_core::ChapterImageInfo>
+        "downloadImage" = u32 => {
+            match it {
+                Ok(ResultTest::Expected(Ok(it))) => {
+                    runtime.with_state(|state| test_state::<mado_deno::MadoCoreRequestBuilderResource>(state, it))
+                }
+                _ => result(it)
+            }
+        }
+        _ = serde_json::Value => {
+            println!("any {}", name);
+            result(it)
+        }
     }
+}
+
+pub enum ResultTest<T> {
+    Expected(Result<T, mado_deno::error::Error>),
+    Error(anyhow::Error),
+    Any,
 }
 
 fn check_type<T>(
     mut runtime: Runtime,
     name: &Name,
-    // filename: &str,
-    // part: Vec<&str>,
     value: v8::Global<v8::Value>,
-) -> Result<bool, anyhow::Error>
+) -> Result<ResultTest<T>, anyhow::Error>
 where
     T: DeserializeOwned,
 {
@@ -302,25 +364,41 @@ where
                 writeln!(string, "{}", err).unwrap();
             }
 
-            Err(anyhow::anyhow!(string))
+            anyhow::anyhow!(string)
         };
 
-        match (split_expected[0], value) {
-            ("Ok", Ok(Ok(_))) => {}
+        let it = match (split_expected[0], value) {
+            ("Ok", Ok(Ok(ok))) => ResultTest::Expected(Ok(ok)),
             ("Err", Ok(Err(error))) => {
-                if split_expected.get(1) != Some(&error.to_string_variant().as_str()) {
-                    return print_error(Some(error.into()));
+                let it = match split_expected.get(1) {
+                    Some(&"MadoError") => match (&error, split_expected.get(2)) {
+                        (mado_deno::error::Error::MadoError(error), Some(expected)) => {
+                            *expected == error.to_string_variant()
+                        }
+                        (mado_deno::error::Error::MadoError(_), None) => true,
+                        _ => false,
+                    },
+                    Some(expected) => *expected == error.to_string_variant(),
+                    None => false,
+                };
+
+                if it {
+                    ResultTest::Expected(Err(error))
+                } else {
+                    ResultTest::Error(print_error(Some(error.into())))
                 }
             }
-            ("Any", _) => {}
+            ("Any", _) => ResultTest::Any,
             (_, err) => {
-                return print_error(err.and_then(|it| it.map_err(Into::into)).err());
+                ResultTest::Error(print_error(err.and_then(|it| it.map_err(Into::into)).err()))
             }
+        };
+
+        if !matches!(it, ResultTest::Error(_)) {
+            println!("{} success", name);
         }
 
-        println!("{} success", name);
-
-        Ok(true)
+        Ok(it)
     })
 }
 

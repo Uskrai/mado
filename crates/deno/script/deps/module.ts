@@ -2,6 +2,16 @@ import { catchAndReturn } from "./error";
 import { HttpClient, HttpRequest } from "./http";
 import { ChapterTask, Manga, MangaAndChapters, RustChapterTask } from "./manga";
 
+export interface BaseModule {
+  uuid: string;
+  name: string;
+  domain: string;
+
+  get_info(id: string): Promise<MangaAndChapters>;
+  get_chapter_image(id: string, task: ChapterTask): Promise<void>;
+  download_image(info: object): Promise<HttpRequest>;
+}
+
 export abstract class Module {
   constructor(
     public uuid: string,
@@ -18,7 +28,7 @@ export abstract class Module {
   abstract get_chapter_image(
     id: string,
     task: ChapterTask
-  ): Promise<ChapterTask>;
+  ): Promise<void>;
 
   async getChapterImage(id: string, task: ChapterTask) {
     return await catchAndReturn(() => this.get_chapter_image(id, task));
@@ -59,7 +69,7 @@ export class ModuleWrapper extends Module {
     return await this.module.get_info(id);
   }
 
-  async get_chapter_image(id: string, task: ChapterTask): Promise<ChapterTask> {
+  async get_chapter_image(id: string, task: ChapterTask): Promise<void> {
     return await this.module.get_chapter_image(id, task);
   }
 

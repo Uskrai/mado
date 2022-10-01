@@ -39,8 +39,11 @@ pub enum Error {
         serde_v8::Error,
     ),
 
+    #[error("Bad resource ID ({1}): {0}")]
+    ResourceError(u32, String),
+
     #[error("{0}")]
-    ModuleLoadError(crate::runtime::ModuleLoadError),
+    ModuleLoadError(#[from] crate::runtime::ModuleLoadError),
 
     #[error("{0}")]
     MadoError(#[from] mado_core::Error),
@@ -76,6 +79,7 @@ impl Error {
             ExternalError(..),
             SerdeError(..),
             ModuleLoadError(..),
+            ResourceError(..),
             MadoError(..)
         }
         .to_string()
@@ -99,7 +103,7 @@ impl From<Error> for mado_core::Error {
             Error::UnexpectedError { url, message } => Self::RequestError { url, message },
             Error::RequestError { url, message } => Self::RequestError { url, message },
             Error::MadoError(err) => err,
-            Error::ExternalError(_) | Error::ModuleLoadError(_) | Error::SerdeError(_) => {
+            Error::ExternalError(..) | Error::ModuleLoadError(..) | Error::ResourceError(..) | Error::SerdeError(..) => {
                 Self::ExternalError(err.into())
             }
         }
@@ -157,6 +161,10 @@ impl ErrorJson {
                 .unwrap_or_else(|it| it),
             Self::Custom { message } => message,
         }
+    }
+
+    pub fn from_error(state: &mut OpState, error: Error) -> ErrorJson {
+        error_to_deno(state, error)
     }
 }
 

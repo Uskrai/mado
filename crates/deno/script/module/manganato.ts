@@ -144,7 +144,6 @@ class MangaNato extends HttpModule {
     }
 
     images.forEach((it) => task.push(it));
-    return task;
   }
 
   async download_image(image: ChapterImageInfo): Promise<HttpRequest> {

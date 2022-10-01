@@ -5,6 +5,7 @@ use std::{cell::RefCell, collections::HashMap};
 use deno_core::{op, Extension, ExtensionBuilder, OpState, Resource};
 use serde::{Deserialize, Serialize};
 
+use crate::error::ErrorJson;
 use crate::ResultJson;
 
 #[derive(Default)]
@@ -70,7 +71,12 @@ pub async fn op_http_client_get<'a>(
     rid: u32,
     request: RequestBuilder,
 ) -> ResultJson<ResponseJson> {
-    let client = state.borrow().resource_table.get::<Client>(rid).unwrap();
+    let client = match state.borrow().resource_table.get::<Client>(rid) {
+        Ok(it) => it,
+        Err(err) => {
+            return ResultJson::Err(ErrorJson::from_error(&mut state.borrow_mut(), err.into()));
+        }
+    };
 
     let response = request.to_request(&client.client).send().await;
 

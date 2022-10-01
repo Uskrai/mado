@@ -7,7 +7,6 @@ import {
   HttpClient,
   HttpModule,
   HttpRequest,
-  HttpResponse,
   Manga,
   MangaAndChapters,
 } from "../deps/index";
@@ -20,7 +19,7 @@ const REGEX_ID = new RegExp(
   `${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}`
 );
 
-class MangaDex extends HttpModule {
+export class MangaDex extends HttpModule {
   constructor(uuid: string, name: string, domain: string) {
     super(uuid, name, domain, new HttpClient());
   }
@@ -171,7 +170,7 @@ class MangaDex extends HttpModule {
     return info;
   }
 
-  async get_chapter_image(id: string, task: ChapterTask): Promise<ChapterTask> {
+  async get_chapter_image(id: string, task: ChapterTask): Promise<void> {
     let url = `${API_URL}/at-home/server/${id}`;
     let response = await this.client.get({ url });
     let json = await response.json();
@@ -191,7 +190,6 @@ class MangaDex extends HttpModule {
       });
     });
 
-    return task;
   }
 
   async download_image(image: any): Promise<HttpRequest> {
@@ -206,7 +204,7 @@ class MangaDex extends HttpModule {
   }
 }
 
-function initMadoModule() {
+export function initMadoModule() {
   return [
     new MangaDex(
       "07bd7f6b-12a1-48f1-9873-f175d4f76c9a",
@@ -215,5 +213,3 @@ function initMadoModule() {
     ),
   ];
 }
-
-export { initMadoModule, MangaDex };

@@ -1,6 +1,9 @@
-import { initMadoModule } from "../../dist/module/manganato.js";
+import { catchAndReturn } from "../deps/error.js";
+import { RustChapterTask } from "../deps/manga.js";
+import { RustModule } from "../deps/rust_module.js";
+import { initMadoModule } from "../module/manganato.js";
 
-const module = initMadoModule()[0];
+const module = new RustModule(initMadoModule()[0]);
 export async function getInfo__Ok__1() {
   let url = "https://readmanganato.com/manga-yu976355";
   return await module.getInfo(url);
@@ -11,7 +14,7 @@ export async function getInfo__Ok__2() {
   return await module.getInfo(url);
 }
 
-export async function getInfo__Err_RequestError__404() {
+export async function getInfo__Err_MadoError_RequestError__404() {
   let url = "https://readmanganato.com/manga-yu176355";
   return await module.getInfo(url);
 }
@@ -21,14 +24,15 @@ export async function getChapterImage__Ok__1() {
   let chapter = info.chapters[0];
 
   let id = chapter.id;
-  let task = [];
-  return await module.getChapterImage(id, task);
+  let task = RustChapterTask.fromRust();
+  await module.getChapterImage(id, task);
+  return task.toArray();
 }
 
-export async function getChapterImage__Err_RequestError__404() {
+export async function getChapterImage__Err_MadoError_RequestError__404() {
   let id = "https://readmanganato.com/manga-yu976355/chapter-1325";
-  let task = [];
-  return await module.getChapterImage(id, task);
+  let task = RustChapterTask.fromRust();
+  return await module.getChapterImage(id, task).then((it) => it.map(task));
 }
 
 export async function downloadImage__Ok__1() {

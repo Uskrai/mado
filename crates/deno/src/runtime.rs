@@ -6,6 +6,7 @@ use deno_core::{
     JsRuntime, RuntimeOptions,
 };
 use event_listener::{Event, EventListener};
+use futures::FutureExt;
 use mado_core::Uuid;
 use tokio::sync::mpsc;
 
@@ -117,46 +118,7 @@ impl ModuleLoader {
         &mut self,
         object: Global<v8::Object>,
     ) -> Result<(DenoMadoModule, ModuleLoop), ModuleLoadError> {
-        #[derive(serde::Deserialize)]
-        struct ClientSerde {
-            rid: u32,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct ObjectSerde {
-            name: String,
-            domain: url::Url,
-            uuid: Uuid,
-            client: ClientSerde,
-        }
-
-        let value = self.runtime.with_scope(|scope| {
-            let object = v8::Local::new(scope, object.clone());
-            crate::from_v8::<ObjectSerde>(scope, object.into()).map_err(ModuleLoadError::SerdeError)
-        })?;
-
-        let client = self.runtime.with_state(|state| {
-            state
-                // .borrow_mut()
-                .resource_table
-                .get::<crate::http::Client>(value.client.rid)
-                .map_err(ModuleLoadError::WrongTypeError)
-                .map(|it| it.client.clone())
-        })?;
-
-        let (cx, rx) = mpsc::channel(5);
-
-        let sender = crate::DenoMadoModule::new(
-            value.name,
-            value.uuid,
-            value.domain,
-            client.clone().into(),
-            cx,
-        );
-
-        let looper = crate::ModuleLoop::new(rx, self.runtime.clone(), object, client);
-
-        Ok((sender, looper))
+        self.runtime.load_object(object)
     }
 
     pub fn into_runtime(self) -> Runtime {
@@ -185,24 +147,40 @@ pub enum ModuleLoadError {
 impl Runtime {
     pub fn new(options: RuntimeOptions) -> Self {
         let event = Arc::new(event_listener::Event::new());
+        let js = JsRuntime::new(options);
 
-        Self {
-            js: Rc::new(RefCell::new(JsRuntime::new(options))),
+        let this = Self {
+            js: Rc::new(RefCell::new(js)),
             event,
-        }
+        };
+
+        this.js
+            .borrow_mut()
+            .op_state()
+            .borrow_mut()
+            .put(this.clone());
+
+        this
     }
 
-    pub fn with_scope<F, R>(&self, fun: F) -> R
+    pub fn with_scope<F, R>(&mut self, fun: F) -> R
     where
         F: FnOnce(&mut v8::HandleScope) -> R,
+    {
+        self.with_runtime_scope(|_, scope| fun(scope))
+    }
+
+    pub fn with_runtime_scope<F, R>(&mut self, fun: F) -> R
+    where
+        F: FnOnce(&Runtime, &mut v8::HandleScope) -> R,
     {
         let mut runtime = self.js.borrow_mut();
         let scope = &mut runtime.handle_scope();
 
-        fun(scope)
+        fun(self, scope)
     }
 
-    pub fn with_state<F, R>(&self, fun: F) -> R
+    pub fn with_state<F, R>(&mut self, fun: F) -> R
     where
         F: FnOnce(&mut deno_core::OpState) -> R,
     {
@@ -214,16 +192,79 @@ impl Runtime {
         fun(ops)
     }
 
-    pub fn with_scope_state<F, R>(&self, fun: F) -> R
+    pub fn with_scope_state<F, R>(&mut self, fun: F) -> R
     where
         F: FnOnce(&mut v8::HandleScope, &mut deno_core::OpState) -> R,
+    {
+        self.with_runtime_scope_state(|_, scope, state| fun(scope, state))
+    }
+
+    pub fn with_runtime_scope_state<F, R>(&mut self, fun: F) -> R
+    where
+        F: FnOnce(&Runtime, &mut v8::HandleScope, &mut deno_core::OpState) -> R,
     {
         let mut runtime = self.js.borrow_mut();
         let ops = runtime.op_state();
         let ops = &mut ops.borrow_mut();
         let scope = &mut runtime.handle_scope();
 
-        fun(scope, ops)
+        fun(self, scope, ops)
+    }
+
+    pub fn load_object(
+        &mut self,
+        object: Global<v8::Object>,
+    ) -> Result<(DenoMadoModule, ModuleLoop), ModuleLoadError> {
+        self.with_runtime_scope_state(|this, scope, state| {
+            this.load_object_with_scope_state(scope, state, object)
+        })
+    }
+
+    pub fn load_object_with_scope_state(
+        &self,
+        scope: &mut v8::HandleScope,
+        state: &mut deno_core::OpState,
+        object: Global<v8::Object>,
+    ) -> Result<(DenoMadoModule, ModuleLoop), ModuleLoadError> {
+        #[derive(serde::Deserialize)]
+        struct ClientSerde {
+            rid: u32,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct ObjectSerde {
+            name: String,
+            domain: url::Url,
+            uuid: Uuid,
+            client: ClientSerde,
+        }
+
+        let value = {
+            let object = v8::Local::new(scope, object.clone());
+            crate::from_v8::<ObjectSerde>(scope, object.into()).map_err(ModuleLoadError::SerdeError)
+        }?;
+
+        let client = {
+            state
+                .resource_table
+                .get::<crate::http::Client>(value.client.rid)
+                .map_err(ModuleLoadError::WrongTypeError)
+                .map(|it| it.client.clone())
+        }?;
+
+        let (cx, rx) = mpsc::channel(5);
+
+        let sender = crate::DenoMadoModule::new(
+            value.name,
+            value.uuid,
+            value.domain,
+            client.clone().into(),
+            cx,
+        );
+
+        let looper = crate::ModuleLoop::new(rx, self.clone(), object, client);
+
+        Ok((sender, looper))
     }
 
     pub async fn resolve_value(

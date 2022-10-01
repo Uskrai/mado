@@ -8,7 +8,7 @@ type ResponseDecl = {
 };
 
 export class HttpResponse {
-  constructor(public result: Result<ResponseDecl, Errors>) {}
+  constructor(public result: Result<ResponseDecl>) {}
 
   get data(): ResponseDecl {
     return this.result.throw();

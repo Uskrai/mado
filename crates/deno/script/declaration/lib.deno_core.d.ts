@@ -13,6 +13,9 @@ declare namespace Deno {
     /** Call an op in Rust, and asynchronously receive the result. */
     function opAsync(opName: string, a?: any, b?: any): Promise<any>;
 
+    /** Call an op in Rust, and asynchronously receive the result. */
+    function opAsync(opName: string, a?: any, b?: any, c?: any): Promise<any>;
+
     /** Mark following promise as "ref", ie. event loop won't exit
      * until all "ref" promises are resolved. All async ops are "ref" by default. */
     function refOp(promiseId: number): void;
