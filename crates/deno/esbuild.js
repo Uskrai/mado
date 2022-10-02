@@ -1,5 +1,4 @@
 import esbuild from "esbuild";
-import { nodePolyfills } from "esbuild-plugin-polyfill-node";
 import fastglob from "fast-glob";
 
 esbuild.build({
@@ -20,7 +19,7 @@ esbuild.build({
   tsconfig: "tsconfig.json",
   chunkNames: "chunk/[name]-[hash]",
   plugins: [
-    nodePolyfills(),
+    // nodePolyfills(),
   ]
 }).then(_ => {
     console.log("watching");
