@@ -224,39 +224,39 @@ impl ModuleMessageHandler {
         Ref: AsRef<[u32]>,
         F: for<'b> FnOnce(&mut HandleScope<'b>, &[u32], FunctionCaller) -> Option<Local<'b, Value>>,
     {
-        let it = {
-            let resource = self.with_state(|state| Ok(resource(state)))?;
+        let resource = self.with_state(|state| Ok(resource(state)))?;
 
-            let value = |scope: &mut HandleScope| -> Result<Global<Value>, DenoError> {
-                let v8_name = v8::String::new(scope, name).unwrap();
-                let it = self
-                    .object
-                    .open(scope)
-                    .get(scope, v8_name.into())
-                    .with_context(|| format!("no value named {}", name))?;
+        let value = |scope: &mut HandleScope| -> Result<Global<Value>, DenoError> {
+            let v8_name = v8::String::new(scope, name).unwrap();
+            let it = self
+                .object
+                .open(scope)
+                .get(scope, v8_name.into())
+                .with_context(|| format!("no value named {}", name))?;
 
-                let function = Local::<Function>::try_from(it)
-                    .with_context(|| format!("{} is not function", name))?;
-                let recv = Local::new(scope, self.object.clone());
-                let it = args(scope, resource.as_ref(), FunctionCaller { recv, function })
-                    .with_context(|| format!("{} return None", name))?;
+            let function = Local::<Function>::try_from(it)
+                .with_context(|| format!("{} is not function", name))?;
+            let recv = Local::new(scope, self.object.clone());
+            let it = args(scope, resource.as_ref(), FunctionCaller { recv, function })
+                .with_context(|| format!("{} return None", name))?;
 
-                Ok(Global::new(scope, it))
-            };
+            Ok(Global::new(scope, it))
+        };
 
-            let value = self.with_scope(value);
+        let value = self.with_scope(value);
+        let value = match value {
+            Ok(val) => self.runtime.resolve_value(val).await.map_err(Into::into),
+            Err(err) => Err(err),
+        };
 
-            self.with_state(|op_state| {
-                for it in resource.as_ref() {
-                    let _ = op_state.resource_table.close(*it);
-                }
-                Ok(())
-            })?;
+        self.with_state(|op_state| {
+            for it in resource.as_ref() {
+                let _ = op_state.resource_table.close(*it);
+            }
+            Ok(())
+        })?;
 
-            value
-        }?;
-
-        self.runtime.resolve_value(it).await.map_err(Into::into)
+        value
     }
 
     fn serialize_result<T>(&self, result: Global<Value>) -> Result<T, DenoError>
