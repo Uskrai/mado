@@ -46,6 +46,8 @@ jobs:
     - name: Generate code coverage
       run: |
         cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
+      env:
+        RUST_BACKTRACE: 1
 
     - uses: denoland/setup-deno@v1
       with:
