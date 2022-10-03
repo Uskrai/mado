@@ -6,6 +6,7 @@ pub mod task;
 
 pub use module::*;
 pub use runtime::*;
+pub use error::{Error, ErrorJson};
 
 pub enum Resource {
     Json(serde_json::Value),
