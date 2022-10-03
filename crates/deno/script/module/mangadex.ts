@@ -9,6 +9,7 @@ import {
   HttpRequest,
   Manga,
   MangaAndChapters,
+  Result,
 } from "../deps/index";
 
 const API_URL = "https://api.mangadex.org";
@@ -56,7 +57,7 @@ export class MangaDex extends HttpModule {
       url,
     });
 
-    let json = await response.json();
+    let json = await response.json_data();
     this.parse_response(url, json);
 
     let query = CommonClosure.query(json);
@@ -134,7 +135,7 @@ export class MangaDex extends HttpModule {
 
       let response = await this.client.get({ url });
 
-      let json = await response.json();
+      let json = await response.json_data();
 
       this.parse_response(url, json);
 
@@ -173,7 +174,7 @@ export class MangaDex extends HttpModule {
   async get_chapter_image(id: string, task: ChapterTask): Promise<void> {
     let url = `${API_URL}/at-home/server/${id}`;
     let response = await this.client.get({ url });
-    let json = await response.json();
+    let json = await response.json_data();
     this.parse_response(url, json);
 
     let query = CommonClosure.query(json);

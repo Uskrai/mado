@@ -5,8 +5,8 @@ use std::{cell::RefCell, collections::HashMap};
 use deno_core::{op, Extension, ExtensionBuilder, OpState, Resource};
 use serde::{Deserialize, Serialize};
 
-use crate::error::ErrorJson;
-use crate::ResultJson;
+use crate::error::Error;
+use crate::{try_json, ResultJson, ToResultJson};
 
 #[derive(Default)]
 pub struct Client {
@@ -46,23 +46,34 @@ impl Resource for ResponseResource {}
 #[derive(Deserialize, Serialize)]
 pub struct StatusCode(NonZeroU16);
 
+fn get_http(state: &mut OpState, rid: u32) -> ResultJson<Rc<Client>> {
+    state
+        .resource_table
+        .get(rid)
+        .map_err(|_| Error::resource_error(rid, "Http Client already closed"))
+        .to_result_json(state)
+}
+
 #[op]
 pub fn op_http_client_new(state: &mut OpState) -> u32 {
     state.resource_table.add(Client::default())
 }
 
 #[op]
-pub fn op_http_client_clone(state: &mut OpState, rid: u32) -> Result<u32, anyhow::Error> {
-    let rid = state
-        .resource_table
-        .add_rc(state.resource_table.get::<Client>(rid)?);
+pub fn op_http_client_clone(state: &mut OpState, rid: u32) -> ResultJson<u32> {
+    let http = try_json!(get_http(state, rid));
+    let rid = state.resource_table.add_rc(http);
 
-    Ok(rid)
+    ResultJson::Ok(rid)
 }
 
 #[op]
-pub fn op_http_client_close(state: &mut OpState, rid: u32) -> Result<(), anyhow::Error> {
-    state.resource_table.close(rid)
+pub fn op_http_client_close(state: &mut OpState, rid: u32) -> ResultJson<()> {
+    state
+        .resource_table
+        .close(rid)
+        .map_err(|_| Error::resource_error(rid, "Http already closed"))
+        .to_result_json(state)
 }
 
 #[op]
@@ -71,12 +82,7 @@ pub async fn op_http_client_get<'a>(
     rid: u32,
     request: RequestBuilder,
 ) -> ResultJson<ResponseJson> {
-    let client = match state.borrow().resource_table.get::<Client>(rid) {
-        Ok(it) => it,
-        Err(err) => {
-            return ResultJson::Err(ErrorJson::from_error(&mut state.borrow_mut(), err.into()));
-        }
-    };
+    let client = try_json!(get_http(&mut state.borrow_mut(), rid));
 
     let response = request.to_request(&client.client).send().await;
 
@@ -101,19 +107,28 @@ pub async fn op_http_client_get<'a>(
 }
 
 #[op]
-pub async fn op_http_response_text(
-    state: Rc<RefCell<OpState>>,
-    rid: u32,
-) -> Result<String, anyhow::Error> {
-    let response = state
-        .borrow_mut()
-        .resource_table
-        .take::<ResponseResource>(rid)?;
+pub async fn op_http_response_text(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<String> {
+    let response = {
+        let state = &mut state.borrow_mut();
 
-    let response =
-        std::rc::Rc::try_unwrap(response).map_err(|_| anyhow::anyhow!("Response already used"))?;
+        state
+            .resource_table
+            .take::<ResponseResource>(rid)
+            .map(|it| std::rc::Rc::try_unwrap(it).ok())
+            .transpose()
+            .and_then(|it| it.ok())
+            .ok_or_else(|| Error::resource_error(rid, "Response already closed"))
+            .to_result_json(state)
+    };
 
-    Ok(response.0.text().await?)
+    let response = try_json!(response);
+
+    response
+        .0
+        .text()
+        .await
+        .map_err(Error::from)
+        .to_result_json_borrow(state)
 }
 
 pub fn init() -> Extension {

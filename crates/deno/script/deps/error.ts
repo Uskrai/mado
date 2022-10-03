@@ -10,12 +10,16 @@ export abstract class ResultBase<O> {
   abstract throwDebug(): O;
 
   or(val: O): O {
-    return this.isOk() ? this.data : val;
+    return this.orElse(() => val);
   }
 
-  map<T>(val: T): ResultBase<T> {
+  orElse(val: () => O): O {
+    return this.isOk() ? this.data : val();
+  }
+
+  map<T>(val: (arg: O) => T): ResultBase<T> {
     if (this.isOk()) {
-      return Ok(val)
+      return Ok(val(this.data))
     } else {
       return Err(this.content as Errors)
     }

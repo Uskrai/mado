@@ -32,7 +32,7 @@ export async function getChapterImage__Ok__1() {
 export async function getChapterImage__Err_MadoError_RequestError__404() {
   let id = "https://readmanganato.com/manga-yu976355/chapter-1325";
   let task = RustChapterTask.fromRust();
-  return await module.getChapterImage(id, task).then((it) => it.map(task));
+  return await module.getChapterImage(id, task).then((it) => it.map(() => task));
 }
 
 export async function downloadImage__Ok__1() {

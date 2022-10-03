@@ -33,7 +33,7 @@ class MangaNato extends HttpModule {
       url: url,
     });
 
-    let text = await response.text();
+    let text = await response.text_data();
     // let response = self.client.get(url.clone()).send().await.unwrap().text().await;
 
     let doc = new XHTMLPath(text);
@@ -121,7 +121,7 @@ class MangaNato extends HttpModule {
   async get_chapter_image(id: string, task: ChapterTask) {
     let response = await this.client.get({ url: id });
 
-    let doc = new XHTMLPath(await response.text());
+    let doc = new XHTMLPath(await response.text_data());
 
     this.parse_404(id, doc);
 

@@ -1,4 +1,4 @@
-import { Errors, Result, ResultFromJson } from "./error";
+import { Result, ResultFromJson } from "./error";
 import { Resource } from "./resource";
 
 type ResponseDecl = {
@@ -26,13 +26,22 @@ export class HttpResponse {
     return this.data.url;
   }
 
-  async text(): Promise<string> {
-    return await Deno.core.opAsync("op_http_response_text", this.data.rid);
+  async text(): Promise<Result<string>> {
+    return ResultFromJson(
+      await Deno.core.opAsync("op_http_response_text", this.rid)
+    );
   }
 
-  async json(): Promise<any> {
-    let text = await this.text();
-    return JSON.parse(text);
+  async text_data(): Promise<string> {
+    return await this.text().then(it => it.data);
+  }
+
+  async json(): Promise<Result<any>> {
+    return await this.text().then((it) => it.map((text) => JSON.parse(text)));
+  }
+
+  async json_data(): Promise<any> {
+    return await this.json().then(it => it.data);
   }
 }
 
@@ -57,7 +66,7 @@ export class HttpClient extends Resource {
   }
 
   clone() {
-    return new HttpClient(this.increment_strong_count());
+    return new HttpClient(ResultFromJson(this.increment_strong_count()).data);
   }
 }
 
