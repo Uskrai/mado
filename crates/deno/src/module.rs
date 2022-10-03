@@ -290,6 +290,22 @@ impl ModuleMessageHandler {
             .and_then(|it| self.serialize_result(it))
     }
 
+    async fn call_async_void<F, Resource, A>(
+        &self,
+        name: &str,
+        resource: Resource,
+        args: F,
+    ) -> Result<(), DenoError>
+    where
+        F: for<'b> FnOnce(&mut HandleScope<'b>, &[u32], FunctionCaller) -> Option<Local<'b, Value>>,
+        Resource: FnOnce(&mut OpState) -> A,
+        A: AsRef<[u32]>,
+    {
+        let it: Result<Option<()>, _> = self.call_async_serialize(name, resource, args).await;
+
+        it.map(|_| ())
+    }
+
     pub async fn get_info(
         &self,
         url: Url,
@@ -316,7 +332,7 @@ impl ModuleMessageHandler {
         cx: oneshot::Sender<Result<(), Error>>,
     ) {
         let it = self
-            .call_async_serialize(
+            .call_async_void(
                 "getChapterImageRust",
                 |state| [DenoChapterTask::new_to_state(task, state)],
                 |scope, state, call| {
@@ -339,7 +355,7 @@ impl ModuleMessageHandler {
         task: u32,
         cx: oneshot::Sender<Result<(), Error>>,
     ) {
-        let it = self
+        let it: Result<Option<()>, _> = self
             .call_async_serialize(
                 "getChapterImageRust",
                 |_| [],
@@ -354,7 +370,7 @@ impl ModuleMessageHandler {
             )
             .await;
 
-        let _ = cx.send(it.map_err(Into::into));
+        let _ = cx.send(it.map(|_| ()).map_err(Into::into));
     }
 
     pub async fn download_image(
