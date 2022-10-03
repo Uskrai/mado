@@ -51,6 +51,9 @@ pub enum Error {
 impl deno_core::Resource for Error {}
 
 impl Error {
+    pub fn resource_error(rid: u32, message: impl ToString) -> Self {
+        Self::ResourceError(rid, message.to_string())
+    }
     pub fn to_string_variant(&self) -> String {
         macro_rules! match_var {
             ($id:ident (..)) => {
@@ -103,9 +106,10 @@ impl From<Error> for mado_core::Error {
             Error::UnexpectedError { url, message } => Self::RequestError { url, message },
             Error::RequestError { url, message } => Self::RequestError { url, message },
             Error::MadoError(err) => err,
-            Error::ExternalError(..) | Error::ModuleLoadError(..) | Error::ResourceError(..) | Error::SerdeError(..) => {
-                Self::ExternalError(err.into())
-            }
+            Error::ExternalError(..)
+            | Error::ModuleLoadError(..)
+            | Error::ResourceError(..)
+            | Error::SerdeError(..) => Self::ExternalError(err.into()),
         }
     }
 }
