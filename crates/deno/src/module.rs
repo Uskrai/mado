@@ -399,28 +399,29 @@ fn op_mado_module_new(
     scope: &mut v8::HandleScope,
     state: &mut OpState,
     value: serde_v8::Value,
-) -> Result<ResultJson<u32>, anyhow::Error> {
+) -> ResultJson<u32> {
     let runtime = state.borrow::<crate::Runtime>().clone();
+
     let object = value
         .v8_value
         .to_object(scope)
-        .ok_or_else(|| anyhow::anyhow!("argument should be object"))?;
+        .ok_or_else(|| anyhow::anyhow!("argument should be object"))
+        .map_err(DenoError::from)
+        .to_result_json(state);
+
+    let object = try_json!(object);
+
     let object = v8::Global::new(scope, object);
 
-    let (module, looper) = match runtime.load_object_with_scope_state(scope, state, object) {
-        Ok(it) => it,
-        Err(err) => {
-            return Ok(ResultJson::Err(error_to_deno(
-                state,
-                err.into(),
-            )))
-        }
-    };
+    let (module, looper) = try_json!(runtime
+        .load_object_with_scope_state(scope, state, object)
+        .map_err(DenoError::from)
+        .to_result_json(state));
 
     let module = state.resource_table.add(module);
     crate::spawn_local(looper.start());
 
-    Ok(ResultJson::Ok(module))
+    ResultJson::Ok(module)
 }
 
 fn get_module(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<Rc<DenoMadoModule>> {

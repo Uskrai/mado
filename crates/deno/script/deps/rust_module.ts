@@ -6,7 +6,11 @@ import { ChapterTask, MangaAndChapters, RustChapterTask } from "./manga";
 export class RustModule {
   rid: number;
   constructor(module: BaseModule) {
-    this.rid = ResultFromJson(Deno.core.opSync("op_mado_module_new", module)).data;
+    this.rid = RustModule.fromRust(module).data;
+  }
+
+  static fromRust(module: BaseModule): Result<number> {
+    return ResultFromJson(Deno.core.opSync("op_mado_module_new", module));
   }
 
   async getInfo(id: string): Promise<Result<MangaAndChapters>> {
