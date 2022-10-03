@@ -1,13 +1,11 @@
-import { Errors } from "./error";
+import { Result, ResultFromJson } from "./error";
 
 function fromPrefix(res: Resource, add: string) {
   return `${res.prefix}_${add}`;
 }
 
 export class Resource {
-  strong_rid: Array<number>;
   constructor(public rid: number, public prefix: string) {
-    this.strong_rid = [rid];
   }
 
   // get rid() {
@@ -20,21 +18,12 @@ export class Resource {
   //     return rid;
   // }
 
-  get last_rid() {
-    return this.strong_rid.at(-1);
-  }
-
   increment_strong_count() {
-    let rid = Deno.core.opSync(fromPrefix(this, "clone"), this.rid);
-    this.strong_rid.push(rid);
+    let rid = ResultFromJson(Deno.core.opSync(fromPrefix(this, "clone"), this.rid)).data;
     return rid;
   }
 
-  decrement_strong_count() {
-    Deno.core.opSync(fromPrefix(this, "close"), this.last_rid);
-
-    if (this.strong_rid.length == 0) {
-      this.rid = null;
-    }
+  decrement_strong_count(): Result<void>  {
+    return ResultFromJson(Deno.core.opSync(fromPrefix(this, "close"), this.rid));
   }
 }

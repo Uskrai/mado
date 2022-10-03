@@ -46,10 +46,11 @@ export class HttpResponse {
 }
 
 export class HttpClient extends Resource {
-  constructor(rid = null) {
+  constructor(rid: number = null) {
     if (rid == null) {
       rid = Deno.core.opSync("op_http_client_new");
     }
+
     super(rid, "op_http_client");
   }
 
@@ -61,12 +62,13 @@ export class HttpClient extends Resource {
     );
   }
 
-  close() {
-    this.decrement_strong_count();
+  close(): Result<void> {
+    return this.decrement_strong_count();
   }
 
   clone() {
-    return new HttpClient(ResultFromJson(this.increment_strong_count()).data);
+    let rid = this.increment_strong_count();
+    return new HttpClient(rid);
   }
 }
 
