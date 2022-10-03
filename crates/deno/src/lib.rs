@@ -96,6 +96,26 @@ impl<T> ResultJson<T> {
     }
 }
 
+pub trait ToResultJson<T>: Sized {
+    fn to_result_json(self, state: &mut deno_core::OpState) -> ResultJson<T>;
+
+    fn to_result_json_borrow(
+        self,
+        state: std::rc::Rc<std::cell::RefCell<deno_core::OpState>>,
+    ) -> ResultJson<T> {
+        self.to_result_json(&mut state.borrow_mut())
+    }
+}
+
+impl<T> ToResultJson<T> for Result<T, self::error::Error> {
+    fn to_result_json(self, state: &mut deno_core::OpState) -> ResultJson<T> {
+        match self {
+            Ok(it) => ResultJson::Ok(it),
+            Err(err) => ResultJson::Err(self::error::error_to_deno(state, err)),
+        }
+    }
+}
+
 impl<T> From<Result<T, self::error::ErrorJson>> for ResultJson<T> {
     fn from(v: Result<T, self::error::ErrorJson>) -> Self {
         match v {
