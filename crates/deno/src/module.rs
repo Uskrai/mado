@@ -15,7 +15,7 @@ use url::Url;
 use crate::{
     error::{error_to_deno, Error as DenoError},
     task::DenoChapterTask,
-    try_json, ResultJson,
+    try_json, ResultJson, ToResultJson,
 };
 
 #[derive(Debug)]
@@ -188,9 +188,7 @@ impl ModuleMessageHandler {
                 self.get_chapter_image_rid(id, task, cx).await
             }
             ModuleMessage::DownloadImage(info, cx) => self.download_image(info, cx).await,
-            ModuleMessage::Close(cx) => {
-                cx.send(Ok(())).unwrap();
-            }
+            ModuleMessage::Close(cx) => self.close(cx).await,
         };
     }
 
@@ -379,6 +377,21 @@ impl ModuleMessageHandler {
 
         let _ = cx.send(it.map(Into::into).map_err(Into::into));
     }
+
+    pub async fn close(&self, cx: oneshot::Sender<Result<(), Error>>) {
+        let it: Result<_, _> = self
+            .call_async_function(
+                "close",
+                |_| &[],
+                |scope, _, call| {
+                    let args = &[];
+                    call.call(scope, args)
+                },
+            )
+            .await;
+
+        let _ = cx.send(it.map(|_| ()).map_err(Into::into));
+    }
 }
 
 #[deno_core::op(v8)]
@@ -467,8 +480,7 @@ async fn op_mado_module_close(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJs
             .resource_table
             .take(rid)
             .map_err(|_| DenoError::ResourceError(rid, "Module Already Closed".to_string()))
-            .map_err(|err| error_to_deno(state, err))
-            .into())
+            .to_result_json(state))
     };
 
     let it = match Rc::try_unwrap(it) {
@@ -478,8 +490,8 @@ async fn op_mado_module_close(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJs
 
     it.close()
         .await
-        .map_err(|err| error_to_deno(&mut state.borrow_mut(), err.into()))
-        .into()
+        .map_err(DenoError::from)
+        .to_result_json_borrow(state)
 }
 
 pub struct MadoCoreRequestBuilderResource(mado_core::RequestBuilder);

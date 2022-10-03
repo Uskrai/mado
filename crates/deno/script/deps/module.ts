@@ -43,6 +43,12 @@ export abstract class Module {
   async downloadImage(info: object) {
     return await catchAndReturn(() => this.download_image(info));
   }
+
+  async close() {
+    return await catchAndReturn(() => this.close_all());
+  }
+
+  abstract close_all(): Promise<void>;
 }
 
 export abstract class HttpModule extends Module {
@@ -77,8 +83,8 @@ export class ModuleWrapper extends Module {
     return await this.module.download_image(info);
   }
 
-  close() {
-    this.client.close();
+  async close_all(): Promise<void> {
+    await this.close_all();
   }
 }
 

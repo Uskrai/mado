@@ -199,7 +199,7 @@ export class MangaDex extends HttpModule {
     };
   }
 
-  close() {
+  async close_all() {
     this.client.close();
   }
 }

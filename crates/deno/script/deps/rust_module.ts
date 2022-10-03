@@ -34,7 +34,7 @@ export class RustModule {
   }
 
   async close() {
-    let it = await Deno.core.opAsync("op_mado_module_close", this.rid);
+    let it = ResultFromJson(await Deno.core.opAsync("op_mado_module_close", this.rid));
     return it;
   }
 }

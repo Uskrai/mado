@@ -154,6 +154,10 @@ class MangaNato extends HttpModule {
       },
     };
   }
+
+  async close_all() {
+    this.client.close();
+  }
 }
 
 export function initMadoModule() {
