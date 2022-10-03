@@ -87,5 +87,3 @@ export class ModuleWrapper extends Module {
     await this.close_all();
   }
 }
-
-export function owo() {}

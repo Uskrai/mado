@@ -35,9 +35,9 @@ export class XHTMLPath {
     return xpath.parse(expression)?.select(this.option());
   }
 
-  evaluate(expression: string) {
-    return xpath.parse(expression)?.evaluate(this.option());
-  }
+  // evaluate(expression: string) {
+  //   return xpath.parse(expression)?.evaluate(this.option());
+  // }
 
   selectString(expression: string) {
     return xpath.parse(expression)?.evaluateString(this.option());
@@ -55,12 +55,12 @@ export class XHTMLPath {
     });
   }
 
-  selectTextHref(expression: string) {
-    return this.select(expression).map((it: Element) => {
-      return {
-        href: it.getAttribute("href"),
-        text: it.textContent,
-      };
-    });
-  }
+  // selectTextHref(expression: string) {
+  //   return this.select(expression).map((it: Element) => {
+  //     return {
+  //       href: it.getAttribute("href"),
+  //       text: it.textContent,
+  //     };
+  //   });
+  // }
 }

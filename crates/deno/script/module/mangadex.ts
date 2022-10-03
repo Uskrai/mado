@@ -33,10 +33,10 @@ export class MangaDex extends HttpModule {
     return json;
   }
 
-  async get_info(id: string): Promise<MangaAndChapters> {
-    id = REGEX_ID.exec(id)?.at(0);
+  async get_info(url: string): Promise<MangaAndChapters> {
+    let id = REGEX_ID.exec(url)?.at(0);
     if (id == null) {
-      throw Error.invalid_url(id);
+      throw Error.invalid_url(url);
     }
 
     let manga_future = this.get_manga_info(id);

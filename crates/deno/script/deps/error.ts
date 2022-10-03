@@ -85,9 +85,10 @@ export class ResultOk<T> extends ResultBase<T> {
 }
 
 export async function catchAndReturn<T>(
-  action: () => Promise<T>
+  action: () => Promise<T> | PromiseLike<T>
 ): Promise<Result<T>> {
-  return await action()
+  return Promise.resolve(action)
+    .then(it => Promise.resolve(it()))
     .then((it) => Ok(it))
     .catch((it) => {
       if (it instanceof Errors) {
@@ -137,8 +138,8 @@ export class Errors extends Error {
     return opSync("op_error_to_debug", this);
   }
 
-  close() {
-    return opSync("op_error_close", this);
+  close(): Result<any> {
+    return ResultFromJson(opSync("op_error_close", this));
   }
 
   static request_error(url: string, message: string) {
