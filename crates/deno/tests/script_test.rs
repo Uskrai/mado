@@ -1,5 +1,5 @@
 use std::{
-    any::type_name, cell::RefCell, collections::HashMap, future::Future, path::PathBuf, rc::Rc,
+    any::type_name, cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc,
 };
 
 use deno_core::v8::{self, Local};
@@ -308,7 +308,6 @@ async fn test_function(
             }
         }
         _ = serde_json::Value => {
-            println!("any {}", name);
             result(it)
         }
     }
@@ -334,7 +333,7 @@ where
 
         let expected = &name.expected;
 
-        let split_expected = expected.split('_').collect::<Vec<_>>();
+        let mut split_expected = expected.splitn(2, '_');
 
         let value = mado_deno::from_v8::<mado_deno::ResultJson<T>>(scope, real_value)
             .map(|it| it.to_result(state));
@@ -359,20 +358,10 @@ where
             anyhow::anyhow!(string)
         };
 
-        let it = match (split_expected[0], value) {
-            ("Ok", Ok(Ok(ok))) => ResultTest::Expected(Ok(ok)),
-            ("Err", Ok(Err(error))) => {
-                let it = match split_expected.get(1) {
-                    Some(&"MadoError") => match (&error, split_expected.get(2)) {
-                        (mado_deno::error::Error::MadoError(error), Some(expected)) => {
-                            *expected == error.to_string_variant()
-                        }
-                        (mado_deno::error::Error::MadoError(_), None) => true,
-                        _ => false,
-                    },
-                    Some(expected) => *expected == error.to_string_variant(),
-                    None => false,
-                };
+        let it = match (split_expected.next(), value) {
+            (Some("Ok"), Ok(Ok(ok))) => ResultTest::Expected(Ok(ok)),
+            (Some("Err"), Ok(Err(error))) => {
+                let it = expected_error(&error, split_expected.next());
 
                 if it {
                     ResultTest::Expected(Err(error))
@@ -380,7 +369,7 @@ where
                     ResultTest::Error(print_error(Some(error.into())))
                 }
             }
-            ("Any", _) => ResultTest::Any,
+            (Some("Any"), _) => ResultTest::Any,
             (_, err) => {
                 ResultTest::Error(print_error(err.and_then(|it| it.map_err(Into::into)).err()))
             }
@@ -394,18 +383,45 @@ where
     })
 }
 
-// pub trait Debugging {
-//     fn to_string(&self) -> String;
-// }
-//
-// impl<T> Debugging for T
-// where
-//     T: serde::Serialize,
-// {
-//     fn to_string(&self) -> String {
-//         serde_json::to_string_pretty(&self).unwrap()
-//     }
-// }
-//
-// impl<T> Debugging for T
-// where T
+pub fn expected_error(error: &mado_deno::error::Error, expected: Option<&str>) -> bool {
+    use mado_core::Error as MadoError;
+    use mado_deno::error::Error;
+
+    let mut expected = expected.map(|it| it.splitn(2, '_')).into_iter().flatten();
+
+    match expected.next() {
+        Some("MadoError") => {
+            let mut expected = expected
+                .next()
+                .map(|it| it.splitn(2, '_'))
+                .into_iter()
+                .flatten();
+
+            match (error, expected.next()) {
+                (Error::MadoError(error), Some(variant)) => {
+                    if error.to_string_variant() == variant {
+                        let mut expected = expected
+                            .next()
+                            .map(|it| it.splitn(2, '_'))
+                            .into_iter()
+                            .flatten();
+
+                        match (error, expected.next()) {
+                            (MadoError::ExternalError(error), Some(variant)) => {
+                                variant == "Error" && error.is::<Error>()
+                            }
+                            _ => true,
+                        }
+                    } else {
+                        false
+                    }
+                }
+                (Error::MadoError(_), None) => true,
+                // Not MadoError
+                _ => false,
+            }
+        }
+        Some(expected) => expected == error.to_string_variant(),
+        None => true,
+    }
+}
