@@ -1,5 +1,6 @@
 import { RustChapterTask } from "../deps/manga";
 import { RustModule } from "../deps/rust_module";
+import { assertOk } from "../deps/test";
 import { initMadoModule } from "../module/mangadex";
 
 const allmodule = initMadoModule();
@@ -23,14 +24,14 @@ export async function getInfo__Err_MadoError_RequestError__InvalidUrl() {
   return it;
 }
 
-async function getChapterImage__Ok__1() {
+export async function getChapterImage__Ok__1() {
   let url = "https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-5634af489ce5";
 
   let info = await module.getInfo(url).then((it) => it.data);
   let chapter = info.chapters[0];
   let id = chapter.id;
   let task = RustChapterTask.fromRust();
-  await module.getChapterImage(id, task);
+  assertOk(await module.getChapterImage(id, task));
   let arr = task.toArray();
   return arr;
 }

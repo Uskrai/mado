@@ -1,6 +1,6 @@
-import { catchAndReturn } from "./error";
+import { catchAndReturn, Result } from "./error";
 import { HttpClient, HttpRequest } from "./http";
-import { ChapterTask, Manga, MangaAndChapters, RustChapterTask } from "./manga";
+import { ChapterTask, MangaAndChapters, RustChapterTask } from "./manga";
 
 export interface BaseModule {
   uuid: string;

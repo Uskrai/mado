@@ -7,7 +7,7 @@ use mado_core::{ChapterImageInfo, ChapterTask};
 use crate::{error::error_to_deno, try_json, ResultJson};
 
 pub struct DenoChapterTask {
-    task: RefCell<ChapterTaskType>,
+    pub task: RefCell<ChapterTaskType>,
 }
 
 pub enum ChapterTaskType {
@@ -15,9 +15,11 @@ pub enum ChapterTaskType {
     Js(JsChapterTask),
 }
 
+#[derive(Default)]
 pub struct JsChapterTask {
     vec: Vec<ChapterImageInfo>,
 }
+
 impl ChapterTask for JsChapterTask {
     fn add(&mut self, image: ChapterImageInfo) {
         self.vec.push(image);
@@ -27,14 +29,21 @@ impl ChapterTask for JsChapterTask {
 impl Resource for DenoChapterTask {}
 
 impl DenoChapterTask {
+    pub fn new(task: ChapterTaskType) -> Self {
+        DenoChapterTask {
+            task: RefCell::new(task),
+        }
+    }
     pub fn new_to_state(task: Box<dyn ChapterTask>, state: &mut OpState) -> u32 {
         Self::new_type_to_state(ChapterTaskType::Trait(task), state)
     }
 
     pub fn new_type_to_state(task: ChapterTaskType, state: &mut OpState) -> u32 {
-        state.resource_table.add(DenoChapterTask {
-            task: RefCell::new(task),
-        })
+        state.resource_table.add(Self::new(task))
+    }
+
+    pub fn into_inner_type(self) -> ChapterTaskType {
+        self.task.into_inner()
     }
 
     pub fn into_inner(self) -> Box<dyn ChapterTask> {
@@ -45,7 +54,7 @@ impl DenoChapterTask {
     }
 }
 
-fn get_chapter_task(state: &mut OpState, rid: u32) -> ResultJson<Rc<DenoChapterTask>> {
+pub fn get_chapter_task(state: &mut OpState, rid: u32) -> ResultJson<Rc<DenoChapterTask>> {
     state
         .resource_table
         .get::<DenoChapterTask>(rid)
@@ -56,11 +65,11 @@ fn get_chapter_task(state: &mut OpState, rid: u32) -> ResultJson<Rc<DenoChapterT
 
 #[op]
 fn op_mado_chapter_task_add(
-    state: &mut OpState,
+    state: Rc<RefCell<OpState>>,
     rid: u32,
     image: ChapterImageInfo,
 ) -> ResultJson<()> {
-    let it = try_json!(get_chapter_task(state, rid));
+    let it = try_json!(get_chapter_task(&mut state.borrow_mut(), rid));
 
     let mut task = it.task.borrow_mut();
     match &mut *task {
@@ -80,16 +89,16 @@ fn op_mado_chapter_task_to_array(
 
     let mut task = it.task.borrow_mut();
     match &mut *task {
-        ChapterTaskType::Js(it) => {
-            ResultJson::Ok(it.vec.clone())
-        }
+        ChapterTaskType::Js(it) => ResultJson::Ok(it.vec.clone()),
         ChapterTaskType::Trait(_) => ResultJson::Ok(vec![]),
     }
 }
 
 #[op]
 fn op_mado_chapter_task_new(state: &mut OpState) -> u32 {
-    let it = JsChapterTask { vec: vec![] };
+    let it = JsChapterTask {
+        vec: Default::default(),
+    };
 
     DenoChapterTask::new_type_to_state(ChapterTaskType::Js(it), state)
 }
@@ -113,7 +122,7 @@ mod tests {
 
     #[test]
     pub fn test_task() {
-        let mut state = OpState::new(0);
+        let state = Rc::new(RefCell::new(OpState::new(0)));
 
         let mut task = MockChapterTask::new();
 
@@ -130,10 +139,10 @@ mod tests {
             })
             .return_once(|_| ());
 
-        let task = DenoChapterTask::new_to_state(Box::new(task), &mut state);
+        let task = DenoChapterTask::new_to_state(Box::new(task), &mut state.borrow_mut());
 
         assert!(matches!(
-            op_mado_chapter_task_add::call(&mut state, task, info),
+            op_mado_chapter_task_add::call(state, task, info),
             ResultJson::Ok(_)
         ));
     }

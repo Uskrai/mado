@@ -1,8 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use anyhow::Context;
 use deno_core::{
     futures::StreamExt,
+    parking_lot::Mutex,
     v8::{self, Function, Global, HandleScope, Local, Object, Value},
     Extension, ExtensionBuilder, OpState,
 };
@@ -14,7 +15,7 @@ use url::Url;
 
 use crate::{
     error::{error_to_deno, Error as DenoError},
-    task::DenoChapterTask,
+    task::{DenoChapterTask, JsChapterTask},
     try_json, ResultJson, ToResultJson,
 };
 
@@ -58,11 +59,6 @@ impl DenoMadoModule {
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         rx.await.context("cannot await request")?
-    }
-
-    async fn get_chapter_images_rid(&self, id: &str, rid: u32) -> Result<(), Error> {
-        self.send_message(|cx| ModuleMessage::GetChapterImagesRid(id.to_string(), rid, cx))
-            .await
     }
 
     async fn close(self) -> Result<(), Error> {
@@ -114,7 +110,6 @@ pub enum ModuleMessage {
         Box<dyn ChapterTask>,
         oneshot::Sender<Result<(), Error>>,
     ),
-    GetChapterImagesRid(String, u32, oneshot::Sender<Result<(), Error>>),
     DownloadImage(
         ChapterImageInfo,
         oneshot::Sender<Result<mado_core::RequestBuilder, Error>>,
@@ -183,10 +178,7 @@ impl ModuleMessageHandler {
             ModuleMessage::GetInfo(url, cx) => self.get_info(url, cx).await,
             ModuleMessage::GetChapterImages(id, task, cx) => {
                 self.get_chapter_image(id, task, cx).await
-            }
-            ModuleMessage::GetChapterImagesRid(id, task, cx) => {
-                self.get_chapter_image_rid(id, task, cx).await
-            }
+            },
             ModuleMessage::DownloadImage(info, cx) => self.download_image(info, cx).await,
             ModuleMessage::Close(cx) => self.close(cx).await,
         };
@@ -349,30 +341,6 @@ impl ModuleMessageHandler {
         let _ = cx.send(it.map_err(Into::into));
     }
 
-    pub async fn get_chapter_image_rid(
-        &self,
-        id: String,
-        task: u32,
-        cx: oneshot::Sender<Result<(), Error>>,
-    ) {
-        let it: Result<Option<()>, _> = self
-            .call_async_serialize(
-                "getChapterImageRust",
-                |_| [],
-                |scope, _, call| {
-                    let args = &[
-                        v8::String::new(scope, &id).unwrap().into(),
-                        v8::BigInt::new_from_u64(scope, task.into()).into(),
-                    ];
-
-                    call.call(scope, args)
-                },
-            )
-            .await;
-
-        let _ = cx.send(it.map(|_| ()).map_err(Into::into));
-    }
-
     pub async fn download_image(
         &self,
         info: ChapterImageInfo,
@@ -475,17 +443,62 @@ async fn op_mado_module_get_chapter_images(
 ) -> ResultJson<()> {
     let module: Rc<DenoMadoModule> = crate::try_json!(get_module(state.clone(), rid));
 
-    let it = || async {
-        module
-            .get_chapter_images_rid(&id, task_rid)
-            .await
-            .map_err(Into::into)
-    };
+    let task = try_json!(crate::task::get_chapter_task(
+        &mut state.borrow_mut(),
+        task_rid
+    ));
+    state.borrow_mut().resource_table.replace(
+        task_rid,
+        DenoChapterTask::new(crate::task::ChapterTaskType::Js(JsChapterTask::default())),
+    );
 
-    let it: Result<(), DenoError> = it().await;
-    let it = it.map_err(|err| error_to_deno(&mut state.borrow_mut(), err));
+    let task = try_json!(std::rc::Rc::try_unwrap(task)
+        .map_err(|_| DenoError::resource_error(task_rid, "Cannot unwrap ChapterTask"))
+        .to_result_json_borrow(state.clone()));
 
-    ResultJson::from(it)
+    #[derive(Clone)]
+    pub struct ArcChapterTask {
+        pub task: Arc<Mutex<JsChapterTask>>,
+    }
+
+    impl ChapterTask for ArcChapterTask {
+        fn add(&mut self, image: ChapterImageInfo) {
+            self.task.lock().add(image);
+        }
+    }
+
+    match task.into_inner_type() {
+        crate::task::ChapterTaskType::Trait(_) => {
+            unreachable!("this should not be used in production")
+        }
+        crate::task::ChapterTaskType::Js(task) => {
+            let task = ArcChapterTask {
+                task: Arc::new(Mutex::new(task)),
+            };
+
+            let task_ = task.clone();
+            let it = || async {
+                module
+                    .get_chapter_images(&id, Box::new(task_))
+                    .await
+                    .map_err(Into::into)
+            };
+
+            let it: Result<(), DenoError> = it().await;
+            try_json!(it.to_result_json_borrow(state.clone()));
+
+            let task = try_json!(Arc::try_unwrap(task.task)
+                .map_err(|_| DenoError::resource_error(task_rid, "Cannot unwrap ArcChapterTask"))
+                .to_result_json_borrow(state.clone()));
+
+            state.borrow_mut().resource_table.replace(
+                task_rid,
+                DenoChapterTask::new(crate::task::ChapterTaskType::Js(task.into_inner())),
+            );
+
+            Ok(()).into()
+        }
+    }
 }
 
 #[deno_core::op]

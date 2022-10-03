@@ -1,5 +1,6 @@
 import { RustChapterTask } from "../deps/manga.js";
 import { RustModule } from "../deps/rust_module.js";
+import { assertOk } from "../deps/test.js";
 import { initMadoModule } from "../module/manganato.js";
 
 const allmodule = initMadoModule();
@@ -25,7 +26,7 @@ export async function getChapterImage__Ok__1() {
 
   let id = chapter.id;
   let task = RustChapterTask.fromRust();
-  await module.getChapterImage(id, task);
+  assertOk(await module.getChapterImage(id, task));
   return task.toArray();
 }
 

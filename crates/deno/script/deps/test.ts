@@ -1,6 +1,6 @@
 import deepequal from "deep-equal";
 import inspect from "object-inspect";
-import { Errors } from "./error";
+import { Errors, Ok, Result } from "./error";
 
 function message(it: string) {
   return Errors.fromCatch(new Error(it));
@@ -12,6 +12,12 @@ export function assertTrue(truth: boolean) {
 
 export function assertEq<T>(actual: T, expected: T) {
   if (!deepequal(actual, expected)) {
-    throw message(`expected: ${inspect(expected)}, actual: ${inspect(actual)}`);
+    throw message(`expected: ${inspect(expected)}, found: ${inspect(actual)}`);
+  }
+}
+
+export function assertOk<T>(actual: Result<T>) {
+  if (actual.isError()) {
+    throw message(`expected: Ok, found: ${inspect(actual)}`);
   }
 }

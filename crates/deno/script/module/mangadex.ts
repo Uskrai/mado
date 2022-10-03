@@ -9,7 +9,6 @@ import {
   HttpRequest,
   Manga,
   MangaAndChapters,
-  Result,
 } from "../deps/index";
 
 const API_URL = "https://api.mangadex.org";
@@ -47,7 +46,7 @@ export class MangaDex extends HttpModule {
 
     return {
       manga,
-      chapters
+      chapters,
     };
   }
 

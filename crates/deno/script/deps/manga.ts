@@ -16,7 +16,7 @@ export class RustChapterTask {
   }
 
   push(image: object) {
-    return Deno.core.opSync("op_mado_chapter_task_add", this.rid, image);
+    return ResultFromJson(Deno.core.opSync("op_mado_chapter_task_add", this.rid, image));
   }
 
   toArray() {
