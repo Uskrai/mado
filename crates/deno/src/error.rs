@@ -3,6 +3,8 @@ use std::rc::Rc;
 use deno_core::{op, Extension, ExtensionBuilder, OpState};
 use thiserror::Error;
 
+use crate::{ResultJson, ToResultJson};
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("{input}: {source}")]
@@ -205,9 +207,15 @@ pub fn op_error_unexpected_error(state: &mut OpState, url: String, message: Stri
 }
 
 #[op]
-pub fn op_error_close(state: &mut OpState, error: ErrorJson) {
+pub fn op_error_close(state: &mut OpState, error: ErrorJson) -> ResultJson<()> {
     if let ErrorJson::Resource { rid, .. } = error {
-        state.resource_table.close(rid).unwrap();
+        state
+            .resource_table
+            .close(rid)
+            .map_err(|_| Error::resource_error(rid, "Error already closed"))
+            .to_result_json(state)
+    } else {
+        ResultJson::Ok(())
     }
 }
 
