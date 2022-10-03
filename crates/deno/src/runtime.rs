@@ -163,6 +163,15 @@ impl Runtime {
         this
     }
 
+    fn with_runtime<F, R>(&mut self, fun: F) -> R
+    where
+        F: FnOnce(&Self, &mut JsRuntime) -> R,
+    {
+        let runtime = &mut *self.js.borrow_mut();
+
+        fun(self, runtime)
+    }
+
     pub fn with_scope<F, R>(&mut self, fun: F) -> R
     where
         F: FnOnce(&mut v8::HandleScope) -> R,
@@ -174,22 +183,21 @@ impl Runtime {
     where
         F: FnOnce(&Runtime, &mut v8::HandleScope) -> R,
     {
-        let mut runtime = self.js.borrow_mut();
-        let scope = &mut runtime.handle_scope();
-
-        fun(self, scope)
+        self.with_runtime(|this, runtime| {
+            let scope = &mut runtime.handle_scope();
+            fun(this, scope)
+        })
     }
 
     pub fn with_state<F, R>(&mut self, fun: F) -> R
     where
         F: FnOnce(&mut deno_core::OpState) -> R,
     {
-        let mut runtime = self.js.borrow_mut();
-        let ops = runtime.op_state();
-        let ops = &mut ops.borrow_mut();
-        // let scope = &mut runtime.handle_scope();
-
-        fun(ops)
+        self.with_runtime(|_, runtime| {
+            let ops = runtime.op_state();
+            let ops = &mut ops.borrow_mut();
+            fun(ops)
+        })
     }
 
     pub fn with_scope_state<F, R>(&mut self, fun: F) -> R
@@ -203,12 +211,13 @@ impl Runtime {
     where
         F: FnOnce(&Runtime, &mut v8::HandleScope, &mut deno_core::OpState) -> R,
     {
-        let mut runtime = self.js.borrow_mut();
-        let ops = runtime.op_state();
-        let ops = &mut ops.borrow_mut();
-        let scope = &mut runtime.handle_scope();
+        self.with_runtime(|this, runtime| {
+            let ops = runtime.op_state();
+            let ops = &mut ops.borrow_mut();
+            let scope = &mut runtime.handle_scope();
 
-        fun(self, scope, ops)
+            fun(this, scope, ops)
+        })
     }
 
     pub fn load_object(
@@ -272,6 +281,22 @@ impl Runtime {
         value: v8::Global<v8::Value>,
     ) -> Result<Global<v8::Value>, anyhow::Error> {
         ValueResolver::new(self, value).await
+    }
+
+    pub async fn with_event_loop<T>(&mut self, fut: impl std::future::Future<Output = T>) -> T {
+        futures::pin_mut!(fut);
+
+        loop {
+            let it =
+                std::future::poll_fn(|cx| self.with_runtime(|_, js| js.poll_event_loop(cx, false)));
+
+            tokio::select! {
+                _ = it => {}
+                result = &mut fut => {
+                    return result;
+                }
+            };
+        }
     }
 
     // pub async fn resolve_value_catch(&self, value: v8::Global<v8::Value>) {

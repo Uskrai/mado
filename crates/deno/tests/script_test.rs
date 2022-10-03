@@ -7,19 +7,6 @@ use mado_deno::Runtime;
 use serde::de::DeserializeOwned;
 use tokio::task::LocalSet;
 
-pub async fn with_event_loop<T>(runtime: Runtime, collect: impl Future<Output = T>) -> T {
-    futures::pin_mut!(collect);
-    let mut runtime = runtime.js().borrow_mut();
-    loop {
-        tokio::select! {
-            _ = runtime.run_event_loop(false) => {}
-            result = &mut collect => {
-                return result;
-            }
-        };
-    }
-}
-
 #[test]
 pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     let tokio = tokio::runtime::Builder::new_current_thread()
@@ -50,9 +37,11 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     let mut coverage_collector =
         mado_deno_coverage::CoverageCollector::new(PathBuf::from("./coverage"), inspector);
 
-    tokio.block_on(async {
-        with_event_loop(runtime.clone(), coverage_collector.start_collecting()).await
-    })?;
+    tokio.block_on(
+        runtime
+            .clone()
+            .with_event_loop(coverage_collector.start_collecting()),
+    )?;
 
     let mut runtime = mado_deno::ModuleLoader::from_runtime(runtime);
 
@@ -163,9 +152,12 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
 
     local_set.block_on(&tokio, test_set);
     local_set.block_on(&tokio, last_set);
-    local_set.block_on(&tokio, async {
-        with_event_loop(runtime.clone(), coverage_collector.stop_collecting()).await
-    })?;
+    local_set.block_on(
+        &tokio,
+        runtime
+            .clone()
+            .with_event_loop(coverage_collector.stop_collecting()),
+    )?;
 
     if errors.borrow().is_empty() {
         return Ok(());
