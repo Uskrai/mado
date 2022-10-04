@@ -8,6 +8,7 @@ esbuild.build({
   outdir: "dist",
   bundle: true,
   treeShaking: true,
+  sourcemap: "both",
   // splitting: true,
   incremental: true,
   watch: {

@@ -9,6 +9,7 @@ export default {
     dir: "dist",
     format: "es",
     chunkFileNames: "chunk/[name].js",
+    sourcemap: 'both',
   },
   watch: {
     chokidar: {
