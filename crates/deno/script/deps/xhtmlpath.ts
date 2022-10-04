@@ -1,5 +1,5 @@
-const xpath = await import("xpath-ts");
-const xmldom = await import("../js/xmldom");
+import xpath from "xpath-ts";
+import xmldom from "../js/xmldom";
 
 // API wrapper for xpath and xmldom
 export class XHTMLPath {
