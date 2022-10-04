@@ -14,7 +14,7 @@ use tokio::sync::{mpsc, oneshot};
 use url::Url;
 
 use crate::{
-    error::{error_to_deno, Error as DenoError},
+    error::Error as DenoError,
     task::{DenoChapterTask, JsChapterTask},
     try_json, ResultJson, ToResultJson,
 };
@@ -178,7 +178,7 @@ impl ModuleMessageHandler {
             ModuleMessage::GetInfo(url, cx) => self.get_info(url, cx).await,
             ModuleMessage::GetChapterImages(id, task, cx) => {
                 self.get_chapter_image(id, task, cx).await
-            },
+            }
             ModuleMessage::DownloadImage(info, cx) => self.download_image(info, cx).await,
             ModuleMessage::Close(cx) => self.close(cx).await,
         };
@@ -409,15 +409,13 @@ fn op_mado_module_new(
 }
 
 fn get_module(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<Rc<DenoMadoModule>> {
-    match state
-        .borrow()
+    let state = &mut state.borrow_mut();
+
+    state
         .resource_table
         .get(rid)
-        .context("Module already closed")
-    {
-        Ok(it) => ResultJson::Ok(it),
-        Err(err) => ResultJson::Err(error_to_deno(&mut state.borrow_mut(), err.into())),
-    }
+        .map_err(|_| DenoError::resource_error(rid, "Module already closed"))
+        .to_result_json(state)
 }
 
 #[deno_core::op]
@@ -428,10 +426,11 @@ async fn op_mado_module_get_info(
 ) -> ResultJson<MangaAndChaptersInfo> {
     let module = crate::try_json!(get_module(state.clone(), rid));
 
-    match module.get_info(url).await.map_err(Into::into) {
-        Ok(it) => ResultJson::Ok(it),
-        Err(err) => ResultJson::Err(error_to_deno(&mut state.borrow_mut(), err)),
-    }
+    module
+        .get_info(url)
+        .await
+        .map_err(DenoError::from)
+        .to_result_json_borrow(state)
 }
 
 #[deno_core::op]
@@ -538,7 +537,8 @@ async fn op_mado_module_download_image(
     let it = try_json!(module
         .download_image(chapter)
         .await
-        .map_err(|err| error_to_deno(&mut state.borrow_mut(), err.into()))
+        .map_err(DenoError::from)
+        .to_result_json_borrow(state.clone())
         .into());
 
     let it = state

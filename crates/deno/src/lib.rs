@@ -112,7 +112,7 @@ impl<T> ToResultJson<T> for Result<T, self::error::Error> {
     fn to_result_json(self, state: &mut deno_core::OpState) -> ResultJson<T> {
         match self {
             Ok(it) => ResultJson::Ok(it),
-            Err(err) => ResultJson::Err(self::error::error_to_deno(state, err)),
+            Err(err) => ResultJson::Err(ErrorJson::from_error(state, err)),
         }
     }
 }

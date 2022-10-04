@@ -86,15 +86,9 @@ pub async fn op_http_client_get<'a>(
 
     let response = request.to_request(&client.client).send().await;
 
-    let response = match response {
-        Ok(response) => response,
-        Err(err) => {
-            return ResultJson::Err(crate::error::error_to_deno(
-                &mut state.borrow_mut(),
-                err.into(),
-            ));
-        }
-    };
+    let response = try_json!(response
+        .map_err(Error::from)
+        .to_result_json_borrow(state.clone()));
 
     ResultJson::Ok(ResponseJson {
         status: response.status().as_u16(),

@@ -170,20 +170,20 @@ impl ErrorJson {
     }
 
     pub fn from_error(state: &mut OpState, error: Error) -> ErrorJson {
-        error_to_deno(state, error)
+        ErrorJson::Resource {
+            types: error.to_string_variant(),
+            rid: state.resource_table.add(error),
+        }
     }
 }
 
 pub fn error_to_deno(state: &mut OpState, error: Error) -> ErrorJson {
-    ErrorJson::Resource {
-        types: error.to_string_variant(),
-        rid: state.resource_table.add(error),
-    }
+    ErrorJson::from_error(state, error)
 }
 
 #[op]
 pub fn op_error_invalid_url(state: &mut OpState, url: String) -> ErrorJson {
-    error_to_deno(state, Error::InvalidUrl { url })
+    ErrorJson::from_error(state, Error::InvalidUrl { url })
 }
 
 #[op]
@@ -198,12 +198,12 @@ pub fn op_error_to_debug(state: &mut OpState, error: ErrorJson) -> String {
 
 #[op]
 pub fn op_error_request_error(state: &mut OpState, url: String, message: String) -> ErrorJson {
-    error_to_deno(state, Error::RequestError { url, message })
+    ErrorJson::from_error(state, Error::RequestError { url, message })
 }
 
 #[op]
 pub fn op_error_unexpected_error(state: &mut OpState, url: String, message: String) -> ErrorJson {
-    error_to_deno(state, Error::UnexpectedError { url, message })
+    ErrorJson::from_error(state, Error::UnexpectedError { url, message })
 }
 
 #[op]

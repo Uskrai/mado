@@ -4,7 +4,7 @@ use anyhow::Context;
 use deno_core::{op, Extension, ExtensionBuilder, OpState, Resource};
 use mado_core::{ChapterImageInfo, ChapterTask};
 
-use crate::{error::error_to_deno, try_json, ResultJson};
+use crate::{try_json, Error, ResultJson, ToResultJson};
 
 pub struct DenoChapterTask {
     pub task: RefCell<ChapterTaskType>,
@@ -58,9 +58,8 @@ pub fn get_chapter_task(state: &mut OpState, rid: u32) -> ResultJson<Rc<DenoChap
     state
         .resource_table
         .get::<DenoChapterTask>(rid)
-        .context("Chapter Task is already closed")
-        .map_err(|err| error_to_deno(state, err.into()))
-        .into()
+        .map_err(|_| Error::resource_error(rid, "ChapterTask already closed"))
+        .to_result_json(state)
 }
 
 #[op]
