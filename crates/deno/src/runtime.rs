@@ -288,7 +288,7 @@ impl Runtime {
 
         loop {
             let it =
-                std::future::poll_fn(|cx| self.with_runtime(|_, js| js.poll_event_loop(cx, false)));
+                futures::future::poll_fn(|cx| self.with_runtime(|_, js| js.poll_event_loop(cx, false)));
 
             tokio::select! {
                 _ = it => {}
