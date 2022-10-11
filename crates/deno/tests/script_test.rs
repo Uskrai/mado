@@ -1,6 +1,4 @@
-use std::{
-    any::type_name, cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc,
-};
+use std::{any::type_name, cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 use deno_core::v8::{self, Local};
 use mado_deno::Runtime;
@@ -163,10 +161,10 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    Err(Box::new(ErrorWrapper(errors)))
+    Err(Box::new(ErrorWrapper(Rc::try_unwrap(errors).unwrap().into_inner())))
 }
 
-pub struct ErrorWrapper(Rc<RefCell<Vec<anyhow::Error>>>);
+pub struct ErrorWrapper(Vec<anyhow::Error>);
 
 impl std::error::Error for ErrorWrapper {
     //
@@ -174,7 +172,7 @@ impl std::error::Error for ErrorWrapper {
 
 impl std::fmt::Display for ErrorWrapper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for it in self.0.borrow().iter() {
+        for it in self.0.iter() {
             writeln!(f, "{:?}", it)?;
         }
 
@@ -184,7 +182,7 @@ impl std::fmt::Display for ErrorWrapper {
 
 impl std::fmt::Debug for ErrorWrapper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for it in self.0.borrow().iter() {
+        for it in self.0.iter() {
             writeln!(f, "{:?}", it)?;
         }
 
