@@ -54,7 +54,3 @@ export class CommonFunction {
     return JSONPath({ path, json, wrap: false });
   }
 }
-
-// export default {
-//     xpath: await import("xpath-ts"),
-// };

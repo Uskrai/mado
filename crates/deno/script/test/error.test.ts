@@ -53,3 +53,9 @@ export async function error__Ok__ToString() {
 
   return Ok({});
 }
+
+export async function error__Ok__CloseCustom() {
+  let error = Errors.message("Custom Error");
+
+  return error.close();
+}

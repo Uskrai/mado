@@ -19,9 +19,9 @@ export abstract class ResultBase<O> {
 
   map<T>(val: (arg: O) => T): ResultBase<T> {
     if (this.isOk()) {
-      return Ok(val(this.data))
+      return Ok(val(this.data));
     } else {
-      return Err(this.content as Errors)
+      return Err(this.content as Errors);
     }
   }
 
@@ -88,7 +88,7 @@ export async function catchAndReturn<T>(
   action: () => Promise<T> | PromiseLike<T>
 ): Promise<Result<T>> {
   return Promise.resolve(action)
-    .then(it => Promise.resolve(it()))
+    .then((it) => Promise.resolve(it()))
     .then((it) => Ok(it))
     .catch((it) => {
       if (it instanceof Errors) {
@@ -122,6 +122,10 @@ export function ResultFromJson(json: any): Result<any> {
 export class Errors extends Error {
   constructor(public type: string, public content: any) {
     super(opSync("op_error_to_string", { type, content }));
+  }
+
+  static message(it: string) {
+    return Errors.fromCatch(new Error(it));
   }
 
   static fromCatch(it: Error) {
