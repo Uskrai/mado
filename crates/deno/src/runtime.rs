@@ -1,4 +1,4 @@
-use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, num::NonZeroI32, path::Path, rc::Rc, sync::Arc};
 
 use anyhow::Context;
 use deno_core::{
@@ -35,9 +35,12 @@ impl ModuleLoader {
         self.max_module
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn load_file(&mut self, path: &Path) -> Result<i32, anyhow::Error> {
         let path = path.canonicalize().unwrap();
-        let url = url::Url::parse(&format!("file://{}", path.to_string_lossy()))?;
+        let path = format!("file://{}", path.to_string_lossy());
+        tracing::trace!("loading {}", path);
+        let url = url::Url::parse(&path)?;
 
         let module = self
             .runtime
@@ -46,7 +49,7 @@ impl ModuleLoader {
             .load_side_module(&url, None)
             .await?;
 
-        if module > self.max_module {
+        if module > self.max_module() {
             let _receiver = self.runtime.js.borrow_mut().mod_evaluate(module);
             self.runtime.js.borrow_mut().run_event_loop(false).await?;
             _receiver.await??;
@@ -147,7 +150,9 @@ pub enum ModuleLoadError {
 impl Runtime {
     pub fn new(options: RuntimeOptions) -> Self {
         let event = Arc::new(event_listener::Event::new());
-        let js = JsRuntime::new(options);
+        let mut js = JsRuntime::new(options);
+
+        js.handle_scope().set_promise_hook(promise_hook);
 
         let this = Self {
             js: Rc::new(RefCell::new(js)),
@@ -280,6 +285,29 @@ impl Runtime {
         &self,
         value: v8::Global<v8::Value>,
     ) -> Result<Global<v8::Value>, anyhow::Error> {
+        let value = self.clone().with_scope(|scope| {
+            let value = v8::Local::new(scope, value);
+
+            let value = match v8::Local::<v8::Promise>::try_from(value) {
+                Ok(promise) => {
+                    let function = build_function(scope, fn_catch_callback);
+
+                    let promise = promise.catch(scope, function).unwrap();
+                    v8::Local::<v8::Value>::try_from(promise).unwrap()
+                }
+                Err(_) => value,
+            };
+
+            PROMISE_SPAN.with(|slot| {
+                slot.borrow_mut().insert(
+                    value.get_hash(),
+                    TracingSpan::Span(tracing::Span::current()),
+                );
+            });
+
+            v8::Global::new(scope, value)
+        });
+
         ValueResolver::new(self, value).await
     }
 
@@ -287,8 +315,9 @@ impl Runtime {
         futures::pin_mut!(fut);
 
         loop {
-            let it =
-                futures::future::poll_fn(|cx| self.with_runtime(|_, js| js.poll_event_loop(cx, false)));
+            let it = futures::future::poll_fn(|cx| {
+                self.with_runtime(|_, js| js.poll_event_loop(cx, false))
+            });
 
             tokio::select! {
                 _ = it => {}
@@ -331,7 +360,7 @@ impl ValueResolver {
             event: runtime.event.clone(),
             prev_err: None,
             js: runtime.js.clone(),
-            timer: async_io::Timer::interval(std::time::Duration::from_millis(250))
+            timer: async_io::Timer::interval(std::time::Duration::from_millis(250)),
         }
     }
 }
@@ -417,11 +446,85 @@ impl std::future::Future for ValueResolver {
     }
 }
 
-// fn fn_catch_callback(
-//     scope: &mut v8::HandleScope,
-//     args: v8::FunctionCallbackArguments,
-//     mut rv: v8::ReturnValue,
-// ) {
-//     let errors = args.get(0);
-//     rv.set(errors);
-// }
+fn build_function<'s>(
+    scope: &mut v8::HandleScope<'s>,
+    callback: impl v8::MapFnTo<v8::FunctionCallback>,
+) -> Local<'s, deno_core::v8::Function> {
+    let function = v8::FunctionBuilder::new(callback);
+    v8::FunctionBuilder::<v8::Function>::build(function, scope).unwrap()
+}
+
+fn fn_catch_callback(
+    scope: &mut v8::HandleScope,
+    args: v8::FunctionCallbackArguments,
+    mut rv: v8::ReturnValue,
+) {
+    let errors = args.get(0);
+    println!("catching {:?}", errors.to_rust_string_lossy(scope));
+    rv.set(errors);
+}
+
+pub enum TracingSpan {
+    Span(tracing::Span),
+    EnteredGuard(tracing::span::EnteredSpan),
+}
+
+std::thread_local! {
+    static PROMISE_SPAN: RefCell<HashMap<NonZeroI32, TracingSpan>> = Default::default();
+}
+
+fn get_slot_span(
+    hash: NonZeroI32,
+    fun: impl FnOnce(&mut HashMap<NonZeroI32, TracingSpan>, tracing::Span),
+) {
+    PROMISE_SPAN.with(|slot| {
+        let slot = &mut slot.borrow_mut();
+        let span = match slot.entry(hash) {
+            std::collections::hash_map::Entry::Occupied(entry) => match entry.remove() {
+                TracingSpan::Span(span) => span,
+                TracingSpan::EnteredGuard(guard) => {
+                    let span = guard.exit();
+                    slot.insert(hash, TracingSpan::EnteredGuard(span.clone().entered()));
+                    span
+                }
+            },
+            std::collections::hash_map::Entry::Vacant(_) => return,
+        };
+
+        fun(slot, span);
+    })
+}
+
+extern "C" fn promise_hook(
+    types: v8::PromiseHookType,
+    current: v8::Local<v8::Promise>,
+    parent: v8::Local<v8::Value>,
+) {
+    println!(
+        "{:?} {} {}",
+        types,
+        current.is_null_or_undefined(),
+        parent.is_null_or_undefined()
+    );
+    match types {
+        v8::PromiseHookType::Init => {
+            if !parent.is_null_or_undefined() {
+                get_slot_span(parent.get_hash(), |slot, span| {
+                    slot.insert(current.get_hash(), TracingSpan::Span(span));
+                })
+            }
+        }
+        v8::PromiseHookType::Before => get_slot_span(current.get_hash(), |slot, span| {
+            slot.insert(
+                current.get_hash(),
+                TracingSpan::EnteredGuard(span.entered()),
+            );
+        }),
+        v8::PromiseHookType::Resolve => get_slot_span(current.get_hash(), |slot, span| {
+            slot.insert(current.get_hash(), TracingSpan::Span(span));
+        }),
+        v8::PromiseHookType::After => PROMISE_SPAN.with(|slot| {
+            slot.borrow_mut().remove(&current.get_hash());
+        }),
+    }
+}

@@ -38,6 +38,7 @@ url = "2.2"
 
 tokio = {version = "1.12", features = ["macros", "rt-multi-thread", "time", "sync"] }
 futures = { version = "0.3"  }
+tracing = "0.1"
 
 regex = "1.6"
 
@@ -47,6 +48,7 @@ features = ["mockall"]
 
 [dev-dependencies]
 mado-deno-coverage = { path = "../deno_coverage" }
+tracing-subscriber = "0.3"
 
 # [[test]]
 # name = "script"
