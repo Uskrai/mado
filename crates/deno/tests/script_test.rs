@@ -217,12 +217,19 @@ async fn test_function(
 ) -> Result<bool, anyhow::Error> {
     let promise = {
         runtime.with_scope(|scope| {
+            let scope = &mut v8::TryCatch::new(scope);
             let nul = v8::null(scope);
 
             let function = function.open(scope);
-            function
+            let val = function
                 .call(scope, nul.into(), &[])
-                .map(|it| v8::Global::new(scope, it))
+                .map(|it| v8::Global::new(scope, it));
+
+            if let Some(ex) = scope.exception() {
+                println!("{:?}", ex);
+            }
+
+            val
         })
     };
 

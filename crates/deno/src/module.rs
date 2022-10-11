@@ -228,11 +228,22 @@ impl ModuleMessageHandler {
 
             let function = Local::<Function>::try_from(it)
                 .with_context(|| format!("{} is not function", name))?;
-            let recv = Local::new(scope, self.object.clone());
-            let it = args(scope, resource.as_ref(), FunctionCaller { recv, function })
-                .with_context(|| format!("{} return None", name))?;
 
-            Ok(Global::new(scope, it))
+            let recv = Local::new(scope, self.object.clone());
+            let scope = &mut v8::TryCatch::new(scope);
+
+            let it = args(scope, resource.as_ref(), FunctionCaller { recv, function });
+
+            match (scope.exception(), it) {
+                (Some(ex), Some(it)) => {
+                    tracing::error!("exception: {:?}", ex);
+
+                    Ok(Global::new(scope, it))
+                }
+                (None, Some(it)) => Ok(Global::new(scope, it)),
+                (Some(it), None) => Ok(Global::new(scope, it)),
+                (None, None) => Err(anyhow::anyhow!("{} return None", name).into()),
+            }
         };
 
         let value = self.with_scope(value);
