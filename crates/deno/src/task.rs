@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use anyhow::Context;
 use deno_core::{op, Extension, ExtensionBuilder, OpState, Resource};
 use mado_core::{ChapterImageInfo, ChapterTask};
 
