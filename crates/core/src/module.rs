@@ -169,67 +169,32 @@ impl<Map: MadoModuleMap> MutMadoModuleMap for MutexMadoModuleMap<Map> {
 mod test {
     use std::sync::Arc;
 
-    use crate::{url::Url, Client, DefaultMadoModuleMap, MadoModuleMap};
-
-    #[derive(Clone, Debug)]
-    pub struct MockMadoModule {
-        uuid: crate::Uuid,
-        url: url::Url,
-    }
-
-    impl MockMadoModule {
-        pub fn new(uuid: super::Uuid, url: url::Url) -> Self {
-            Self { uuid, url }
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl super::MadoModule for MockMadoModule {
-        fn uuid(&self) -> uuid::Uuid {
-            self.uuid
-        }
-
-        fn domain(&self) -> &Url {
-            &self.url
-        }
-
-        fn client(&self) -> &Client {
-            todo!();
-        }
-
-        async fn get_info(&self, _: Url) -> Result<crate::MangaAndChaptersInfo, crate::Error> {
-            todo!()
-        }
-
-        async fn get_chapter_images(
-            &self,
-            _: &str,
-            _: Box<dyn crate::ChapterTask>,
-        ) -> Result<(), crate::Error> {
-            todo!()
-        }
-
-        fn name(&self) -> &str {
-            "test"
-        }
-
-        async fn download_image(
-            &self,
-            _: crate::ChapterImageInfo,
-        ) -> Result<crate::RequestBuilder, crate::Error> {
-            todo!()
-        }
-    }
+    use crate::{
+        url::Url, DefaultMadoModuleMap, MadoModuleMap, MockMadoModule, MutexMadoModuleMap,
+    };
 
     #[test]
     fn duplicate_insert() {
-        let mut map = DefaultMadoModuleMap::default();
-        let mock = Arc::new(MockMadoModule::new(
-            super::Uuid::from_u128(123),
-            url::Url::parse("https://google.com").unwrap(),
-        ));
+        let mut map = MutexMadoModuleMap::new(DefaultMadoModuleMap::default());
+
+        let mut module = MockMadoModule::new();
+
+        let domain = Url::parse("https://localhost").unwrap();
+        let uuid = super::Uuid::from_u128(123);
+
+        module.expect_uuid().return_const(uuid);
+        module.expect_domain().return_const(domain.clone());
+
+        let mock = Arc::new(module);
 
         map.push(mock.clone()).unwrap();
-        assert!(map.push(mock).is_err())
+        assert!(map.push(mock).is_err());
+
+        assert_eq!(
+            map.get_by_url(domain.clone()).unwrap().uuid(),
+            super::Uuid::from_u128(123)
+        );
+
+        assert_eq!(map.get_by_uuid(uuid).unwrap().domain().to_owned(), domain);
     }
 }
