@@ -72,12 +72,61 @@ impl<T> ObserverHandle<T> {
     }
 
     pub fn is_disconnected(&self) -> bool {
-        self.observers
-            .upgrade()
-            // is not disconnected if get return Some
-            .and_then(|it| it.lock().get(&self.id).map(|_| false))
-            // else is disconnected
+        self.observers.is_disconnected(self.id)
+    }
+}
+
+impl<T: Send + 'static> ObserverHandle<T> {
+    pub fn send_handle_any(self) -> AnyObserverHandleSend {
+        AnyObserverHandleSend {
+            map: Box::new(self.observers),
+            id: self.id,
+        }
+    }
+}
+
+pub trait ObserverMapTrait {
+    fn disconnect_any(&self, id: usize) -> bool;
+    fn is_disconnected(&self, id: usize) -> bool;
+}
+
+pub trait TypedObserverMapTrait: ObserverMapTrait {
+    type Out;
+    fn disconnect(&self, id: usize) -> Self::Out;
+}
+
+impl<T> ObserverMapTrait for Weak<ObserverMap<T>> {
+    fn disconnect_any(&self, id: usize) -> bool {
+        self.upgrade()
+            .and_then(|it| it.lock().remove(&id))
+            .is_some()
+    }
+
+    fn is_disconnected(&self, id: usize) -> bool {
+        self.upgrade()
+            .and_then(|it| it.lock().get(&id).map(|_| false))
             .unwrap_or(true)
+    }
+}
+
+impl<T> TypedObserverMapTrait for Weak<ObserverMap<T>> {
+    type Out = Option<T>;
+    fn disconnect(&self, id: usize) -> Self::Out {
+        self.upgrade().and_then(|it| it.lock().remove(&id))
+    }
+}
+
+pub struct AnyObserverHandleSend {
+    map: Box<dyn ObserverMapTrait + Send>,
+    id: usize,
+}
+
+impl AnyObserverHandleSend {
+    fn is_disconnected(&self) -> bool {
+        self.map.is_disconnected(self.id)
+    }
+    fn disconnect(self) -> bool {
+        self.map.disconnect_any(self.id)
     }
 }
 
@@ -113,5 +162,26 @@ mod tests {
             i += 1;
         });
         assert_eq!(i, 3);
+    }
+
+    #[test]
+    fn observer_any() {
+        let observer = Observers::new();
+
+        let handle = observer.connect(1);
+        let _ = handle.clone().send_handle_any().disconnect();
+        assert!(handle.is_disconnected());
+        assert!(handle.clone().send_handle_any().is_disconnected());
+        assert!(!handle.clone().send_handle_any().disconnect());
+        assert_eq!(handle.disconnect(), None);
+    }
+
+    #[test]
+    fn observer_debug() {
+        let observer = Observers::<()>::new();
+        assert_eq!(
+            format!("{:?}", observer),
+            "Observers { last_insert_id: 0, .. }"
+        );
     }
 }
