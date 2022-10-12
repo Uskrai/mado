@@ -97,6 +97,6 @@ impl RelmMadoEngineStateObserver {
                     self.sender.send(AppMsg::PushModule(module.clone())).ok()
                 }
             };
-        })
+        });
     }
 }

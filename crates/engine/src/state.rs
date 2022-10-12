@@ -60,7 +60,7 @@ impl MadoEngineState {
     /// Connect observer to state.
     ///
     /// This will also call on_* of previously pushed item.
-    pub fn connect(&self, mut observer: ImplObserver!()) {
+    pub fn connect(&self, mut observer: ImplObserver!()) -> crate::ObserverHandle<BoxObserver> {
         for it in self.tasks.write().iter() {
             observer(MadoEngineStateMsg::Download(it));
         }
@@ -69,7 +69,7 @@ impl MadoEngineState {
             observer(MadoEngineStateMsg::PushModule(it));
         }
 
-        self.connect_only(observer);
+        self.connect_only(observer)
     }
 
     /// Connect without calling on_* method.
