@@ -89,9 +89,8 @@ impl Channel {
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
             }
-            DbMsg::DownloadChapterImagesChanged(pk, info) => {
-                // TODO
-                // self.db.update_download_chapter_images(pk, info)?;
+            DbMsg::DownloadChapterImagesChanged(pk, images) => {
+                self.db.update_download_chapter_images(pk, images)?;
             }
             DbMsg::Close => {
                 self.sender().close_channel();

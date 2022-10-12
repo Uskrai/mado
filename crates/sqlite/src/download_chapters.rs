@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use mado_engine::{path::Utf8PathBuf, DownloadChapterInfo};
+use mado_engine::{path::Utf8PathBuf, DownloadChapterImageInfo, DownloadChapterInfo};
 use rusqlite::{params, Connection, Error};
 
 use crate::{downloads::DownloadPK, status::DownloadStatus};
@@ -104,6 +104,28 @@ pub fn update_status(
     conn.execute(
         "UPDATE download_chapters SET status = ? WHERE id = ?",
         params![status, pk.id],
+    )
+}
+
+pub fn update_images(
+    conn: &mut Connection,
+    pk: DownloadChapterPK,
+    images: Vec<Arc<DownloadChapterImageInfo>>,
+) -> Result<(), Error> {
+    let conn = conn.transaction()?;
+    delete_images(&conn, pk)?;
+
+    for it in images {
+        crate::download_chapter_images::insert_info(&conn, pk, &it)?;
+    }
+
+    conn.commit()
+}
+
+pub fn delete_images(conn: &Connection, pk: DownloadChapterPK) -> Result<usize, Error> {
+    conn.execute(
+        "DELETE download_chapter_images WHERE download_chapter_id = ?",
+        params![pk.id],
     )
 }
 
