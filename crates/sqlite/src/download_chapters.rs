@@ -8,6 +8,7 @@ use crate::{downloads::DownloadPK, status::DownloadStatus};
 #[derive(Debug)]
 pub struct DownloadChapter {
     pub pk: DownloadChapterPK,
+    pub dl_pk: DownloadPK,
     pub title: String,
     pub chapter_id: String,
     pub path: Utf8PathBuf,
@@ -17,12 +18,11 @@ pub struct DownloadChapter {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct DownloadChapterPK {
     pub id: i64,
-    pub dl_pk: DownloadPK,
 }
 
 impl DownloadChapterPK {
-    pub fn new(dl_pk: DownloadPK, id: i64) -> Self {
-        Self { id, dl_pk }
+    pub fn new(id: i64) -> Self {
+        Self { id }
     }
 }
 
@@ -64,7 +64,7 @@ pub fn insert_info(
     insert(conn, model)?;
     let id = conn.last_insert_rowid();
 
-    Ok(DownloadChapterPK { id, dl_pk })
+    Ok(DownloadChapterPK { id })
 }
 
 pub fn load(conn: &Connection) -> Result<HashMap<DownloadPK, Vec<DownloadChapter>>, Error> {
@@ -78,10 +78,11 @@ pub fn load(conn: &Connection) -> Result<HashMap<DownloadPK, Vec<DownloadChapter
     while let Some(row) = rows.next()? {
         let dl_pk = DownloadPK::new(row.get("download_id")?);
 
-        let pk = DownloadChapterPK::new(dl_pk, row.get("id")?);
+        let pk = DownloadChapterPK::new(row.get("id")?);
 
         let chapter = DownloadChapter {
             pk,
+            dl_pk,
             title: row.get("title")?,
             chapter_id: row.get("chapter_id")?,
             path: row.get::<_, String>("path")?.into(),
@@ -101,8 +102,8 @@ pub fn update_status(
     status: DownloadStatus,
 ) -> Result<usize, Error> {
     conn.execute(
-        "UPDATE download_chapters SET status = ? WHERE id = ? AND download_id = ?",
-        params![status, pk.id, pk.dl_pk.id],
+        "UPDATE download_chapters SET status = ? WHERE id = ?",
+        params![status, pk.id],
     )
 }
 
@@ -147,7 +148,8 @@ mod tests {
         assert_eq!(vec.len(), 1);
 
         let it = &vec[0];
-        assert_eq!(it.pk, DownloadChapterPK::new(pk, 1));
+        assert_eq!(it.pk, DownloadChapterPK::new(1));
+        assert_eq!(it.dl_pk, DownloadPK::new(1));
         assert_eq!(it.title, "title");
         assert_eq!(it.chapter_id, "chapter-id");
         assert_eq!(it.path, "path");

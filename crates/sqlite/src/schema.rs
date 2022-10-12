@@ -69,6 +69,25 @@ fn v1_download_chapter() -> &'static str {
     "#
 }
 
+fn v1_download_chapter_images() -> &'static str {
+    r#"
+    CREATE TABLE download_chapter_images (
+        id INTEGER PRIMARY KEY,
+        download_chapter_id INTEGER NOT NULL,
+        image_url INTEGER NOT NULL,
+        extension TEXT NOT NULL,
+        name TEXT,
+        path TEXT NOT NULL,
+        status TEXT NOT NULL,
+
+        FOREIGN KEY (download_chapter_id)
+            REFERENCES download_chapters(id)
+            ON DELETE CASCADE
+            ON UPDATE CASCADE
+    );
+    "#
+}
+
 fn insert_migration_version(conn: &Connection, version: i64) -> Result<usize, Error> {
     conn.execute("INSERT INTO __migration (version) VALUES (?)", [version])
 }
@@ -77,6 +96,7 @@ fn v1_schema(conn: &Connection) -> Result<(), Error> {
     conn.execute(v1_module(), []).unwrap();
     conn.execute(v1_download(), []).unwrap();
     conn.execute(v1_download_chapter(), []).unwrap();
+    conn.execute(v1_download_chapter_images(), []).unwrap();
 
     insert_migration_version(conn, 1)?;
 
