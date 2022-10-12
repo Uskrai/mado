@@ -4,7 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 use mado_engine::{
     core::{ArcMadoModule, ArcMadoModuleMap, Uuid},
     DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
-    MadoEngineState, MadoEngineStateMsg,
+    MadoEngineState, MadoEngineStateMsg, DownloadChapterImageInfo,
 };
 
 use crate::{
@@ -22,6 +22,7 @@ pub enum DbMsg {
     PushModule(ArcMadoModule),
     DownloadStatusChanged(DownloadPK, DownloadStatus),
     DownloadChapterStatusChanged(DownloadChapterPK, DownloadStatus),
+    DownloadChapterImagesChanged(DownloadChapterPK, Vec<Arc<DownloadChapterImageInfo>>),
     Close,
 }
 
@@ -87,6 +88,10 @@ impl Channel {
             }
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
+            }
+            DbMsg::DownloadChapterImagesChanged(pk, info) => {
+                // TODO
+                // self.db.update_download_chapter_images(pk, info)?;
             }
             DbMsg::Close => {
                 self.sender().close_channel();
@@ -183,6 +188,9 @@ impl Channel {
             match msg {
                 DownloadChapterInfoMsg::StatusChanged(status) => {
                     tx.unbounded_send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
+                }
+                DownloadChapterInfoMsg::DownloadImagesChanged(images) => {
+                    tx.unbounded_send(DbMsg::DownloadChapterImagesChanged(pk, images.clone()))
                 }
             }
             .ok();

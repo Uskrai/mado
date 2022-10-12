@@ -61,9 +61,12 @@ impl TaskDownloader {
 
         let mut get_images = self.get_chapter_images(it.clone()).await;
 
+        let mut images = vec![];
         while let Some(image) = get_images.next().await {
             let image = image?;
-            self.download_image(image).await?;
+            self.download_image(image.clone()).await?;
+            images.push(image);
+            it.set_images(images.clone());
         }
 
         it.set_status(DownloadStatus::Finished);
@@ -95,7 +98,7 @@ impl TaskDownloader {
             let filename = format!("{:0>4}.{}", i, image.extension);
             let path = it.path().join(filename);
 
-            let image = DownloadChapterImageInfo::new(image, path);
+            let image = DownloadChapterImageInfo::new(image, path, it.status().clone());
             Ok(Arc::new(image))
         });
 
@@ -113,6 +116,9 @@ impl TaskDownloader {
         image: Arc<DownloadChapterImageInfo>,
     ) -> Result<(), mado_core::Error> {
         let module = self.info.wait_module().await;
+        self.info
+            .set_status(DownloadStatus::resumed(DownloadResumedStatus::Downloading));
+
         let path = image.path();
         let image = image.image();
         let exists = path.exists();
@@ -137,6 +143,7 @@ impl TaskDownloader {
 
             let mut file = std::fs::File::create(path).unwrap();
             file.write_all(&buffer)?;
+            self.info.set_status(DownloadStatus::finished());
             tracing::trace!("Finished writing to {}", path);
         } else {
             tracing::trace!("File {} already exists, skipping...", path);
