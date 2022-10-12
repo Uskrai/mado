@@ -163,7 +163,7 @@ impl TaskDownloader {
             let buffer = task.download().await?;
 
             tracing::trace!("Finished downloading {} {:?}", path, image);
-            let mut file = std::fs::File::create(&path).unwrap();
+            let mut file = std::fs::File::create(path).unwrap();
             file.write_all(&buffer)?;
             tracing::trace!("Finished writing to {}", path);
         } else {
@@ -191,10 +191,7 @@ impl DownloadInfoWatcher {
             }
         });
 
-        Self {
-            info: info.clone(),
-            event: event.clone(),
-        }
+        Self { info, event }
     }
 
     pub async fn wait_status(&self, fun: impl Fn(&DownloadStatus) -> bool) {

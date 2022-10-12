@@ -57,7 +57,7 @@ where
             return Poll::Ready(Ok(result));
         }
 
-        if let Poll::Ready(_) = me.timer.poll(cx) {
+        if me.timer.poll(cx).is_ready() {
             return Poll::Ready(Err(Elapsed));
         }
 

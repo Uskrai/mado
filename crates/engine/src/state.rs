@@ -62,11 +62,11 @@ impl MadoEngineState {
     /// This will also call on_* of previously pushed item.
     pub fn connect(&self, mut observer: ImplObserver!()) {
         for it in self.tasks.write().iter() {
-            observer(MadoEngineStateMsg::Download(&it));
+            observer(MadoEngineStateMsg::Download(it));
         }
 
         for it in self.modules.lock().unwrap().vec() {
-            observer(MadoEngineStateMsg::PushModule(&it));
+            observer(MadoEngineStateMsg::PushModule(it));
         }
 
         self.connect_only(observer);

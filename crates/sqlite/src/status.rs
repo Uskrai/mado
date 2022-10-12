@@ -48,7 +48,7 @@ impl From<&str> for DownloadStatus {
             Self::Resumed
         } else {
             let fun = || {
-                let (first, last) = string.split_once("(")?;
+                let (first, last) = string.split_once('(')?;
                 let last = last.strip_suffix(')')?;
 
                 if first == "Error" {

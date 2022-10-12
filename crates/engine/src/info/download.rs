@@ -98,7 +98,7 @@ impl DownloadInfo {
     }
 
     pub fn module_uuid(&self) -> &Uuid {
-        &self.module.uuid()
+        self.module.uuid()
     }
 
     pub fn manga_title(&self) -> &str {
@@ -106,7 +106,7 @@ impl DownloadInfo {
     }
 
     pub fn module_domain(&self) -> Option<&str> {
-        self.url.as_ref().map(|url| url.domain()).flatten()
+        self.url.as_ref().and_then(|url| url.domain())
     }
 
     pub fn url(&self) -> Option<&Url> {

@@ -48,12 +48,12 @@ impl<T> Observers<T> {
     }
 
     pub fn emit(&self, mut f: impl FnMut(&mut T)) {
-        for (_, mut it) in self.observers.lock().iter_mut() {
-            f(&mut it);
+        for (_, it) in self.observers.lock().iter_mut() {
+            f(it);
         }
     }
 
-    pub fn lock<'a>(&'a self) -> impl Deref + 'a {
+    pub fn lock(&'_ self) -> impl Deref + '_ {
         self.observers.lock()
     }
 }
@@ -68,8 +68,7 @@ impl<T> ObserverHandle<T> {
     pub fn disconnect(self) -> Option<T> {
         self.observers
             .upgrade()
-            .map(|it| it.lock().remove(&self.id))
-            .flatten()
+            .and_then(|it| it.lock().remove(&self.id))
     }
 
     pub fn is_disconnected(&self) -> bool {
@@ -92,7 +91,7 @@ mod tests {
 
         let handle = observer.connect(1);
 
-        assert_eq!(handle.is_disconnected(), false);
+        assert!(!handle.is_disconnected());
 
         assert_eq!(handle.disconnect(), Some(1));
 
@@ -102,7 +101,7 @@ mod tests {
         assert_eq!(h2.clone().disconnect(), Some(2));
         assert_eq!(h_2.disconnect(), Some(2));
 
-        assert_eq!(h2.is_disconnected(), true);
+        assert!(h2.is_disconnected());
         assert_eq!(h2.disconnect(), None);
 
         observer.connect(1);
