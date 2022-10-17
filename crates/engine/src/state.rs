@@ -61,7 +61,7 @@ impl MadoEngineState {
     ///
     /// This will also call on_* of previously pushed item.
     pub fn connect(&self, mut observer: ImplObserver!()) -> crate::ObserverHandle<BoxObserver> {
-        for it in self.tasks.write().iter() {
+        for it in self.tasks().iter() {
             observer(MadoEngineStateMsg::Download(it));
         }
 
