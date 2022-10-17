@@ -34,7 +34,7 @@ impl LateBindingModule {
                         break module;
                     }
 
-                    crate::timer::sleep_secs(1).await;
+                    crate::timer::sleep(std::time::Duration::from_secs(1)).await;
                 };
 
                 *self = Self::Module(module.clone());

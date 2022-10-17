@@ -23,10 +23,6 @@ pub async fn sleep(duration: Duration) {
     Timer::after(duration).await;
 }
 
-pub async fn sleep_secs(secs: u64) {
-    sleep(Duration::from_secs(secs)).await
-}
-
 #[pin_project::pin_project]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Timeout<F>
