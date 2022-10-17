@@ -10,8 +10,8 @@ pub fn load_module() {
         ),
         MadoModule::to_module(
             "41b52ac9-bdc7-4a26-84ea-801ccbf111a2", 
-            "readmanganato", 
-            "https://readmanganato.com"
+            "chapmanganato", 
+            "https://chapmanganato.com"
         ),
     ]
 }
@@ -234,7 +234,7 @@ mod test {
     #[test]
     pub async fn get_info() {
         let module = create_module();
-        let url = Url::parse("https://readmanganato.com/manga-yu976355").unwrap();
+        let url = Url::parse("https://chapmanganato.com/manga-yu976355").unwrap();
         let info = module.get_info(url).await;
 
         info
@@ -243,7 +243,7 @@ mod test {
     #[test]
     pub async fn get_info_404() {
         let module = create_module();
-        let url = Url::parse("https://readmanganato.com/manga-yu176355").unwrap();
+        let url = Url::parse("https://chapmanganato.com/manga-yu176355").unwrap();
         let info = module.get_info(url).await;
 
         match info {
@@ -262,7 +262,7 @@ mod test {
     #[test]
     pub async fn get_chapter_images() {
         let module = create_module();
-        let url = Url::parse("https://readmanganato.com/manga-yu976355").unwrap();
+        let url = Url::parse("https://chapmanganato.com/manga-yu976355").unwrap();
         let info = module.get_info(url)
             .await
             .expect("expecting Ok");
