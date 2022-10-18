@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
+use async_trait::async_trait;
 use bytes::Bytes;
 
 use crate::{
@@ -19,8 +20,8 @@ pub trait ChapterTask: Send {
 pub trait BytesStream: futures_core::stream::Stream<Item = Result<Bytes, Error>> + Send {}
 impl<T> BytesStream for T where T: futures_core::stream::Stream<Item = Result<Bytes, Error>> + Send {}
 
-#[async_trait::async_trait]
-#[cfg_attr(feature = "mockall", mockall::automock)]
+#[cfg_attr(any(feature = "mockall", test), mockall::automock)]
+#[async_trait]
 pub trait MadoModule: Send + Sync + Debug + 'static {
     /// Get UUID of module. this value should be const
     /// and should'nt be changed ever.
