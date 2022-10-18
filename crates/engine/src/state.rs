@@ -111,7 +111,7 @@ mod tests {
         state.connect_only(|_| unreachable!()).disconnect();
 
         let mut module = MockMadoModule::new();
-        let uuid = Uuid::new_v4();
+        let uuid = Uuid::from_u128(1);
         module.expect_uuid().times(0..).returning({
             let uuid = uuid;
             move || uuid
