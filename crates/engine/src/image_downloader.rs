@@ -206,10 +206,7 @@ mod tests {
 
     use std::{
         net::SocketAddr,
-        sync::{
-            atomic::AtomicUsize,
-            Arc,
-        },
+        sync::{atomic::AtomicUsize, Arc},
         time::Duration,
     };
 
@@ -318,7 +315,7 @@ mod tests {
             then.body_stream(move || {
                 StreamBuilder::new()
                     .body("t")
-                    .delay(Duration::from_secs(1))
+                    .delay(Duration::from_millis(10))
                     .build()
             });
         });
