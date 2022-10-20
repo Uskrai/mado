@@ -220,3 +220,50 @@ impl crate::core::ChapterTask for ChapterTaskSender {
         self.tx.unbounded_send(image).ok();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use mado_core::{DefaultMadoModuleMap, Uuid};
+
+    use crate::{DownloadInfo, DownloadStatus, LateBindingModule};
+
+    use super::DownloadInfoWatcher;
+
+    #[test]
+    fn watcher_test() {
+        let map = DefaultMadoModuleMap::default();
+
+        let module = LateBindingModule::WaitModule(Arc::new(map), Uuid::from_u128(1));
+        let info = DownloadInfo::new(
+            module,
+            "title".to_string(),
+            vec![],
+            Default::default(),
+            None,
+            crate::DownloadStatus::Finished,
+        );
+
+        let info = Arc::new(info);
+        let watcher = DownloadInfoWatcher::connect(info.clone());
+
+        futures::executor::block_on(async {
+            let future = watcher.wait_status(|status| status.is_resumed());
+            crate::timer::timeout(std::time::Duration::from_millis(10), future)
+                .await
+                .unwrap_err();
+
+            let future = watcher.wait_status(DownloadStatus::is_completed);
+            info.set_status(DownloadStatus::waiting());
+            crate::timer::timeout(std::time::Duration::from_millis(10), future)
+                .await
+                .unwrap_err();
+
+            let future = watcher.wait_status(DownloadStatus::is_resumed);
+            crate::timer::timeout(std::time::Duration::from_millis(10), future)
+                .await
+                .unwrap();
+        });
+    }
+}
