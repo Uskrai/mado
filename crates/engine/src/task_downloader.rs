@@ -7,7 +7,7 @@ use std::{
 };
 
 use event_listener::Event;
-use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
+use futures::{channel::mpsc, FutureExt, StreamExt};
 
 use crate::{DownloadChapterImageInfo, DownloadChapterInfo, DownloadResumedStatus, DownloadStatus};
 
@@ -60,19 +60,12 @@ impl TaskDownloader {
             return Ok(());
         }
 
-        let (download_tx, mut download_rx) = mpsc::channel(1);
+        let mut get_images = self.get_chapter_images(it.clone()).await;
 
-        let image_downloader = async {
-            while let Some(image) = download_rx.next().await {
-                self.download_image(image).await?;
-            }
-
-            Ok(())
-        };
-
-        let get_images = self.get_chapter_images(&it, download_tx);
-
-        futures::try_join!(get_images, image_downloader)?;
+        while let Some(image) = get_images.next().await {
+            let image = image?;
+            self.download_image(image).await?;
+        }
 
         it.set_status(DownloadStatus::Finished);
 
@@ -81,39 +74,38 @@ impl TaskDownloader {
 
     pub async fn get_chapter_images(
         &self,
-        it: &DownloadChapterInfo,
-        tx: mpsc::Sender<Arc<DownloadChapterImageInfo>>,
-    ) -> Result<(), crate::core::Error> {
+        it: Arc<DownloadChapterInfo>,
+    ) -> impl futures::Stream<Item = Result<Arc<DownloadChapterImageInfo>, mado_core::Error>> + 'static
+    {
         let module = self.info.wait_module().await;
-        let mut download_tx = tx;
 
-        let (image_tx, mut image_rx) = chapter_task_channel();
-        let get_images = module.get_chapter_images(it.chapter_id(), Box::new(image_tx));
+        let (image_tx, image_rx) = chapter_task_channel();
 
-        let mut i = 1;
+        let chapter_id = it.chapter_id().to_string();
 
-        let receiver = async {
-            while let Some(image) = image_rx.next().await {
-                let filename = format!("{:0>4}.{}", i, image.extension);
-                let path = it.path().join(filename);
+        let mut get_images = async move {
+            module
+                .get_chapter_images(&chapter_id, Box::new(image_tx))
+                .await
+        }
+        .boxed();
 
-                let image = DownloadChapterImageInfo::new(image, path);
-                let image = Arc::new(image);
+        let mut stream = image_rx.enumerate().map(move |(i, image)| {
+            let i = i + 1;
+            let filename = format!("{:0>4}.{}", i, image.extension);
+            let path = it.path().join(filename);
 
-                download_tx
-                    .send(image)
-                    .await
-                    .map_err(|e| crate::core::Error::ExternalError(e.into()))?;
+            let image = DownloadChapterImageInfo::new(image, path);
+            Ok(Arc::new(image))
+        });
 
-                i += 1;
+        futures::stream::poll_fn(move |cx| {
+            if let std::task::Poll::Ready(Err(err)) = get_images.as_mut().poll(cx) {
+                std::task::Poll::Ready(Some(Err(err)))
+            } else {
+                stream.poll_next_unpin(cx)
             }
-
-            Ok(())
-        };
-
-        futures::try_join!(get_images, receiver)?;
-
-        Ok(())
+        })
     }
 
     pub async fn download_image(
