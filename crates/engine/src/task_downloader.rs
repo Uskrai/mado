@@ -27,19 +27,15 @@ impl TaskDownloader {
         loop {
             status.wait_status(DownloadStatus::is_resumed).await;
 
-            let paused = status.wait_status(DownloadStatus::is_paused).fuse();
-            let dl = self.download().fuse();
+            let paused = status
+                .wait_status(DownloadStatus::is_paused)
+                .map(|_| Ok::<(), mado_core::Error>(()));
+
+            let dl = self.download();
 
             futures::pin_mut!(dl, paused);
 
-            let result = futures::select! {
-                _ = paused => {
-                    continue;
-                }
-                r = dl => {
-                    r
-                }
-            };
+            let (result, _) = futures::future::select(dl, paused).await.factor_first();
 
             if let Err(err) = result {
                 tracing::error!("{}", err);
