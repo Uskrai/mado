@@ -214,6 +214,8 @@ impl DownloadRequest {
 
 #[cfg(test)]
 mod tests {
+    use mado_core::MockMadoModule;
+
     use mado_core::DefaultMadoModuleMap;
     use mockall::predicate;
 
@@ -286,5 +288,25 @@ mod tests {
             mock.expect_on_status_changed().never();
             let _ = info.connect_only(mock.handler()).disconnect().unwrap();
         }
+    }
+
+    #[test]
+    fn test_request() {
+        let mut module = MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(1));
+        let url = Url::parse("https://localhost").unwrap();
+        module.expect_domain().return_const(url.clone());
+
+        let download = DownloadInfo::from_request(DownloadRequest::new(
+            Arc::new(module),
+            Arc::new(MangaInfo::default()),
+            vec![Default::default()],
+            Default::default(),
+            Some(url.clone()),
+            DownloadRequestStatus::Resume,
+        ));
+
+        assert_eq!(download.url(), Some(&url));
+        assert_eq!(*download.module_uuid(), Uuid::from_u128(1));
     }
 }

@@ -29,3 +29,4 @@ path = "../core"
 
 [dev-dependencies]
 mockall = "0.11.0"
+mado-core = { path = "../core", features = ["mockall"] }
