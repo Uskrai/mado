@@ -66,9 +66,7 @@ pub struct ObserverHandle<T> {
 
 impl<T> ObserverHandle<T> {
     pub fn disconnect(self) -> Option<T> {
-        self.observers
-            .upgrade()
-            .and_then(|it| it.lock().remove(&self.id))
+        self.observers.disconnect(self.id)
     }
 
     pub fn is_disconnected(&self) -> bool {
