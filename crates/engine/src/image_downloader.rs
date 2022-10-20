@@ -389,7 +389,7 @@ mod tests {
                 let it = match body {
                     StreamBuilderAction::Body(body) => body.clone(),
                     StreamBuilderAction::Delay(duration) => {
-                        tokio::time::sleep(*duration).await;
+                        crate::timer::sleep(*duration).await;
 
                         vec![]
                     }
