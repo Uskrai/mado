@@ -207,7 +207,7 @@ mod tests {
     use std::{
         net::SocketAddr,
         sync::{
-            atomic::{AtomicUsize},
+            atomic::AtomicUsize,
             Arc,
         },
         time::Duration,
