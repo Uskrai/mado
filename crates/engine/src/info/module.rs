@@ -101,9 +101,12 @@ mod tests {
         map.push_mut(module.clone()).unwrap();
 
         futures::executor::block_on(async {
-            let wait_module = wait_module.wait().await;
+            let wait_module_a = wait_module.wait().await;
 
-            assert_eq!(wait_module.uuid(), module.uuid());
+            assert_eq!(wait_module_a.uuid(), module.uuid());
+
+            let wait_module_b = wait_module.wait().await;
+            assert_eq!(wait_module_b.uuid(), module.uuid());
         });
     }
 
