@@ -88,6 +88,7 @@ impl TaskDownloader {
                 .get_chapter_images(&chapter_id, Box::new(image_tx))
                 .await
         }
+        .fuse()
         .boxed();
 
         let mut stream = image_rx.enumerate().map(move |(i, image)| {
@@ -217,11 +218,71 @@ impl crate::core::ChapterTask for ChapterTaskSender {
 mod tests {
     use std::sync::Arc;
 
-    use mado_core::{DefaultMadoModuleMap, Uuid};
+    use futures::StreamExt;
+    use mado_core::{ChapterImageInfo, DefaultMadoModuleMap, MockMadoModule, Uuid};
+    use mockall::predicate::{always, eq};
 
-    use crate::{DownloadInfo, DownloadStatus, LateBindingModule};
+    use crate::{
+        DownloadChapterInfo, DownloadInfo, DownloadStatus, LateBindingModule, TaskDownloader,
+    };
 
     use super::DownloadInfoWatcher;
+
+    #[test]
+    fn get_chapter_test() {
+        let mut module = MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(1));
+
+        let firstinfo = ChapterImageInfo {
+            id: "1".to_string(),
+            extension: "png".to_string(),
+            name: Some("1.png".to_string()),
+        };
+
+        let i1 = firstinfo.clone();
+        module
+            .expect_get_chapter_images()
+            .with(eq("1"), always())
+            .returning(move |_, mut a| {
+                a.add(firstinfo.clone());
+
+                Ok(())
+            });
+
+        let module = Arc::new(module);
+        let chapter = Arc::new(DownloadChapterInfo::new(
+            module.clone().into(),
+            "1".to_string(),
+            "title".to_string(),
+            Default::default(),
+            DownloadStatus::waiting(),
+        ));
+        let info = Arc::new(DownloadInfo::new(
+            module.into(),
+            "title".to_string(),
+            vec![chapter.clone()],
+            Default::default(),
+            None,
+            DownloadStatus::waiting(),
+        ));
+
+        let downloader = TaskDownloader::new(info);
+
+        futures::executor::block_on(async {
+            let mut it = downloader.get_chapter_images(chapter).await.enumerate();
+            while let Some((i, image)) = it.next().await {
+                match i {
+                    0 => {
+                        assert_eq!(*image.unwrap().image(), i1);
+                    }
+                    1 => {
+                        image.unwrap_err();
+                    }
+                    _ => unreachable!()
+                }
+            }
+        });
+    }
 
     #[test]
     fn watcher_test() {

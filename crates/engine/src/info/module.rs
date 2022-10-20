@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use futures::lock::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard};
 
-use mado_core::{ArcMadoModule, ArcMadoModuleMap, Uuid};
+use mado_core::{ArcMadoModule, ArcMadoModuleMap, MadoModule, Uuid};
 
 #[derive(Clone)]
 pub enum LateBindingModule {
@@ -22,6 +24,21 @@ impl std::fmt::Debug for LateBindingModule {
                 .field("module", module)
                 .finish(),
         }
+    }
+}
+
+impl From<ArcMadoModule> for LateBindingModule {
+    fn from(v: ArcMadoModule) -> Self {
+        Self::Module(v)
+    }
+}
+
+impl<T> From<Arc<T>> for LateBindingModule
+where
+    T: MadoModule,
+{
+    fn from(v: Arc<T>) -> Self {
+        Self::Module(v)
     }
 }
 
