@@ -120,10 +120,11 @@ pub struct AnyObserverHandleSend {
 }
 
 impl AnyObserverHandleSend {
-    fn is_disconnected(&self) -> bool {
+    pub fn is_disconnected(&self) -> bool {
         self.map.is_disconnected(self.id)
     }
-    fn disconnect(self) -> bool {
+
+    pub fn disconnect(self) -> bool {
         self.map.disconnect_any(self.id)
     }
 }
