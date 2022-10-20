@@ -74,3 +74,62 @@ impl ModuleInfo {
         &self.uuid
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use mado_core::{
+        DefaultMadoModuleMap, MockMadoModule, MutMadoModuleMap, MutexMadoModuleMap, Url,
+    };
+
+    use super::*;
+    #[test]
+    pub fn wait_test() {
+        let map = MutexMadoModuleMap::<DefaultMadoModuleMap>::new(Default::default());
+
+        let map = Arc::new(map);
+        let mut wait_module = LateBindingModule::WaitModule(map.clone(), Uuid::from_u128(1));
+
+        let mut module = MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(1));
+        module
+            .expect_domain()
+            .return_const(Url::try_from("http://localhost").unwrap());
+
+        let module = Arc::new(module) as ArcMadoModule;
+        map.push_mut(module.clone()).unwrap();
+
+        futures::executor::block_on(async {
+            let wait_module = wait_module.wait().await;
+
+            assert_eq!(wait_module.uuid(), module.uuid());
+        });
+    }
+
+    #[test]
+    pub fn timeout_test() {
+        let map = MutexMadoModuleMap::<DefaultMadoModuleMap>::new(Default::default());
+
+        let map = Arc::new(map);
+        let mut wait_module = LateBindingModule::WaitModule(map.clone(), Uuid::from_u128(1));
+
+        let mut module = MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(2));
+        module
+            .expect_domain()
+            .return_const(Url::try_from("http://localhost").unwrap());
+
+        let module = Arc::new(module) as ArcMadoModule;
+        map.push_mut(module.clone()).unwrap();
+
+        futures::executor::block_on(async {
+            crate::timer::timeout(std::time::Duration::from_secs(2), async {
+                wait_module.wait().await;
+                unreachable!();
+            })
+            .await
+            .expect_err("this should error because no same uuid");
+        });
+    }
+}
