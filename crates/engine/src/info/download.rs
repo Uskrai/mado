@@ -271,14 +271,12 @@ mod tests {
 
             mock.expect_on_status_changed()
                 .once()
-                .with(predicate::eq(DownloadStatus::resumed(
-                    DownloadResumedStatus::Waiting,
-                )))
+                .with(predicate::eq(DownloadStatus::waiting()))
                 .returning(|_| ());
 
             let handle = info.connect(mock.handler());
 
-            info.set_status(DownloadStatus::resumed(DownloadResumedStatus::Waiting));
+            info.set_status(DownloadStatus::waiting());
             let _ = handle.disconnect().unwrap();
             info.set_status(DownloadStatus::finished());
         }
