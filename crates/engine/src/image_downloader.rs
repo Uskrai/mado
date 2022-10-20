@@ -159,7 +159,13 @@ where
 #[cfg(test)]
 mod tests {
 
-    use std::sync::{atomic::AtomicUsize, Arc};
+    use std::{
+        net::SocketAddr,
+        pin::Pin,
+        sync::{atomic::AtomicUsize, Arc},
+    };
+
+    use parking_lot::Mutex;
 
     use super::*;
 
@@ -205,6 +211,125 @@ mod tests {
             do_while_err_or(|| async { Ok::<_, &str>(()) }, |_| unreachable!())
                 .await
                 .unwrap();
+        });
+    }
+
+    #[derive(Default, Clone)]
+    pub struct MutexVec(Arc<Mutex<Vec<u8>>>);
+    impl futures::io::AsyncWrite for MutexVec {
+        fn poll_write(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+            buf: &[u8],
+        ) -> std::task::Poll<std::io::Result<usize>> {
+            Pin::new(&mut *self.0.lock()).poll_write(cx, buf)
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            Pin::new(&mut *self.0.lock()).poll_flush(cx)
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            Pin::new(&mut *self.0.lock()).poll_close(cx)
+        }
+    }
+
+    impl std::fmt::Display for MutexVec {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", String::from_utf8_lossy(&self.0.lock()))
+        }
+    }
+
+    use httpmock::prelude::*;
+
+    fn server_url(socket: &SocketAddr) -> mado_core::url::Url {
+        mado_core::url::Url::try_from(format!("http://{}", socket).as_str()).unwrap()
+    }
+
+    #[test]
+    fn download_test() {
+        let mut buffer = MutexVec::default();
+
+        let server = MockServer::start();
+
+        let buff = buffer.clone();
+        let _m = server.mock(move |when, then| {
+            when.path("/test");
+
+            then.body_stream(move || {
+                let buff = buff.clone();
+                futures::stream::unfold(0, move |state| {
+                    let buff = buff.clone();
+                    async move {
+                        let val = match state {
+                            0 => "test",
+                            1 => {
+                                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                                assert_eq!(buff.to_string(), "test");
+                                "test"
+                            }
+                            _ => return None,
+                        };
+
+                        Some((Ok(val), state + 1))
+                    }
+                })
+            });
+        });
+
+        let client = mado_core::http::Client::default();
+        let server_url = server_url(_m.server_address());
+
+        futures::executor::block_on(async {
+            let request = client.get(server_url.join("/test").unwrap());
+            download_http(request, &mut buffer, || {
+                std::time::Duration::from_millis(20)
+            })
+            .await
+            .unwrap();
+            assert_eq!(buffer.to_string(), "testtest");
+        });
+    }
+
+    #[test]
+    fn timeout_test() {
+        let mut buffer = MutexVec::default();
+
+        let server = httpmock::MockServer::start();
+
+        let _m = server.mock(move |when, then| {
+            when.path("/timeout").method(GET);
+
+            then.body_stream(move || {
+                futures::stream::unfold(0, move |state| async move {
+                    let val = match state {
+                        0 => "t",
+                        _ => {
+                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                            return None;
+                        }
+                    };
+
+                    Some((Ok(val), state + 1))
+                })
+            });
+        });
+
+        let server_url = server_url(_m.server_address());
+        let client = mado_core::http::Client::default();
+
+        futures::executor::block_on(async {
+            let request = client.get(server_url.join("/timeout").unwrap());
+            download_http(request, &mut buffer, || std::time::Duration::from_millis(2))
+                .await
+                .unwrap_err();
         });
     }
 }
