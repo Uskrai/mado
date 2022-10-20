@@ -8,6 +8,8 @@ pub enum LateBindingModule {
     WaitModule(ArcMadoModuleMap, Uuid),
 }
 
+const SLEEP_TIME_MILLIS: u64 = 100;
+
 impl std::fmt::Debug for LateBindingModule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -34,7 +36,7 @@ impl LateBindingModule {
                         break module;
                     }
 
-                    crate::timer::sleep(std::time::Duration::from_secs(1)).await;
+                    crate::timer::sleep(std::time::Duration::from_millis(SLEEP_TIME_MILLIS)).await;
                 };
 
                 *self = Self::Module(module.clone());
@@ -127,7 +129,7 @@ mod tests {
         map.push_mut(module.clone()).unwrap();
 
         futures::executor::block_on(async {
-            crate::timer::timeout(std::time::Duration::from_secs(2), async {
+            crate::timer::timeout(std::time::Duration::from_millis(SLEEP_TIME_MILLIS * 2), async {
                 wait_module.wait().await;
                 unreachable!();
             })
