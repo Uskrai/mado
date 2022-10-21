@@ -6,14 +6,9 @@ use std::{
 
 pub use async_io::Timer;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[error("timeout reached")]
 pub struct Elapsed;
-impl std::error::Error for Elapsed {}
-impl std::fmt::Display for Elapsed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        "timeout reached".fmt(f)
-    }
-}
 
 pub fn timeout<F>(duration: Duration, f: F) -> Timeout<F>
 where
@@ -26,10 +21,6 @@ where
 
 pub async fn sleep(duration: Duration) {
     Timer::after(duration).await;
-}
-
-pub async fn sleep_secs(secs: u64) {
-    sleep(Duration::from_secs(secs)).await
 }
 
 #[pin_project::pin_project]
@@ -57,7 +48,7 @@ where
             return Poll::Ready(Ok(result));
         }
 
-        if let Poll::Ready(_) = me.timer.poll(cx) {
+        if me.timer.poll(cx).is_ready() {
             return Poll::Ready(Err(Elapsed));
         }
 
@@ -78,6 +69,16 @@ mod tests {
             timeout(nanos, async { sleep(secs).await })
                 .await
                 .unwrap_err();
+
+            timeout(
+                Duration::from_millis(10),
+                futures::future::poll_fn(|cx| {
+                    cx.waker().wake_by_ref();
+                    Poll::<()>::Pending
+                }),
+            )
+            .await
+            .unwrap_err();
         });
     }
 }

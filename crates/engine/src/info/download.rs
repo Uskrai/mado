@@ -98,7 +98,7 @@ impl DownloadInfo {
     }
 
     pub fn module_uuid(&self) -> &Uuid {
-        &self.module.uuid()
+        self.module.uuid()
     }
 
     pub fn manga_title(&self) -> &str {
@@ -106,7 +106,7 @@ impl DownloadInfo {
     }
 
     pub fn module_domain(&self) -> Option<&str> {
-        self.url.as_ref().map(|url| url.domain()).flatten()
+        self.url.as_ref().and_then(|url| url.domain())
     }
 
     pub fn url(&self) -> Option<&Url> {
@@ -214,6 +214,8 @@ impl DownloadRequest {
 
 #[cfg(test)]
 mod tests {
+    use mado_core::MockMadoModule;
+
     use mado_core::DefaultMadoModuleMap;
     use mockall::predicate;
 
@@ -271,14 +273,12 @@ mod tests {
 
             mock.expect_on_status_changed()
                 .once()
-                .with(predicate::eq(DownloadStatus::resumed(
-                    DownloadResumedStatus::Waiting,
-                )))
+                .with(predicate::eq(DownloadStatus::waiting()))
                 .returning(|_| ());
 
             let handle = info.connect(mock.handler());
 
-            info.set_status(DownloadStatus::resumed(DownloadResumedStatus::Waiting));
+            info.set_status(DownloadStatus::waiting());
             let _ = handle.disconnect().unwrap();
             info.set_status(DownloadStatus::finished());
         }
@@ -288,5 +288,52 @@ mod tests {
             mock.expect_on_status_changed().never();
             let _ = info.connect_only(mock.handler()).disconnect().unwrap();
         }
+    }
+
+    #[test]
+    fn test_request() {
+        let mut module = MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(1));
+        let url = Url::parse("https://localhost").unwrap();
+        module.expect_domain().return_const(url.clone());
+
+        let download = DownloadInfo::from_request(DownloadRequest::new(
+            Arc::new(module),
+            Arc::new(MangaInfo::default()),
+            vec![Default::default()],
+            Default::default(),
+            Some(url.clone()),
+            DownloadRequestStatus::Resume,
+        ));
+
+        assert_eq!(download.url(), Some(&url));
+        assert_eq!(*download.module_uuid(), Uuid::from_u128(1));
+    }
+
+    #[test]
+    fn test_resume() {
+        let info = DownloadInfo::new(
+            LateBindingModule::WaitModule(
+                Arc::new(DefaultMadoModuleMap::new()),
+                Default::default(),
+            ),
+            Default::default(),
+            Vec::new(),
+            Default::default(),
+            None,
+            DownloadStatus::paused(),
+        );
+
+        info.resume(true);
+        assert!(info.status().is_resumed());
+        info.resume(false);
+        assert!(info.status().is_paused());
+
+        info.set_status(DownloadStatus::finished());
+        assert!(info.status().is_completed());
+        info.resume(true);
+        assert!(info.status().is_completed());
+        info.resume(false);
+        assert!(info.status().is_completed());
     }
 }

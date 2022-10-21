@@ -40,3 +40,13 @@ pub mod path {
     pub use camino::Utf8Path;
     pub use camino::Utf8PathBuf;
 }
+
+#[cfg(test)]
+mod tests {
+    use std::net::SocketAddr;
+
+    pub fn server_url(socket: &SocketAddr) -> mado_core::url::Url {
+        mado_core::url::Url::try_from(format!("http://localhost:{}", socket.port()).as_str())
+            .unwrap()
+    }
+}

@@ -29,3 +29,9 @@ path = "../core"
 
 [dev-dependencies]
 mockall = "0.11.0"
+mado-core = { path = "../core", features = ["mockall"] }
+tracing-test = "0.2"
+test-log = "0.2"
+httpmock  = { rev = "a39162df6c87b4d8116c6d4ea101f01675647f83", git = "https://github.com/Uskrai/httpmock", features = ["stream"]}
+pin-project = "1"
+tempfile = "3.0.0"

@@ -16,15 +16,29 @@ pub fn fill_host(input: &str) -> Result<Url, crate::Error> {
     })
 }
 
-pub fn parse_resolve_domain(input: &str) -> Result<Url, ParseError> {
-    Url::parse(input).or_else(|err| match err {
-        ParseError::RelativeUrlWithoutBase => {
-            let input = format!("https://{}", input);
-            Url::parse(&input).map_err(|_| {
-                // return the first error instead
-                err
-            })
-        }
-        _ => Err(err),
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn fill_host_test() {
+        assert_eq!(
+            fill_host("localhost").unwrap(),
+            Url::parse("https://localhost").unwrap()
+        );
+
+        assert_eq!(
+            fill_host("https://localhost").unwrap(),
+            Url::parse("https://localhost").unwrap()
+        );
+
+        assert!(matches!(
+            fill_host("https://lo:calhost"),
+            Err(crate::Error::UrlParseError { .. })
+        ));
+
+        assert!(matches!(
+            fill_host("://localhost"),
+            Err(crate::Error::UrlParseError { .. })
+        ))
+    }
 }

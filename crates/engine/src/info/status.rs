@@ -39,6 +39,14 @@ impl DownloadStatus {
         Self::InProgress(DownloadProgressStatus::Resumed(status))
     }
 
+    pub fn waiting() -> Self {
+        Self::resumed(DownloadResumedStatus::Waiting)
+    }
+
+    pub fn downloading() -> Self {
+        Self::resumed(DownloadResumedStatus::Downloading)
+    }
+
     pub fn paused() -> Self {
         Self::InProgress(DownloadProgressStatus::Paused)
     }

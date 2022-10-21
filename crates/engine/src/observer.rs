@@ -2,7 +2,6 @@ use parking_lot::Mutex;
 use std::{
     collections::HashMap,
     fmt::Debug,
-    ops::Deref,
     sync::{atomic::AtomicUsize, Arc, Weak},
 };
 
@@ -48,13 +47,9 @@ impl<T> Observers<T> {
     }
 
     pub fn emit(&self, mut f: impl FnMut(&mut T)) {
-        for (_, mut it) in self.observers.lock().iter_mut() {
-            f(&mut it);
+        for (_, it) in self.observers.lock().iter_mut() {
+            f(it);
         }
-    }
-
-    pub fn lock<'a>(&'a self) -> impl Deref + 'a {
-        self.observers.lock()
     }
 }
 
@@ -66,19 +61,66 @@ pub struct ObserverHandle<T> {
 
 impl<T> ObserverHandle<T> {
     pub fn disconnect(self) -> Option<T> {
-        self.observers
-            .upgrade()
-            .map(|it| it.lock().remove(&self.id))
-            .flatten()
+        self.observers.disconnect(self.id)
     }
 
     pub fn is_disconnected(&self) -> bool {
-        self.observers
-            .upgrade()
-            // is not disconnected if get return Some
-            .and_then(|it| it.lock().get(&self.id).map(|_| false))
-            // else is disconnected
+        self.observers.is_disconnected(self.id)
+    }
+}
+
+impl<T: Send + 'static> ObserverHandle<T> {
+    pub fn send_handle_any(self) -> AnyObserverHandleSend {
+        AnyObserverHandleSend {
+            map: Box::new(self.observers),
+            id: self.id,
+        }
+    }
+}
+
+pub trait ObserverMapTrait {
+    fn disconnect_any(&self, id: usize) -> bool;
+    fn is_disconnected(&self, id: usize) -> bool;
+}
+
+pub trait TypedObserverMapTrait: ObserverMapTrait {
+    type Out;
+    fn disconnect(&self, id: usize) -> Self::Out;
+}
+
+impl<T> ObserverMapTrait for Weak<ObserverMap<T>> {
+    fn disconnect_any(&self, id: usize) -> bool {
+        self.upgrade()
+            .and_then(|it| it.lock().remove(&id))
+            .is_some()
+    }
+
+    fn is_disconnected(&self, id: usize) -> bool {
+        self.upgrade()
+            .and_then(|it| it.lock().get(&id).map(|_| false))
             .unwrap_or(true)
+    }
+}
+
+impl<T> TypedObserverMapTrait for Weak<ObserverMap<T>> {
+    type Out = Option<T>;
+    fn disconnect(&self, id: usize) -> Self::Out {
+        self.upgrade().and_then(|it| it.lock().remove(&id))
+    }
+}
+
+pub struct AnyObserverHandleSend {
+    map: Box<dyn ObserverMapTrait + Send>,
+    id: usize,
+}
+
+impl AnyObserverHandleSend {
+    pub fn is_disconnected(&self) -> bool {
+        self.map.is_disconnected(self.id)
+    }
+
+    pub fn disconnect(self) -> bool {
+        self.map.disconnect_any(self.id)
     }
 }
 
@@ -92,7 +134,7 @@ mod tests {
 
         let handle = observer.connect(1);
 
-        assert_eq!(handle.is_disconnected(), false);
+        assert!(!handle.is_disconnected());
 
         assert_eq!(handle.disconnect(), Some(1));
 
@@ -102,7 +144,7 @@ mod tests {
         assert_eq!(h2.clone().disconnect(), Some(2));
         assert_eq!(h_2.disconnect(), Some(2));
 
-        assert_eq!(h2.is_disconnected(), true);
+        assert!(h2.is_disconnected());
         assert_eq!(h2.disconnect(), None);
 
         observer.connect(1);
@@ -114,5 +156,26 @@ mod tests {
             i += 1;
         });
         assert_eq!(i, 3);
+    }
+
+    #[test]
+    fn observer_any() {
+        let observer = Observers::new();
+
+        let handle = observer.connect(1);
+        let _ = handle.clone().send_handle_any().disconnect();
+        assert!(handle.is_disconnected());
+        assert!(handle.clone().send_handle_any().is_disconnected());
+        assert!(!handle.clone().send_handle_any().disconnect());
+        assert_eq!(handle.disconnect(), None);
+    }
+
+    #[test]
+    fn observer_debug() {
+        let observer = Observers::<()>::new();
+        assert_eq!(
+            format!("{:?}", observer),
+            "Observers { last_insert_id: 0, .. }"
+        );
     }
 }

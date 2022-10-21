@@ -96,7 +96,7 @@ mod tests {
         let mut conn = connection();
         let mut module = MockMadoModule::new();
         module.expect_name().times(0..).return_const("Module".to_string());
-        module.expect_uuid().times(0..).return_const(Uuid::new_v4());
+        module.expect_uuid().times(0..).return_const(Uuid::from_u128(1));
         let module = Arc::new(module);
 
         insert(

@@ -60,16 +60,16 @@ impl MadoEngineState {
     /// Connect observer to state.
     ///
     /// This will also call on_* of previously pushed item.
-    pub fn connect(&self, mut observer: ImplObserver!()) {
-        for it in self.tasks.write().iter() {
-            observer(MadoEngineStateMsg::Download(&it));
+    pub fn connect(&self, mut observer: ImplObserver!()) -> crate::ObserverHandle<BoxObserver> {
+        for it in self.tasks().iter() {
+            observer(MadoEngineStateMsg::Download(it));
         }
 
         for it in self.modules.lock().unwrap().vec() {
-            observer(MadoEngineStateMsg::PushModule(&it));
+            observer(MadoEngineStateMsg::PushModule(it));
         }
 
-        self.connect_only(observer);
+        self.connect_only(observer)
     }
 
     /// Connect without calling on_* method.
@@ -79,5 +79,92 @@ impl MadoEngineState {
 
     pub fn tasks(&self) -> RwLockReadGuard<'_, Vec<Arc<DownloadInfo>>> {
         self.tasks.read()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mado_core::Uuid;
+    use mockall::automock;
+
+    use crate::DownloadRequestStatus;
+
+    use super::*;
+    use mado_core::MockMadoModule;
+
+    #[automock]
+    pub trait Call {
+        #[allow(clippy::needless_lifetimes)]
+        fn handle_msg<'a>(&self, msg: MadoEngineStateMsg<'a>);
+    }
+
+    #[test]
+    fn connect_test() {
+        let state = MadoEngineState::new(Default::default(), Vec::new());
+
+        state
+            .connect(|_| {
+                unreachable!();
+            })
+            .disconnect();
+
+        state.connect_only(|_| unreachable!()).disconnect();
+
+        let mut module = MockMadoModule::new();
+        let uuid = Uuid::from_u128(1);
+        module.expect_uuid().times(0..).returning({
+            let uuid = uuid;
+            move || uuid
+        });
+        module
+            .expect_domain()
+            .times(0..)
+            .return_const(mado_core::Url::parse("http://localhost").unwrap());
+
+        let module = Arc::new(module);
+        state.push_module(module.clone()).unwrap();
+
+        let mut it = MockCall::new();
+        it.expect_handle_msg().times(1).return_const(());
+        state
+            .connect(move |msg| {
+                match msg {
+                    MadoEngineStateMsg::Download(_) => unreachable!(),
+                    MadoEngineStateMsg::PushModule(_) => it.handle_msg(msg),
+                };
+            })
+            .disconnect();
+
+        state.download_request(DownloadRequest::new(
+            module,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Some(mado_core::Url::parse("http://localhost").unwrap()),
+            DownloadRequestStatus::Resume,
+        ));
+
+        let mut it = MockCall::new();
+        it.expect_handle_msg()
+            .times(1)
+            .withf(|it| matches!(it, MadoEngineStateMsg::PushModule(_)))
+            .return_const(());
+
+        it.expect_handle_msg()
+            .times(1)
+            .withf(|it| match it {
+                MadoEngineStateMsg::Download(download) => {
+                    return download.url()
+                        == Some(&mado_core::Url::parse("http://localhost").unwrap())
+                }
+                _ => false,
+            })
+            .return_const(());
+
+        state
+            .connect(move |msg| {
+                it.handle_msg(msg);
+            })
+            .disconnect();
     }
 }

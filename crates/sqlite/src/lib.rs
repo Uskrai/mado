@@ -50,9 +50,8 @@ mod tests {
             vec,
             Default::default(),
             None,
-            mado_engine::DownloadStatus::InProgress(DownloadProgressStatus::Paused),
+            mado_engine::DownloadStatus::paused()
         ))
-        //
     }
 
     pub struct State {
