@@ -67,7 +67,7 @@ impl Database {
         pk: DownloadChapterPK,
         images: Vec<Arc<DownloadChapterImageInfo>>,
     ) -> Result<(), Error> {
-        crate::download_chapters::update_images(&mut self.conn, pk, images)
+        crate::download_chapter_images::update_images(&mut self.conn, pk, images)
     }
 
     pub fn load_download(&self) -> Result<Vec<DownloadJoin>, Error> {

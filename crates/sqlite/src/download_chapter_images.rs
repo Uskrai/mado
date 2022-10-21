@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use mado_engine::{path::Utf8PathBuf, DownloadChapterImageInfo};
 use rusqlite::{params, Connection, Error};
@@ -27,6 +27,7 @@ impl DownloadChapterImagePK {
     }
 }
 
+#[derive(Debug)]
 pub struct InsertDownloadChapterImage<'a> {
     pub download_chapter_id: i64,
     pub image_url: &'a str,
@@ -113,14 +114,39 @@ pub fn update_status(
     )
 }
 
+pub fn update_images(
+    conn: &mut Connection,
+    pk: DownloadChapterPK,
+    images: Vec<Arc<DownloadChapterImageInfo>>,
+) -> Result<(), Error> {
+    let conn = conn.transaction()?;
+    delete_images(&conn, pk)?;
+
+
+    for it in images {
+        insert_info(&conn, pk, &it)?;
+    }
+
+    conn.commit()
+}
+
+pub fn delete_images(conn: &Connection, pk: DownloadChapterPK) -> Result<usize, Error> {
+    conn.execute(
+        "DELETE FROM download_chapter_images WHERE download_chapter_id = ?",
+        params![pk.id],
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    use mado_core::ChapterImageInfo;
+
     use super::*;
     use crate::{download_chapters::InsertDownloadChapter, downloads::InsertDownload, tests::*};
 
     #[test]
     fn insert_test() {
-        let db = connection();
+        let mut db = connection();
 
         crate::downloads::insert(
             &db,
@@ -173,5 +199,35 @@ mod tests {
         assert_eq!(it.image_url, "image-url");
         assert_eq!(it.path, "path");
         assert_eq!(it.status, "Finished".into());
+
+        update_images(
+            &mut db,
+            pk,
+            vec![Arc::new(DownloadChapterImageInfo::new(
+                ChapterImageInfo {
+                    id: "image-id".to_string(),
+                    name: Some("iho".to_string()),
+                    extension: "png".to_string(),
+                },
+                "path-changed".into(),
+                mado_engine::DownloadStatus::paused(),
+            ))],
+        ).unwrap();
+
+        let updated = load(&db).unwrap();
+
+        assert_eq!(updated.len(), 1);
+        let vec = &updated[&pk];
+        assert_eq!(vec.len(), 1);
+
+        let it = &vec[0];
+
+        assert_eq!(it.download_chapter_id, DownloadChapterPK::new(1));
+        assert_eq!(it.image_url, "image-id");
+        assert_eq!(it.path, "path-changed");
+        assert_eq!(it.status, "Paused".into());
+
+        delete_images(&db, pk).unwrap();
+        assert_eq!(load(&db).unwrap().len(), 0);
     }
 }
