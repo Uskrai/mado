@@ -52,18 +52,17 @@ pub fn channel(db: Database) -> Channel {
 
 impl Channel {
     /// Handle next message.
-    pub fn try_next(&mut self) -> Result<(), rusqlite::Error> {
+    pub fn try_next(&mut self) -> Result<bool, rusqlite::Error> {
         if let Ok(Some(msg)) = self.rx.try_next() {
-            self.handle_msg(msg)?;
+            self.handle_msg(msg).map(|_| true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     /// Handle all message until empty or fail.
     pub fn try_all(&mut self) -> Result<(), rusqlite::Error> {
-        while let Ok(Some(msg)) = self.rx.try_next() {
-            self.handle_msg(msg)?;
-        }
+        while self.try_next()? {}
         Ok(())
     }
 
