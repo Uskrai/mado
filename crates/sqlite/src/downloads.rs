@@ -6,7 +6,7 @@ use rusqlite::{params, Connection, Error};
 use crate::{
     download_chapters::DownloadChapterPK,
     module::ModulePK,
-    query::{DownloadChapterInfoJoin, DownloadInfoJoin},
+    query::{DownloadChapterImageInfoJoin, DownloadChapterInfoJoin, DownloadInfoJoin},
     status::DownloadStatus,
 };
 
@@ -71,9 +71,24 @@ pub fn insert_info(
     for it in info.chapters() {
         let pk = crate::download_chapters::insert_info(&transaction, dl_pk, it).unwrap();
 
+        let images = it
+            .images()
+            .iter()
+            .map(|img| {
+                let pk = crate::download_chapter_images::insert_info(&transaction, pk, img)?;
+
+                Ok(DownloadChapterImageInfoJoin {
+                    pk,
+                    image: img.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
+
         chapters.push(DownloadChapterInfoJoin {
             pk,
             chapter: it.clone(),
+            images,
         });
     }
 

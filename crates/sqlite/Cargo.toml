@@ -7,6 +7,7 @@ license = "MIT"
 [dependencies]
 mado-engine = { path = "../engine" }
 futures = "0.3.0"
+parking_lot = "0.12.0"
 
 [dependencies.rusqlite]
 git = "https://github.com/rusqlite/rusqlite.git"

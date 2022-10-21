@@ -1,9 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
-use mado_engine::{core::ArcMadoModuleMap, DownloadChapterInfo, DownloadInfo, LateBindingModule};
+use mado_engine::{
+    core::{ArcMadoModuleMap, ChapterImageInfo},
+    DownloadChapterImageInfo, DownloadChapterInfo, DownloadInfo, LateBindingModule,
+};
 use rusqlite::{Connection, Error};
 
 use crate::{
+    download_chapter_images::{DownloadChapterImage, DownloadChapterImagePK},
     download_chapters::{DownloadChapter, DownloadChapterPK},
     downloads::{Download, DownloadPK},
 };
@@ -11,29 +15,68 @@ use crate::{
 #[derive(Debug)]
 pub struct DownloadJoin {
     pub download: Download,
-    pub chapters: Vec<DownloadChapter>,
+    pub chapters: Vec<DownloadChapterJoin>,
+}
+
+#[derive(Debug)]
+pub struct DownloadChapterJoin {
+    pub chapter: DownloadChapter,
+    pub images: Vec<DownloadChapterImageJoin>,
+}
+
+#[derive(Debug)]
+pub struct DownloadChapterImageJoin {
+    image: DownloadChapterImage,
 }
 
 pub fn load_download_join(conn: &Connection) -> Result<Vec<DownloadJoin>, Error> {
     let downloads = crate::downloads::load(conn)?;
-    let mut index_map = HashMap::new();
+    let mut download_index_map = HashMap::new();
 
     let mut download_joins = Vec::new();
     for (i, download) in downloads.into_iter().enumerate() {
-        index_map.insert(download.pk, i);
+        download_index_map.insert(download.pk, i);
         download_joins.push(DownloadJoin {
             download,
             chapters: Vec::new(),
         });
     }
 
+    let mut chapter_index_map = HashMap::new();
     let chapters = crate::download_chapters::load(conn)?;
 
     for (download_id, it) in chapters {
-        let index = index_map[&download_id];
+        for (i, ch) in it.iter().enumerate() {
+            chapter_index_map.insert(ch.pk, (download_id, i));
+        }
+        let index = download_index_map[&download_id];
 
         debug_assert_eq!(download_joins[index].download.pk, download_id);
-        download_joins[index].chapters = it;
+        download_joins[index].chapters = it
+            .into_iter()
+            .map(|it| DownloadChapterJoin {
+                chapter: it,
+                images: vec![],
+            })
+            .collect();
+    }
+
+    let images = crate::download_chapter_images::load(conn)?;
+    for (chapter_id, it) in images {
+        let (download_id, chapter_index) = chapter_index_map[&chapter_id];
+        let download_index = download_index_map[&download_id];
+
+        debug_assert_eq!(download_joins[download_index].download.pk, download_id);
+        debug_assert_eq!(
+            download_joins[download_index].chapters[chapter_index]
+                .chapter
+                .pk,
+            chapter_id
+        );
+        download_joins[download_index].chapters[chapter_index].images = it
+            .into_iter()
+            .map(|it| DownloadChapterImageJoin { image: it })
+            .collect();
     }
 
     Ok(download_joins)
@@ -48,6 +91,12 @@ pub struct DownloadInfoJoin {
 pub struct DownloadChapterInfoJoin {
     pub pk: DownloadChapterPK,
     pub chapter: Arc<DownloadChapterInfo>,
+    pub images: Vec<DownloadChapterImageInfoJoin>,
+}
+
+pub struct DownloadChapterImageInfoJoin {
+    pub pk: DownloadChapterImagePK,
+    pub image: Arc<DownloadChapterImageInfo>,
 }
 
 pub fn load_download_info_join(
@@ -71,7 +120,9 @@ pub fn load_download_info_join(
         let chapters_join: Vec<_> = chapters
             .into_iter()
             .map(|chapter| {
-                let pk = chapter.pk;
+                let pk = chapter.chapter.pk;
+                let images = chapter.images;
+                let chapter = chapter.chapter;
                 let chapter = Arc::new(DownloadChapterInfo::new(
                     module.clone(),
                     chapter.chapter_id,
@@ -80,7 +131,33 @@ pub fn load_download_info_join(
                     chapter.status.into(),
                 ));
 
-                DownloadChapterInfoJoin { pk, chapter }
+                let images: Vec<_> = images
+                    .into_iter()
+                    .map(|it| {
+                        let pk = it.image.pk;
+
+                        let image = it.image;
+                        let image = Arc::new(DownloadChapterImageInfo::new(
+                            ChapterImageInfo {
+                                id: image.image_url,
+                                extension: image.extension,
+                                name: image.name,
+                            },
+                            image.path,
+                            image.status.into(),
+                        ));
+
+                        DownloadChapterImageInfoJoin { pk, image }
+                    })
+                    .collect();
+
+                chapter.set_images(images.iter().map(|it| it.image.clone()).collect());
+
+                DownloadChapterInfoJoin {
+                    pk,
+                    chapter,
+                    images,
+                }
             })
             .collect();
 

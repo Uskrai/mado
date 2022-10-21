@@ -8,7 +8,7 @@ use crate::{
     downloads::DownloadPK,
     module::{InsertModule, Module, ModulePK},
     query::{DownloadInfoJoin, DownloadJoin},
-    status::DownloadStatus,
+    status::DownloadStatus, download_chapter_images::DownloadChapterImagePK,
 };
 
 pub struct Database {
@@ -66,8 +66,12 @@ impl Database {
         &mut self,
         pk: DownloadChapterPK,
         images: Vec<Arc<DownloadChapterImageInfo>>,
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<crate::query::DownloadChapterImageInfoJoin>, Error> {
         crate::download_chapter_images::update_images(&mut self.conn, pk, images)
+    }
+
+    pub fn update_download_chapter_image_status(&mut self, pk: DownloadChapterImagePK, status: DownloadStatus) -> Result<usize, Error> {
+        crate::download_chapter_images::update_status(&self.conn, pk, status)
     }
 
     pub fn load_download(&self) -> Result<Vec<DownloadJoin>, Error> {

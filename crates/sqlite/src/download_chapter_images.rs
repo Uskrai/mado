@@ -3,12 +3,16 @@ use std::{collections::HashMap, sync::Arc};
 use mado_engine::{path::Utf8PathBuf, DownloadChapterImageInfo};
 use rusqlite::{params, Connection, Error};
 
-use crate::{download_chapters::DownloadChapterPK, status::DownloadStatus};
+use crate::{
+    download_chapters::DownloadChapterPK, query::DownloadChapterImageInfoJoin,
+    status::DownloadStatus,
+};
 
 #[derive(Debug)]
 pub struct DownloadChapterImage {
     pub pk: DownloadChapterImagePK,
     pub download_chapter_id: DownloadChapterPK,
+    pub name: Option<String>,
     pub image_url: String,
     pub extension: String,
     pub path: Utf8PathBuf,
@@ -90,6 +94,7 @@ pub fn load(
         let chapter = DownloadChapterImage {
             pk,
             download_chapter_id: dl_pk,
+            name: row.get("name")?,
             image_url: row.get("image_url")?,
             path: row.get::<_, String>("path")?.into(),
             extension: row.get("extension")?,
@@ -118,16 +123,24 @@ pub fn update_images(
     conn: &mut Connection,
     pk: DownloadChapterPK,
     images: Vec<Arc<DownloadChapterImageInfo>>,
-) -> Result<(), Error> {
+) -> Result<Vec<DownloadChapterImageInfoJoin>, Error> {
     let conn = conn.transaction()?;
+    let mut vec = vec![];
     delete_images(&conn, pk)?;
-
 
     for it in images {
         insert_info(&conn, pk, &it)?;
+        let id = conn.last_insert_rowid();
+
+        vec.push(DownloadChapterImageInfoJoin {
+            pk: DownloadChapterImagePK::new(pk, id),
+            image: it,
+        });
     }
 
-    conn.commit()
+    conn.commit()?;
+
+    Ok(vec)
 }
 
 pub fn delete_images(conn: &Connection, pk: DownloadChapterPK) -> Result<usize, Error> {
@@ -212,7 +225,8 @@ mod tests {
                 "path-changed".into(),
                 mado_engine::DownloadStatus::paused(),
             ))],
-        ).unwrap();
+        )
+        .unwrap();
 
         let updated = load(&db).unwrap();
 
