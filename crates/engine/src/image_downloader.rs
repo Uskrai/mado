@@ -205,7 +205,6 @@ where
 mod tests {
 
     use std::{
-        net::SocketAddr,
         sync::{atomic::AtomicUsize, Arc},
         time::Duration,
     };
@@ -214,6 +213,8 @@ mod tests {
     use mockall::predicate::eq;
 
     use super::*;
+    use crate::tests::*;
+    use httpmock::prelude::*;
 
     #[test]
     fn retry_test() {
@@ -258,13 +259,6 @@ mod tests {
                 .await
                 .unwrap();
         });
-    }
-
-    use httpmock::prelude::*;
-
-    fn server_url(socket: &SocketAddr) -> mado_core::url::Url {
-        mado_core::url::Url::try_from(format!("http://localhost:{}", socket.port()).as_str())
-            .unwrap()
     }
 
     #[test]
