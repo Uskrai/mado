@@ -117,31 +117,10 @@ impl TaskDownloader {
         let image = image.image();
         let exists = path.exists();
 
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
         const RETRY_LIMIT: usize = 10;
         const TIMEOUT: u64 = 10;
         let retry = Arc::new(RETRY_LIMIT.into());
         let timeout = Arc::new(TIMEOUT.into());
-
-        struct Config(Arc<AtomicUsize>, Arc<AtomicU64>);
-        impl crate::ImageDownloaderConfig for Config {
-            type Buffer = Vec<u8>;
-
-            fn should_retry(&self, retry_count: usize) -> bool {
-                retry_count < self.0.load(atomic::Ordering::Relaxed)
-            }
-
-            fn timeout(&self) -> std::time::Duration {
-                std::time::Duration::from_secs(self.1.load(atomic::Ordering::Relaxed))
-            }
-
-            fn buffer(&self) -> Self::Buffer {
-                Vec::new()
-            }
-        }
 
         if !exists {
             let task = ImageDownloader::new(module.clone(), image.clone(), Config(retry, timeout));
@@ -151,6 +130,11 @@ impl TaskDownloader {
             let buffer = task.download().await?;
 
             tracing::trace!("Finished downloading {} {:?}", path, image);
+
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
             let mut file = std::fs::File::create(path).unwrap();
             file.write_all(&buffer)?;
             tracing::trace!("Finished writing to {}", path);
@@ -158,6 +142,23 @@ impl TaskDownloader {
             tracing::trace!("File {} already exists, skipping...", path);
         }
         Ok(())
+    }
+}
+
+struct Config(Arc<AtomicUsize>, Arc<AtomicU64>);
+impl crate::ImageDownloaderConfig for Config {
+    type Buffer = Vec<u8>;
+
+    fn should_retry(&self, retry_count: usize) -> bool {
+        retry_count < self.0.load(atomic::Ordering::Relaxed)
+    }
+
+    fn timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.1.load(atomic::Ordering::Relaxed))
+    }
+
+    fn buffer(&self) -> Self::Buffer {
+        Vec::new()
     }
 }
 
@@ -217,15 +218,98 @@ impl crate::core::ChapterTask for ChapterTaskSender {
 mod tests {
     use std::sync::Arc;
 
+    use camino::Utf8PathBuf;
     use futures::StreamExt;
+    use httpmock::Method::GET;
     use mado_core::{ChapterImageInfo, DefaultMadoModuleMap, MockMadoModule, Uuid};
     use mockall::predicate::{always, eq};
 
     use crate::{
-        DownloadChapterInfo, DownloadInfo, DownloadStatus, LateBindingModule, TaskDownloader,
+        tests::server_url, DownloadChapterInfo, DownloadInfo, DownloadStatus, LateBindingModule,
+        TaskDownloader,
     };
 
     use super::DownloadInfoWatcher;
+
+    // TODO: improve this test to not use fs
+    #[test]
+    fn download_image_test() {
+        let mut module = MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(1));
+
+        let firstinfo = ChapterImageInfo {
+            id: "1".to_string(),
+            extension: "png".to_string(),
+            name: Some("1.png".to_string()),
+        };
+
+        let i1 = firstinfo.clone();
+        module
+            .expect_get_chapter_images()
+            .with(eq("1"), always())
+            .returning(move |_, mut a| {
+                a.add(firstinfo.clone());
+                Ok(())
+            });
+
+        let mock = httpmock::MockServer::start();
+        let h = mock.mock(|when, then| {
+            when.path("/test").method(GET);
+            then.body("testtest");
+        });
+
+        let client = mado_core::http::Client::default();
+        let url = server_url(h.server_address()).join("/test").unwrap();
+
+        module
+            .expect_download_image()
+            .with(eq(i1))
+            .returning(move |_| Ok(client.get(url.clone()).into()));
+
+        let module = Arc::new(module);
+
+        let temp = tempfile::tempdir().unwrap();
+        let path = Utf8PathBuf::from_path_buf(temp.path().to_path_buf()).unwrap();
+
+        let chapter = Arc::new(DownloadChapterInfo::new(
+            module.clone().into(),
+            "1".to_string(),
+            "title".to_string(),
+            path.join("1"),
+            DownloadStatus::waiting(),
+        ));
+        let info = Arc::new(DownloadInfo::new(
+            module.into(),
+            "title".to_string(),
+            vec![chapter],
+            path.clone(),
+            None,
+            DownloadStatus::waiting(),
+        ));
+
+        futures::executor::block_on(async {
+            let downloader = TaskDownloader::new(info.clone());
+
+            let status = DownloadInfoWatcher::connect(info.clone());
+
+            let fut = status.wait_status(|s| !s.is_resumed());
+
+            let runner = downloader.run();
+
+            futures::pin_mut!(fut);
+            futures::pin_mut!(runner);
+            let _ = futures::future::select(fut, runner).await;
+
+            assert_eq!(*info.status(), DownloadStatus::finished());
+        });
+
+        assert_eq!(
+            std::fs::read_to_string(path.join("1").join("0001.png")).unwrap(),
+            "testtest"
+        );
+
+        temp.close().unwrap();
+    }
 
     #[test]
     fn get_chapter_test() {
@@ -308,7 +392,6 @@ mod tests {
 
             let future = watcher.wait_status(DownloadStatus::is_completed);
             info.resume(true);
-            println!("{:?}", *info.status());
             assert!(info.status().is_resumed());
             assert!(!info.status().is_completed());
             crate::timer::timeout(std::time::Duration::from_millis(10), future)
