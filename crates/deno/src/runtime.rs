@@ -460,7 +460,6 @@ fn fn_catch_callback(
     mut rv: v8::ReturnValue,
 ) {
     let errors = args.get(0);
-    println!("catching {:?}", errors.to_rust_string_lossy(scope));
     rv.set(errors);
 }
 
@@ -500,12 +499,6 @@ extern "C" fn promise_hook(
     current: v8::Local<v8::Promise>,
     parent: v8::Local<v8::Value>,
 ) {
-    println!(
-        "{:?} {} {}",
-        types,
-        current.is_null_or_undefined(),
-        parent.is_null_or_undefined()
-    );
     match types {
         v8::PromiseHookType::Init => {
             if !parent.is_null_or_undefined() {
