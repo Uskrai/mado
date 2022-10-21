@@ -194,7 +194,6 @@ where
 
         match request {
             mado_core::RequestBuilder::Http(request) => {
-                println!("download http");
                 download_http(request, buffer, || self.config.timeout()).await
             }
         }
