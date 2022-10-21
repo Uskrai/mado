@@ -52,10 +52,6 @@ impl<T> Observers<T> {
             f(it);
         }
     }
-
-    pub fn lock(&'_ self) -> impl Deref + '_ {
-        self.observers.lock()
-    }
 }
 
 #[derive(Debug, Clone)]
