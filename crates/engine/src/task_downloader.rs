@@ -315,6 +315,12 @@ mod tests {
             "testtest"
         );
 
+        assert_eq!(info.chapters().len(), 1);
+        assert_eq!(info.chapters()[0].images().len(), 1);
+        assert_eq!(
+            info.chapters()[0].images()[0].path(),
+            path.join("1").join("0001.png")
+        );
         temp.close().unwrap();
     }
 
