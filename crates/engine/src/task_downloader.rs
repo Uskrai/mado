@@ -46,8 +46,7 @@ impl TaskDownloader {
 
     async fn download(&self) -> Result<(), mado_core::Error> {
         let _ = self.info.wait_module().await;
-        self.info
-            .set_status(DownloadStatus::resumed(DownloadResumedStatus::Downloading));
+        self.info.set_status(DownloadStatus::downloading());
         for it in self.info.chapters() {
             self.download_chapter(it.clone()).await?;
         }
