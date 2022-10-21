@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mado_engine::{core::ArcMadoModuleMap, DownloadInfo};
+use mado_engine::{core::ArcMadoModuleMap, DownloadInfo, DownloadChapterImageInfo};
 use rusqlite::{Connection, Error};
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     downloads::DownloadPK,
     module::{InsertModule, Module, ModulePK},
     query::{DownloadInfoJoin, DownloadJoin},
-    status::DownloadStatus,
+    status::DownloadStatus, download_chapter_images::DownloadChapterImagePK,
 };
 
 pub struct Database {
@@ -60,6 +60,18 @@ impl Database {
         status: DownloadStatus,
     ) -> Result<usize, Error> {
         crate::download_chapters::update_status(&self.conn, pk, status)
+    }
+
+    pub fn update_download_chapter_images(
+        &mut self,
+        pk: DownloadChapterPK,
+        images: Vec<Arc<DownloadChapterImageInfo>>,
+    ) -> Result<Vec<crate::query::DownloadChapterImageInfoJoin>, Error> {
+        crate::download_chapter_images::update_images(&mut self.conn, pk, images)
+    }
+
+    pub fn update_download_chapter_image_status(&mut self, pk: DownloadChapterImagePK, status: DownloadStatus) -> Result<usize, Error> {
+        crate::download_chapter_images::update_status(&self.conn, pk, status)
     }
 
     pub fn load_download(&self) -> Result<Vec<DownloadJoin>, Error> {

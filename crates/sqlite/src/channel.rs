@@ -1,17 +1,19 @@
 use futures::{channel::mpsc, StreamExt};
+use parking_lot::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
 use mado_engine::{
     core::{ArcMadoModule, ArcMadoModuleMap, Uuid},
-    DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
+    DownloadChapterImageInfo, DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
     MadoEngineState, MadoEngineStateMsg,
 };
 
 use crate::{
+    download_chapter_images::DownloadChapterImagePK,
     download_chapters::DownloadChapterPK,
     downloads::DownloadPK,
     module::{InsertModule, Module},
-    query::DownloadInfoJoin,
+    query::{DownloadChapterImageInfoJoin, DownloadChapterInfoJoin, DownloadInfoJoin},
     status::DownloadStatus,
     Database,
 };
@@ -22,6 +24,8 @@ pub enum DbMsg {
     PushModule(ArcMadoModule),
     DownloadStatusChanged(DownloadPK, DownloadStatus),
     DownloadChapterStatusChanged(DownloadChapterPK, DownloadStatus),
+    DownloadChapterImagesChanged(DownloadChapterPK, Vec<Arc<DownloadChapterImageInfo>>),
+    DownloadChapterImageStatusChanged(DownloadChapterImagePK, DownloadStatus),
     Close,
 }
 
@@ -32,6 +36,7 @@ pub struct Channel {
     tx: mpsc::UnboundedSender<DbMsg>,
     db: Database,
     module: HashMap<Uuid, Module>,
+    download_chapter_images: Mutex<HashMap<DownloadChapterPK, Vec<mado_engine::AnyObserverHandleSend>>>,
 }
 
 pub fn channel(db: Database) -> Channel {
@@ -41,23 +46,23 @@ pub fn channel(db: Database) -> Channel {
         rx,
         tx,
         module: HashMap::new(),
+        download_chapter_images: Default::default(),
     }
 }
 
 impl Channel {
     /// Handle next message.
-    pub fn try_next(&mut self) -> Result<(), rusqlite::Error> {
+    pub fn try_next(&mut self) -> Result<bool, rusqlite::Error> {
         if let Ok(Some(msg)) = self.rx.try_next() {
-            self.handle_msg(msg)?;
+            self.handle_msg(msg).map(|_| true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }
 
     /// Handle all message until empty or fail.
     pub fn try_all(&mut self) -> Result<(), rusqlite::Error> {
-        while let Ok(Some(msg)) = self.rx.try_next() {
-            self.handle_msg(msg)?;
-        }
+        while self.try_next()? {}
         Ok(())
     }
 
@@ -87,6 +92,14 @@ impl Channel {
             }
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
+            }
+            DbMsg::DownloadChapterImagesChanged(ch_pk, images) => {
+                let image = self.db.update_download_chapter_images(ch_pk, images)?;
+
+                self.connect_download_chapter_images(ch_pk, image);
+            }
+            DbMsg::DownloadChapterImageStatusChanged(pk, status) => {
+                self.db.update_download_chapter_image_status(pk, status)?;
             }
             DbMsg::Close => {
                 self.sender().close_channel();
@@ -138,7 +151,9 @@ impl Channel {
 
     fn connect_info(&self, join: DownloadInfoJoin) {
         for info in join.chapters {
-            self.connect_download_chapter(info.pk, info.chapter);
+            self.connect_download_chapter(info.pk, info.chapter.clone());
+
+            self.connect_download_chapter_images(info.pk, info.images);
         }
 
         let tx = self.tx.clone();
@@ -184,9 +199,51 @@ impl Channel {
                 DownloadChapterInfoMsg::StatusChanged(status) => {
                     tx.unbounded_send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
                 }
+                DownloadChapterInfoMsg::DownloadImagesChanged(images) => {
+                    tx.unbounded_send(DbMsg::DownloadChapterImagesChanged(pk, images.clone()))
+                }
             }
             .ok();
         });
+    }
+
+    fn connect_download_chapter_images(
+        &self,
+        ch_pk: DownloadChapterPK,
+        info: Vec<DownloadChapterImageInfoJoin>,
+    ) {
+        let mut vec = Vec::new();
+        for it in info {
+            let handle = self.connect_download_chapter_image(ch_pk, it.pk, it.image);
+            vec.push(handle);
+        }
+
+        // make sure observer that is attached before disconnected
+        let before = self.download_chapter_images.lock().insert(ch_pk, vec);
+        if let Some(handles) = before {
+            for it in handles {
+                it.disconnect();
+            }
+        }
+    }
+
+    fn connect_download_chapter_image(
+        &self,
+        _: DownloadChapterPK,
+        pk: DownloadChapterImagePK,
+        info: Arc<DownloadChapterImageInfo>,
+    ) -> mado_engine::AnyObserverHandleSend {
+        let tx = self.tx.clone();
+
+        info.connect_only(move |msg| {
+            match msg {
+                mado_engine::DownloadChapterImageInfoMsg::StatusChanged(status) => {
+                    tx.unbounded_send(DbMsg::DownloadChapterImageStatusChanged(pk, status.into()))
+                }
+            }
+            .ok();
+        })
+        .send_handle_any()
     }
 }
 
@@ -286,7 +343,7 @@ mod tests {
         {
             let it = rx.db.load_download().unwrap();
             let ch = &it[0].chapters[0];
-            assert_eq!(ch.status, DownloadStatus::Finished);
+            assert_eq!(ch.chapter.status, DownloadStatus::Finished);
         }
 
         {
@@ -300,9 +357,29 @@ mod tests {
             it[0].set_status(mado_engine::DownloadStatus::paused());
             rx.try_all().unwrap();
 
-            let it = rx.load_connect(state.map).unwrap();
+            let it = rx.load_connect(state.map.clone()).unwrap();
             let status = it[0].status().clone();
             assert_eq!(DownloadStatus::Paused, status.into());
+        }
+
+        state.populate_chapter_image(info.chapters()[0].clone(), 2);
+        rx.try_all().unwrap();
+
+        {
+            let it = rx.load_connect(state.map.clone()).unwrap();
+            let ch = &it[0].chapters()[0];
+            assert_eq!(ch.images().len(), 2);
+            let image = &ch.images()[0];
+            assert_eq!(DownloadStatus::Finished, image.status().clone().into());
+
+            image.set_status(mado_engine::DownloadStatus::waiting());
+            rx.try_all().unwrap();
+
+            let it = rx.load_connect(state.map.clone()).unwrap();
+            assert_eq!(
+                DownloadStatus::Finished,
+                it[0].chapters()[0].images()[0].status().clone().into()
+            );
         }
     }
 

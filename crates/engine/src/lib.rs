@@ -2,7 +2,7 @@ mod image_downloader;
 mod info;
 mod observer;
 pub use info::*;
-pub use observer::{ObserverHandle, Observers};
+pub use observer::*;
 mod engine;
 mod task_downloader;
 pub mod timer;

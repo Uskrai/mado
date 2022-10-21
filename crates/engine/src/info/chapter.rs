@@ -1,4 +1,9 @@
-use crate::{path::Utf8PathBuf, DownloadStatus, LateBindingModule, ObserverHandle, Observers};
+use std::sync::Arc;
+
+use crate::{
+    path::Utf8PathBuf, DownloadChapterImageInfo, DownloadStatus, LateBindingModule, ObserverHandle,
+    Observers,
+};
 use parking_lot::Mutex;
 
 #[derive(Debug)]
@@ -9,6 +14,7 @@ pub struct DownloadChapterInfo {
     path: Utf8PathBuf,
     status: Mutex<DownloadStatus>,
     observers: Observers<BoxObserver>,
+    images: Mutex<Vec<Arc<DownloadChapterImageInfo>>>,
 }
 macro_rules! ImplObserver {
     () => {
@@ -18,9 +24,11 @@ macro_rules! ImplObserver {
 
 pub type BoxObserver = Box<dyn FnMut(DownloadChapterInfoMsg<'_>) + Send>;
 
+// REMINDER: add new variant to connect
 #[derive(Debug)]
 pub enum DownloadChapterInfoMsg<'a> {
     StatusChanged(&'a DownloadStatus),
+    DownloadImagesChanged(&'a Vec<Arc<DownloadChapterImageInfo>>),
 }
 
 pub trait DownloadChapterInfoObserver: std::fmt::Debug + Send + 'static {
@@ -41,6 +49,7 @@ impl DownloadChapterInfo {
             chapter_id,
             path,
             status: Mutex::new(status),
+            images: Default::default(),
             observers: Default::default(),
         }
     }
@@ -67,6 +76,16 @@ impl DownloadChapterInfo {
             .emit(|it| it(DownloadChapterInfoMsg::StatusChanged(&lock)));
     }
 
+    pub fn images(&self) -> impl std::ops::Deref<Target = Vec<Arc<DownloadChapterImageInfo>>> + '_ {
+        self.images.lock()
+    }
+    pub fn set_images(&self, images: Vec<Arc<DownloadChapterImageInfo>>) {
+        let mut lock = self.images.lock();
+        *lock = images;
+        self.observers
+            .emit(|it| it(DownloadChapterInfoMsg::DownloadImagesChanged(&lock)));
+    }
+
     /// Get a reference to the download chapter info's title.
     ///
     /// this isn't necessarily ChapterInfo::title
@@ -81,6 +100,7 @@ impl DownloadChapterInfo {
 
     pub fn connect(&self, mut observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
         observer(DownloadChapterInfoMsg::StatusChanged(&self.status()));
+        observer(DownloadChapterInfoMsg::DownloadImagesChanged(&self.images()));
 
         self.connect_only(observer)
     }
