@@ -1,0 +1,44 @@
+{
+  "name": "mado-deno",
+  "version": "0.0.1",
+  "description": "typescript dependency for mado-deno",
+  "type": "module",
+  "scripts": {
+    "test": "cargo test script_test -- --nocapture"
+  },
+  "author": {
+    "name": "Muhammad Fathurrohim",
+    "email": "m.faturrohim13@gmail.com",
+    "url": "https://github.com/uskrai/"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.2",
+    "deep-equal": "^2.0.5",
+    "esbuild": "^0.15.10",
+    "fast-glob": "^3.2.12",
+    "jsonpath-plus": "^7.2.0",
+    "lcov-sourcemap-ts": "^0.4.0",
+    "object-inspect": "^1.12.2",
+    "verbose-regexp": "^2.0.0",
+    "xpath-ts": "^1.3.13"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^22.0.2",
+    "@rollup/plugin-node-resolve": "^14.1.0",
+    "@rollup/plugin-typescript": "^8.5.0",
+    "@types/deep-equal": "^1.0.1",
+    "@types/jsdom": "^20.0.0",
+    "@types/node": "^18.7.23",
+    "@types/object-inspect": "^1.8.1",
+    "@types/xmldom": "^0.1.31",
+    "chokidar": "^3.5.3",
+    "rollup": "^2.79.1",
+    "rollup-plugin-multi-input": "^1.3.1",
+    "rollup-plugin-rename": "^1.0.1",
+    "rollup-plugin-ts": "^3.0.2",
+    "rollup-plugin-typescript2": "0.32.0",
+    "tslib": "^2.4.0",
+    "typescript": "^4.8.4"
+  }
+}

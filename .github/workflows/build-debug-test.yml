@@ -29,12 +29,16 @@ jobs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-cache-debug-test
 
+    - uses: ./.github/actions/init-deno
+
     - name: Dependency
       run: sudo apt-get install libgtk-4-dev
     - name: Build Debug
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+      env:
+        RUST_BACKTRACE: 1
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
