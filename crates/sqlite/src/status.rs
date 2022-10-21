@@ -211,4 +211,28 @@ mod tests {
             mado_engine::DownloadStatus::resumed(DownloadResumedStatus::Waiting).into()
         );
     }
+
+    #[test]
+    fn to_status() {
+        assert_eq!(
+            mado_engine::DownloadStatus::finished(),
+            DownloadStatus::Finished.into(),
+        );
+
+        assert_eq!(
+            mado_engine::DownloadStatus::paused(),
+            DownloadStatus::Paused.into(),
+        );
+
+        assert_eq!(
+            mado_engine::DownloadStatus::error("error"),
+            DownloadStatus::error("error").into(),
+        );
+
+        assert_eq!(
+            mado_engine::DownloadStatus::resumed(DownloadResumedStatus::Waiting),
+            DownloadStatus::Resumed.into(),
+        );
+        //
+    }
 }
