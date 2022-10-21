@@ -6,7 +6,7 @@ import { initMadoModule } from "../module/manganato.js";
 const allmodule = initMadoModule();
 const module = new RustModule(allmodule[0]);
 export async function getInfo__Ok__1() {
-  let url = "https://readmanganato.com/manga-yu976355";
+  let url = "https://chapmanganato.com/manga-yu976355";
   return await module.getInfo(url);
 }
 
@@ -16,7 +16,7 @@ export async function getInfo__Ok__2() {
 }
 
 export async function getInfo__Err_MadoError_RequestError__404() {
-  let url = "https://readmanganato.com/manga-yu176355";
+  let url = "https://chapmanganato.com/manga-yu176355";
   return await module.getInfo(url);
 }
 
@@ -31,7 +31,7 @@ export async function getChapterImage__Ok__1() {
 }
 
 export async function getChapterImage__Err_MadoError_RequestError__404() {
-  let id = "https://readmanganato.com/manga-yu976355/chapter-1325";
+  let id = "https://chapmanganato.com/manga-yu976355/chapter-1325";
   let task = RustChapterTask.fromRust();
   return await module
     .getChapterImage(id, task)

@@ -164,7 +164,7 @@ export function initMadoModule() {
   let readmanganato = new MangaNato(
     "fa8bb4d1ceea4c8fa0e98c00755f95d4",
     "Manganato",
-    "https://readmanganato.com"
+    "https://chapmanganato.com"
   );
 
   let manganato = new ModuleWrapper(
