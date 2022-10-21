@@ -42,8 +42,10 @@ mod tests {
         state: &State,
     ) -> Arc<DownloadInfo> {
         let mut vec = Vec::new();
-        for _ in 0..chapter_length.into() {
-            vec.push(state.new_chapter());
+        for i in 0..chapter_length.into() {
+            let ch = state.new_chapter();
+            state.populate_chapter_image(ch.clone(), i % 4);
+            vec.push(ch);
         }
 
         Arc::new(DownloadInfo::new(
