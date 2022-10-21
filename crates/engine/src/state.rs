@@ -147,14 +147,19 @@ mod tests {
         let mut it = MockCall::new();
         it.expect_handle_msg()
             .times(1)
-            .withf(|it| matches!(it, MadoEngineStateMsg::PushModule(_))).return_const(());
+            .withf(|it| matches!(it, MadoEngineStateMsg::PushModule(_)))
+            .return_const(());
 
-        it.expect_handle_msg().times(1).withf(|it| match it {
-            MadoEngineStateMsg::Download(download) => {
-                return download.url() == Some(&mado_core::Url::parse("http://localhost").unwrap())
-            }
-            _ => false,
-        }).return_const(());
+        it.expect_handle_msg()
+            .times(1)
+            .withf(|it| match it {
+                MadoEngineStateMsg::Download(download) => {
+                    return download.url()
+                        == Some(&mado_core::Url::parse("http://localhost").unwrap())
+                }
+                _ => false,
+            })
+            .return_const(());
 
         state
             .connect(move |msg| {

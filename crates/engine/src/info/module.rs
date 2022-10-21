@@ -146,10 +146,13 @@ mod tests {
         map.push_mut(module.clone()).unwrap();
 
         futures::executor::block_on(async {
-            crate::timer::timeout(std::time::Duration::from_millis(SLEEP_TIME_MILLIS * 2), async {
-                wait_module.wait().await;
-                unreachable!();
-            })
+            crate::timer::timeout(
+                std::time::Duration::from_millis(SLEEP_TIME_MILLIS * 2),
+                async {
+                    wait_module.wait().await;
+                    unreachable!();
+                },
+            )
             .await
             .expect_err("this should error because no same uuid");
         });
