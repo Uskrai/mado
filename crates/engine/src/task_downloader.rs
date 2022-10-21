@@ -9,7 +9,7 @@ use std::{
 use event_listener::Event;
 use futures::{channel::mpsc, FutureExt, StreamExt};
 
-use crate::{DownloadChapterImageInfo, DownloadChapterInfo, DownloadResumedStatus, DownloadStatus};
+use crate::{DownloadChapterImageInfo, DownloadChapterInfo, DownloadStatus};
 
 pub use super::*;
 
@@ -277,7 +277,7 @@ mod tests {
                     1 => {
                         image.unwrap_err();
                     }
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             }
         });
@@ -294,20 +294,23 @@ mod tests {
             vec![],
             Default::default(),
             None,
-            crate::DownloadStatus::Finished,
+            crate::DownloadStatus::error("Error"),
         );
 
         let info = Arc::new(info);
         let watcher = DownloadInfoWatcher::connect(info.clone());
 
         futures::executor::block_on(async {
-            let future = watcher.wait_status(|status| status.is_resumed());
+            let future = watcher.wait_status(DownloadStatus::is_paused);
             crate::timer::timeout(std::time::Duration::from_millis(10), future)
                 .await
                 .unwrap_err();
 
             let future = watcher.wait_status(DownloadStatus::is_completed);
-            info.set_status(DownloadStatus::waiting());
+            info.resume(true);
+            println!("{:?}", *info.status());
+            assert!(info.status().is_resumed());
+            assert!(!info.status().is_completed());
             crate::timer::timeout(std::time::Duration::from_millis(10), future)
                 .await
                 .unwrap_err();

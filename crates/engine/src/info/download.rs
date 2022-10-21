@@ -309,4 +309,31 @@ mod tests {
         assert_eq!(download.url(), Some(&url));
         assert_eq!(*download.module_uuid(), Uuid::from_u128(1));
     }
+
+    #[test]
+    fn test_resume() {
+        let info = DownloadInfo::new(
+            LateBindingModule::WaitModule(
+                Arc::new(DefaultMadoModuleMap::new()),
+                Default::default(),
+            ),
+            Default::default(),
+            Vec::new(),
+            Default::default(),
+            None,
+            DownloadStatus::paused(),
+        );
+
+        info.resume(true);
+        assert!(info.status().is_resumed());
+        info.resume(false);
+        assert!(info.status().is_paused());
+
+        info.set_status(DownloadStatus::finished());
+        assert!(info.status().is_completed());
+        info.resume(true);
+        assert!(info.status().is_completed());
+        info.resume(false);
+        assert!(info.status().is_completed());
+    }
 }
