@@ -2,7 +2,6 @@ use parking_lot::Mutex;
 use std::{
     collections::HashMap,
     fmt::Debug,
-    ops::Deref,
     sync::{atomic::AtomicUsize, Arc, Weak},
 };
 
