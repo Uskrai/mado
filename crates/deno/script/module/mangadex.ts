@@ -157,7 +157,7 @@ export class MangaDex extends HttpModule {
       id: json.id,
       title: attr.title,
       volume: attr.volume,
-      chapter: attr.title,
+      chapter: attr.chapter,
       language: attr.translatedLanguage,
       scanlator: [],
     };
