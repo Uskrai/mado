@@ -12,7 +12,9 @@ import {
   HttpRequest,
   Chapter,
   MangaAndChapters,
+  RustHttpClient,
 } from "../deps/index";
+import { ResultModule } from "../deps/module";
 
 const FLOAT_REGEX = `/^[+-]?\d+(\.\d+)?$/`;
 
@@ -23,12 +25,11 @@ const NAME_REGEX = rx`
     (?<title>.*))?
 `;
 
-class MangaNato extends HttpModule {
-  constructor(uuid: string, name: string, domain: string) {
-    super(uuid, name, domain, new HttpClient());
+class MangaNato implements HttpModule {
+  constructor(public uuid: string, public name: string, public domain: string, public client: HttpClient) {
   }
 
-  async get_info(url: string): Promise<MangaAndChapters> {
+  async getInfo(url: string): Promise<MangaAndChapters> {
     let response = await this.client.get({
       url: url,
     });
@@ -118,7 +119,7 @@ class MangaNato extends HttpModule {
     return info;
   }
 
-  async get_chapter_image(id: string, task: ChapterTask) {
+  async getChapterImage(id: string, task: ChapterTask) {
     let response = await this.client.get({ url: id });
 
     let doc = new XHTMLPath(await response.text_data());
@@ -146,7 +147,7 @@ class MangaNato extends HttpModule {
     images.forEach((it) => task.push(it));
   }
 
-  async download_image(image: ChapterImageInfo): Promise<HttpRequest> {
+  async downloadImage(image: ChapterImageInfo): Promise<HttpRequest> {
     return {
       url: image.id,
       header: {
@@ -155,16 +156,17 @@ class MangaNato extends HttpModule {
     };
   }
 
-  async close_all() {
+  async closeAll() {
     this.client.close();
   }
 }
 
-export function initMadoModule() {
+export function initModule() {
   let readmanganato = new MangaNato(
     "fa8bb4d1ceea4c8fa0e98c00755f95d4",
     "Manganato",
-    "https://chapmanganato.com"
+    "https://chapmanganato.com",
+    new RustHttpClient(),
   );
 
   let manganato = new ModuleWrapper(
@@ -180,17 +182,24 @@ export function initMadoModule() {
     new MangaNato(
       "74674292e13c496699b8c5e4efd4b583",
       "MangaKakalot",
-      "https://mangakakalot.com"
+      "https://mangakakalot.com",
+      new RustHttpClient(),
     ),
     new MangaNato(
       "ed4175a390e74aedbe4b4f622f3767c6",
       "MangaKakalots",
-      "https://mangakakalots.com"
+      "https://mangakakalots.com",
+      new RustHttpClient(),
     ),
     new MangaNato(
       "2234588abb544fc6a279c7811f2a9733",
       "MangaBat",
-      "https://m.mangabat.com"
+      "https://m.mangabat.com",
+      new RustHttpClient(),
     ),
   ];
+}
+
+export function initMadoModule() {
+  return initModule().map(it => new ResultModule(it));
 }

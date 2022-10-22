@@ -1,5 +1,4 @@
-import { RustChapterTask } from "../deps/manga";
-import { RustModule } from "../deps/rust_module";
+import { RustChapterTask, RustModule } from "../deps/index";
 import { assertOk } from "../deps/test";
 import { initMadoModule } from "../module/mangadex";
 

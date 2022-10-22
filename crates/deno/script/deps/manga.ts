@@ -1,27 +1,5 @@
-import { ResultFromJson } from "./error";
-
 export interface ChapterTask {
   push(image: ChapterImageInfo): void;
-}
-
-export class RustChapterTask {
-  rid: number;
-
-  constructor(rid: number) {
-    this.rid = rid;
-  }
-
-  static fromRust() {
-    return new RustChapterTask(Deno.core.opSync("op_mado_chapter_task_new"));
-  }
-
-  push(image: object) {
-    return ResultFromJson(Deno.core.opSync("op_mado_chapter_task_add", this.rid, image));
-  }
-
-  toArray() {
-    return ResultFromJson(Deno.core.opSync("op_mado_chapter_task_to_array", this.rid));
-  }
 }
 
 export interface Manga {

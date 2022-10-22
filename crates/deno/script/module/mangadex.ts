@@ -9,7 +9,9 @@ import {
   HttpRequest,
   Manga,
   MangaAndChapters,
+  RustHttpClient,
 } from "../deps/index";
+import { ResultModule } from "../deps/module";
 
 const API_URL = "https://api.mangadex.org";
 const API_PARAMS = "includes[]=author&includes[]=artist&includes[]=cover_art";
@@ -19,9 +21,8 @@ const REGEX_ID = new RegExp(
   `${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}`
 );
 
-export class MangaDex extends HttpModule {
-  constructor(uuid: string, name: string, domain: string) {
-    super(uuid, name, domain, new HttpClient());
+export class MangaDex implements HttpModule {
+  constructor(public uuid: string, public name: string, public domain: string, public client: HttpClient) {
   }
 
   parse_response(url: string, json: any) {
@@ -32,7 +33,7 @@ export class MangaDex extends HttpModule {
     return json;
   }
 
-  async get_info(url: string): Promise<MangaAndChapters> {
+  async getInfo(url: string): Promise<MangaAndChapters> {
     let id = REGEX_ID.exec(url)?.at(0);
     if (id == null) {
       throw Error.invalid_url(url);
@@ -170,7 +171,7 @@ export class MangaDex extends HttpModule {
     return info;
   }
 
-  async get_chapter_image(id: string, task: ChapterTask): Promise<void> {
+  async getChapterImage(id: string, task: ChapterTask): Promise<void> {
     let url = `${API_URL}/at-home/server/${id}`;
     let response = await this.client.get({ url });
     let json = await response.json_data();
@@ -192,24 +193,29 @@ export class MangaDex extends HttpModule {
 
   }
 
-  async download_image(image: any): Promise<HttpRequest> {
+  async downloadImage(image: any): Promise<HttpRequest> {
     return {
       url: image.id,
       header: undefined,
     };
   }
 
-  async close_all() {
+  async closeAll() {
     this.client.close();
   }
 }
 
-export function initMadoModule() {
+export function initModule() {
   return [
     new MangaDex(
       "07bd7f6b-12a1-48f1-9873-f175d4f76c9a",
       "MangaDex",
-      "https://mangadex.org"
+      "https://mangadex.org",
+      new RustHttpClient(),
     ),
   ];
+}
+
+export function initMadoModule() {
+  return initModule().map(it => new ResultModule(it));
 }

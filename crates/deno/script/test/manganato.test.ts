@@ -1,7 +1,6 @@
-import { RustChapterTask } from "../deps/manga.js";
-import { RustModule } from "../deps/rust_module.js";
-import { assertOk } from "../deps/test.js";
-import { initMadoModule } from "../module/manganato.js";
+import { RustChapterTask, RustModule } from "../deps/index";
+import { assertOk } from "../deps/test";
+import { initMadoModule } from "../module/manganato";
 
 const allmodule = initMadoModule();
 const module = new RustModule(allmodule[0]);
