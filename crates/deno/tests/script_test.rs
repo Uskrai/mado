@@ -12,19 +12,13 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .unwrap();
 
-    let options = deno_core::RuntimeOptions {
-        module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
-        extensions: mado_deno::extensions(),
-        ..Default::default()
-    };
-
     let local_set = LocalSet::new();
     let _local_set_guard = local_set.enter();
 
     let test_set = LocalSet::new();
     let last_set = LocalSet::new();
 
-    let runtime = Runtime::new(options);
+    let runtime = Runtime::default();
     let inspector = runtime
         .js()
         .borrow_mut()
