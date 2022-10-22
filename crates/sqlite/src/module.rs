@@ -24,7 +24,9 @@ pub struct InsertModule<'a> {
 pub fn insert(conn: &Connection, model: InsertModule<'_>) -> Result<usize, Error> {
     conn.execute(
         "INSERT INTO modules (uuid, name)
-        VALUES (:uuid, :name)",
+            VALUES (:uuid, :name)
+            ON CONFLICT(uuid)
+                DO UPDATE SET name=:name;",
         rusqlite::named_params! {
             ":uuid": model.uuid,
             ":name": model.name,
@@ -122,12 +124,12 @@ mod tests {
                 name: "Module",
             },
         )
-        .unwrap_err();
+        .unwrap();
 
         let it = insert_info(&mut conn, module.clone()).unwrap();
         assert_eq!(it.name, module.name().to_string());
         assert_eq!(it.uuid, module.uuid());
 
-        insert_info(&mut conn, module).unwrap_err();
+        insert_info(&mut conn, module).unwrap();
     }
 }
