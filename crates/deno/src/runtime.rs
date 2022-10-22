@@ -147,6 +147,18 @@ pub enum ModuleLoadError {
     WrongTypeError(anyhow::Error),
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        let options = deno_core::RuntimeOptions {
+            module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
+            extensions: crate::extensions(),
+            ..Default::default()
+        };
+
+        Self::new(options)
+    }
+}
+
 impl Runtime {
     pub fn new(options: RuntimeOptions) -> Self {
         let event = Arc::new(event_listener::Event::new());
@@ -520,4 +532,17 @@ extern "C" fn promise_hook(
             slot.borrow_mut().remove(&current.get_hash());
         }),
     }
+}
+
+pub enum RuntimeActorMsg {
+    //
+}
+
+pub struct RuntimeActorSend {
+    message: RuntimeActorMsg,
+    span: tracing::Span,
+}
+
+pub struct RuntimeActor {
+    sender: futures::channel::mpsc::Sender<RuntimeActorSend>,
 }

@@ -21,7 +21,8 @@ async-trait = "0.1"
 mado = { path = "../mado" }
 # mado-engine = { path = "../engine" }
 # mado-core = { path = "../core" }
-mado-rune = { path = "../rune" }
+# mado-rune = { path = "../rune" }
+mado-deno = { path = "../deno" }
 mado-sqlite = { path = "../sqlite" }
 # mado-dylib = { path = "../dylib" }
 
