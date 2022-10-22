@@ -1,22 +1,24 @@
 import { JSONPath } from "jsonpath-plus";
 export { JSONPath };
 export {
-  Manga,
-  Chapter,
-  MangaAndChapters,
-  ChapterTask,
-  RustChapterTask,
-  ChapterImageInfo,
+  type Manga,
+  type Chapter,
+  type MangaAndChapters,
+  type ChapterTask,
+  type ChapterImageInfo,
 } from "./manga";
+export { RustChapterTask } from './rust_chapter_task';
+export { RustHttpClient } from './rust_http';
+export { RustModule } from './rust_module';
 
-export { HttpModule, ModuleWrapper, Module } from "./module";
-export { HttpClient, HttpResponse, HttpRequest } from "./http";
+export { type HttpModule, ModuleWrapper, type Module } from "./module";
+export { type HttpClient, type HttpResponse, type HttpRequest } from "./http";
 export {
   catchAndReturn,
   Errors as Error,
   ResultOk,
   ResultError,
-  Result,
+  type Result,
   ResultFromJson,
 } from "./error";
 export { XHTMLPath } from "./xhtmlpath";
