@@ -1,3 +1,4 @@
 ignore:
   - crates/deno/tests/*
+  - crates/deno/bootstrap/*
   - crates/rune/tests/*

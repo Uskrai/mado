@@ -4,9 +4,9 @@ mod module;
 mod runtime;
 pub mod task;
 
+pub use error::{Error, ErrorJson};
 pub use module::*;
 pub use runtime::*;
-pub use error::{Error, ErrorJson};
 
 pub enum Resource {
     Json(serde_json::Value),
@@ -43,6 +43,14 @@ pub fn extensions() -> Vec<deno_core::Extension> {
         crate::task::init(),
         deno_core::ExtensionBuilder::default()
             .ops(vec![op_tokio_sleep::decl()])
+            .build(),
+        deno_core::Extension::builder()
+            .js(deno_core::include_js_files!(
+                prefix "bootstrap",
+                "../script/bootstrap/00_bootstrap.js",
+                "../script/bootstrap/01_console.js",
+
+            ))
             .build(),
     ]
 }
