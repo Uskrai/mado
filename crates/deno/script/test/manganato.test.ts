@@ -1,5 +1,6 @@
 import { RustChapterTask, RustModule } from "../deps/index";
 import { assertOk } from "../deps/test";
+import '../deps/index';
 import { initMadoModule } from "../module/manganato";
 
 const allmodule = initMadoModule();
@@ -44,8 +45,8 @@ export async function downloadImage__Ok__1() {
   return await module.downloadImage(images);
 }
 
-export function close() {
+export async function close() {
   for (const it of allmodule) {
-    it.close();
+    await it.close();
   }
 }

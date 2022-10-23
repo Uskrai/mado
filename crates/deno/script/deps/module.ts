@@ -79,6 +79,6 @@ export class ModuleWrapper implements Module {
   }
 
   async closeAll(): Promise<void> {
-    await this.closeAll();
+    await this.module.closeAll();
   }
 }
