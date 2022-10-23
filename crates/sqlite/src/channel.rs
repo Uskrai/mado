@@ -13,7 +13,7 @@ use crate::{
     download_chapters::DownloadChapterPK,
     downloads::DownloadPK,
     module::{InsertModule, Module},
-    query::{DownloadChapterImageInfoJoin, DownloadChapterInfoJoin, DownloadInfoJoin},
+    query::{DownloadChapterImageInfoJoin, DownloadInfoJoin},
     status::DownloadStatus,
     Database,
 };

@@ -467,7 +467,7 @@ fn build_function<'s>(
 }
 
 fn fn_catch_callback(
-    scope: &mut v8::HandleScope,
+    _: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
@@ -532,17 +532,4 @@ extern "C" fn promise_hook(
             slot.borrow_mut().remove(&current.get_hash());
         }),
     }
-}
-
-pub enum RuntimeActorMsg {
-    //
-}
-
-pub struct RuntimeActorSend {
-    message: RuntimeActorMsg,
-    span: tracing::Span,
-}
-
-pub struct RuntimeActor {
-    sender: futures::channel::mpsc::Sender<RuntimeActorSend>,
 }
