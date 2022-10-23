@@ -1,5 +1,4 @@
-import { RustChapterTask } from "../deps/manga";
-import { RustModule } from "../deps/rust_module";
+import { RustChapterTask, RustModule } from "../deps/index";
 import { assertOk } from "../deps/test";
 import { initMadoModule } from "../module/mangadex";
 
@@ -45,8 +44,8 @@ export async function downloadImage__Ok__1() {
   return it;
 }
 
-export function close() {
+export async function close() {
   for (let it of allmodule) {
-    it.close();
+    await it.close();
   }
 }

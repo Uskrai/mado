@@ -9,7 +9,7 @@ esbuild.build({
   bundle: true,
   treeShaking: true,
   sourcemap: "both",
-  // splitting: true,
+  splitting: true,
   incremental: true,
   watch: {
     onRebuild(error, result) {

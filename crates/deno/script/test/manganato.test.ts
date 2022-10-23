@@ -1,7 +1,7 @@
-import { RustChapterTask } from "../deps/manga.js";
-import { RustModule } from "../deps/rust_module.js";
-import { assertOk } from "../deps/test.js";
-import { initMadoModule } from "../module/manganato.js";
+import { RustChapterTask, RustModule } from "../deps/index";
+import { assertOk } from "../deps/test";
+import '../deps/index';
+import { initMadoModule } from "../module/manganato";
 
 const allmodule = initMadoModule();
 const module = new RustModule(allmodule[0]);
@@ -45,8 +45,8 @@ export async function downloadImage__Ok__1() {
   return await module.downloadImage(images);
 }
 
-export function close() {
+export async function close() {
   for (const it of allmodule) {
-    it.close();
+    await it.close();
   }
 }

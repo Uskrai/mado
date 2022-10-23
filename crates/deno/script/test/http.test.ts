@@ -1,31 +1,31 @@
-import { HttpClient } from "../deps";
+import { RustHttpClient } from "../deps";
 import { Ok } from "../deps/error";
 
 export function http__Ok() {
-  let http = new HttpClient();
+  let http = new RustHttpClient();
   http.close();
 
   return Ok({});
 }
 
 export function http__Ok__Clone() {
-  let http = new HttpClient();
+  let http = new RustHttpClient();
   let http2 = http.clone();
 
-  http.close().data;
-  http2.close().data;
+  http.close();
+  http2.close();
 
   return Ok({});
 }
 
 export async function http__Err_ResourceError__Decrement() {
-  let http = new HttpClient();
+  let http = new RustHttpClient();
   http.close();
   return http.close();
 }
 
 export async function http__Ok__Response() {
-  let http = new HttpClient();
+  let http = new RustHttpClient();
   let url = "https://google.com/";
   let response = await http.get({
     url

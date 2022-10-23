@@ -1,5 +1,5 @@
 import { RustModule } from "../deps/rust_module";
-import { initMadoModule } from "../module/mangadex";
+import { initMadoModule} from "../module/mangadex";
 
 
 export async function module__Ok__Close() {

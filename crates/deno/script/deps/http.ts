@@ -7,72 +7,26 @@ type ResponseDecl = {
   url: string;
 };
 
-export class HttpResponse {
-  constructor(public result: Result<ResponseDecl>) {}
+export interface HttpResponse {
+  get status(): number;
+  get url(): string;
 
-  get data(): ResponseDecl {
-    return this.result.throw();
-  }
+  text(): Promise<Result<string>>;
+  text_data(): Promise<string>;
+  json(): Promise<Result<any>>;
+  json_data(): Promise<any>;
 
-  get status() {
-    return this.data.status;
-  }
-
-  get rid() {
-    return this.data.rid;
-  }
-
-  get url() {
-    return this.data.url;
-  }
-
-  async text(): Promise<Result<string>> {
-    return ResultFromJson(
-      await Deno.core.opAsync("op_http_response_text", this.rid)
-    );
-  }
-
-  async text_data(): Promise<string> {
-    return await this.text().then(it => it.data);
-  }
-
-  async json(): Promise<Result<any>> {
-    return await this.text().then((it) => it.map((text) => JSON.parse(text)));
-  }
-
-  async json_data(): Promise<any> {
-    return await this.json().then(it => it.data);
-  }
+  close(): Promise<void>;
 }
 
-export class HttpClient extends Resource {
-  constructor(rid: number = null) {
-    if (rid == null) {
-      rid = Deno.core.opSync("op_http_client_new");
-    }
+export interface HttpClient {
+  get(request: HttpRequest): Promise<HttpResponse>;
 
-    super(rid, "op_http_client");
-  }
-
-  async get(request: object): Promise<HttpResponse> {
-    return new HttpResponse(
-      ResultFromJson(
-        await Deno.core.opAsync("op_http_client_get", this.rid, request)
-      )
-    );
-  }
-
-  close(): Result<void> {
-    return this.decrement_strong_count();
-  }
-
-  clone() {
-    let rid = this.increment_strong_count();
-    return new HttpClient(rid);
-  }
+  close(): Promise<void>;
+  clone(): HttpClient;
 }
 
 export interface HttpRequest {
   url: string;
-  header: Record<string, string>;
+  header?: Record<string, string>;
 }

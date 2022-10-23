@@ -1,15 +1,16 @@
-import { BaseModule } from "./module";
+import { ResultModule } from "./module";
 import { Result, ResultFromJson } from "./error";
 import { HttpRequest } from "./http";
-import { ChapterTask, MangaAndChapters, RustChapterTask } from "./manga";
+import { ChapterTask, MangaAndChapters } from "./manga";
+import { RustChapterTask } from './rust_chapter_task';
 
 export class RustModule {
   rid: number;
-  constructor(module: BaseModule) {
+  constructor(module: ResultModule) {
     this.rid = RustModule.fromRust(module).data;
   }
 
-  static fromRust(module: BaseModule): Result<number> {
+  static fromRust(module: ResultModule): Result<number> {
     return ResultFromJson(Deno.core.opSync("op_mado_module_new", module));
   }
 

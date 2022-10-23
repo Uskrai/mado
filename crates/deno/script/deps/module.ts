@@ -1,89 +1,84 @@
-import { catchAndReturn, Result } from "./error";
+import { catchAndReturn} from "./error";
 import { HttpClient, HttpRequest } from "./http";
-import { ChapterTask, MangaAndChapters, RustChapterTask } from "./manga";
+import { ChapterTask, MangaAndChapters} from "./manga";
+import { RustChapterTask } from './rust_chapter_task';
 
-export interface BaseModule {
+export interface Module {
   uuid: string;
   name: string;
   domain: string;
+  client: any;
 
-  get_info(id: string): Promise<MangaAndChapters>;
-  get_chapter_image(id: string, task: ChapterTask): Promise<void>;
-  download_image(info: object): Promise<HttpRequest>;
+  getInfo(id: string): Promise<MangaAndChapters>;
+  getChapterImage(id: string, task: ChapterTask): Promise<void>;
+  downloadImage(info: object): Promise<HttpRequest>;
+  close(): Promise<void>;
 }
 
-export abstract class Module {
-  constructor(
-    public uuid: string,
-    public name: string,
-    public domain: string,
-    public client: any
-  ) {}
-  abstract get_info(id: string): Promise<MangaAndChapters>;
+export class ResultModule {
+  public name: string;
+  public client: any;
+  public uuid: string;
+  public domain: string;
 
-  async getInfo(id: string) {
-    return await catchAndReturn(() => this.get_info(id));
+  constructor(public module: Module) {
+    this.name = module.name;
+    this.client = module.client;
+    this.uuid = module.uuid;
+    this.domain = module.domain;
   }
 
-  abstract get_chapter_image(
-    id: string,
-    task: ChapterTask
-  ): Promise<void>;
+  async getInfo(id: string) {
+    return await catchAndReturn(() => this.module.getInfo(id));
+  }
 
   async getChapterImage(id: string, task: ChapterTask) {
-    return await catchAndReturn(() => this.get_chapter_image(id, task));
+    return await catchAndReturn(() => this.module.getChapterImage(id, task));
   }
 
   async getChapterImageRust(id: string, task_rid: number) {
-    return this.getChapterImage(id, new RustChapterTask(task_rid));
+    return await this.getChapterImage(id, new RustChapterTask(task_rid));
   }
 
-  abstract download_image(info: object): Promise<HttpRequest>;
-
   async downloadImage(info: object) {
-    return await catchAndReturn(() => this.download_image(info));
+    return await catchAndReturn(() => this.module.downloadImage(info));
   }
 
   async close() {
-    return await catchAndReturn(() => this.close_all());
+    return await catchAndReturn(() => this.module.close());
   }
-
-  abstract close_all(): Promise<void>;
 }
 
-export abstract class HttpModule extends Module {
-  declare client: HttpClient;
-
-  constructor(uuid: string, name: string, domain: string, client: HttpClient) {
-    super(uuid, name, domain, client);
-  }
+export interface HttpModule extends Module {
+  client: HttpClient;
 }
 
 // Module Wrapper that just use underlying module to operate
 // with different uuid
-export class ModuleWrapper extends Module {
+export class ModuleWrapper implements Module {
+  public client: any;
   constructor(
-    uuid: string,
-    name: string,
-    domain: string,
+    public uuid: string,
+    public name: string,
+    public domain: string,
     public module: Module
   ) {
-    super(uuid, name, domain, module.client.clone());
+    this.client = module.client.clone();
   }
 
-  async get_info(id: string): Promise<MangaAndChapters> {
-    return await this.module.get_info(id);
+  async getInfo(id: string): Promise<MangaAndChapters> {
+    return await this.module.getInfo(id);
   }
 
-  async get_chapter_image(id: string, task: ChapterTask): Promise<void> {
-    return await this.module.get_chapter_image(id, task);
+  async getChapterImage(id: string, task: ChapterTask): Promise<void> {
+    return await this.module.getChapterImage(id, task);
   }
 
-  async download_image(info: object): Promise<HttpRequest> {
-    return await this.module.download_image(info);
+  async downloadImage(info: object): Promise<HttpRequest> {
+    return await this.module.downloadImage(info);
   }
 
-  async close_all(): Promise<void> {
-    await this.close_all();
+  async close(): Promise<void> {
+    await this.module.close();
   }
 }
