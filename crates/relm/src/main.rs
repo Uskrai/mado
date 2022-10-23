@@ -1,4 +1,3 @@
-use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use mado::core::{ArcMadoModule, DefaultMadoModuleMap, MutexMadoModuleMap};
 use mado::engine::{
@@ -84,7 +83,7 @@ async fn handle_loader_msg(loader: &mut mado_deno::ModuleLoader, msg: LoaderMsg)
 
             let result = fun.await;
 
-            rx.send(result);
+            rx.send(result).ok();
         }
     }
 }

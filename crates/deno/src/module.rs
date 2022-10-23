@@ -549,8 +549,7 @@ async fn op_mado_module_download_image(
         .download_image(chapter)
         .await
         .map_err(DenoError::from)
-        .to_result_json_borrow(state.clone())
-        .into());
+        .to_result_json_borrow(state.clone()));
 
     let it = state
         .borrow_mut()
