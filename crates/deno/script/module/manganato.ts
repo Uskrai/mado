@@ -156,7 +156,7 @@ class MangaNato implements HttpModule {
     };
   }
 
-  async closeAll() {
+  async close() {
     this.client.close();
   }
 }

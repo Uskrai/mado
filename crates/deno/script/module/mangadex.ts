@@ -200,7 +200,7 @@ export class MangaDex implements HttpModule {
     };
   }
 
-  async closeAll() {
+  async close() {
     this.client.close();
   }
 }

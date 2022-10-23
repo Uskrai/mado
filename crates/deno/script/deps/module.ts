@@ -12,7 +12,7 @@ export interface Module {
   getInfo(id: string): Promise<MangaAndChapters>;
   getChapterImage(id: string, task: ChapterTask): Promise<void>;
   downloadImage(info: object): Promise<HttpRequest>;
-  closeAll(): Promise<void>;
+  close(): Promise<void>;
 }
 
 export class ResultModule {
@@ -45,7 +45,7 @@ export class ResultModule {
   }
 
   async close() {
-    return await catchAndReturn(() => this.module.closeAll());
+    return await catchAndReturn(() => this.module.close());
   }
 }
 
@@ -78,7 +78,7 @@ export class ModuleWrapper implements Module {
     return await this.module.downloadImage(info);
   }
 
-  async closeAll(): Promise<void> {
-    await this.module.closeAll();
+  async close(): Promise<void> {
+    await this.module.close();
   }
 }
