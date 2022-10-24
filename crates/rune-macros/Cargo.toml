@@ -14,4 +14,4 @@ quote = "1.0"
 
 [dev-dependencies]
 rune = "0.10"
-rune-modules = "0.10"
+rune-modules = "0.12"
