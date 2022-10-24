@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use deno_core::{op, Extension, ExtensionBuilder, OpState};
+use deno_core::{op, Extension, ExtensionBuilder, OpState, serde_v8};
 use thiserror::Error;
 
 use crate::{ResultJson, ToResultJson};

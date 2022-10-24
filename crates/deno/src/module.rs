@@ -6,6 +6,7 @@ use deno_core::{
     parking_lot::Mutex,
     v8::{self, Function, Global, HandleScope, Local, Object, Value},
     Extension, ExtensionBuilder, OpState,
+    serde_v8,
 };
 
 use mado_core::{ChapterImageInfo, ChapterTask, Error, MadoModule, MangaAndChaptersInfo, Uuid};

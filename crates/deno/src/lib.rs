@@ -63,6 +63,7 @@ where
     T: serde::de::DeserializeOwned,
 {
     use anyhow::Context;
+    use deno_core::serde_v8;
     // using this give better information about path failing
     // #[cfg(debug_assertions)]
     let deserializer = serde_v8::from_v8::<serde_json::Value>(scope, value).unwrap();
