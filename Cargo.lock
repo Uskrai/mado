@@ -1492,7 +1492,7 @@ name = "mado-rune-macros"
 version = "0.1.0"
 dependencies = [
  "quote",
- "rune",
+ "rune 0.12.0",
  "rune-modules",
  "syn",
 ]
@@ -2121,12 +2121,38 @@ dependencies = [
  "num",
  "num-bigint",
  "pin-project",
- "rune-macros",
+ "rune-macros 0.10.3",
  "ryu",
  "serde",
  "serde_bytes",
  "smallvec",
  "thiserror",
+ "twox-hash",
+]
+
+[[package]]
+name = "rune"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e417065787a6600d0471be2e04c845377268020624fdb107a61a36be3c4725f"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "codespan-reporting",
+ "futures-core",
+ "futures-util",
+ "hashbrown 0.11.2",
+ "itoa 0.4.8",
+ "num",
+ "num-bigint",
+ "pin-project",
+ "rune-macros 0.12.0",
+ "ryu",
+ "serde",
+ "serde_bytes",
+ "smallvec",
+ "thiserror",
+ "tracing",
  "twox-hash",
 ]
 
@@ -2142,12 +2168,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "rune-macros"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dba487cb48f418e152c748ecac22b67674e0642f1f1b49efe9f72341e628713"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "rune-modules"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f30a87c6d45d8e29888e758484626a8ab85c24594dada80bcff07d50bbcae80"
 dependencies = [
- "rune",
+ "rune 0.10.3",
 ]
 
 [[package]]
