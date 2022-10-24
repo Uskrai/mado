@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use gtk::prelude::WidgetExt;
+use gtk::{gio, prelude::WidgetExt};
 use mado::engine::DownloadInfo;
 use relm4::{ComponentUpdate, Components, Model, RelmComponent, Widgets};
 use relm4_macros::widget;

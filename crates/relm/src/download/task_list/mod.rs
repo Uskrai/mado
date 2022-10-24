@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use gtk::prelude::*;
+use gtk::{gio, prelude::*};
 use mado::engine::{DownloadInfo, DownloadInfoMsg, DownloadStatus};
 
 #[derive(Debug)]

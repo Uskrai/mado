@@ -1,5 +1,7 @@
-use gio::{prelude::Cast, traits::ListModelExt};
-use gtk::prelude::{CheckButtonExt, GridExt, SelectionModelExt};
+use gtk::{
+    gio::{prelude::Cast, traits::ListModelExt},
+    prelude::{CheckButtonExt, GridExt, SelectionModelExt},
+};
 use relm4::{ComponentUpdate, Model};
 
 use super::{ChapterListWidgets, GChapterInfo, GChapterInfoItem, VecChapters};

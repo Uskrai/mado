@@ -1,8 +1,7 @@
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::sync::Arc;
 
-pub use gtk::prelude::*;
-pub use gtk::subclass::prelude::*;
+pub use gtk::{gio, prelude::*, subclass::prelude::*};
 use mado::core::ChapterInfo;
 
 mod model;
