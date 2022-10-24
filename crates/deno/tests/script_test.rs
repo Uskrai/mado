@@ -1,6 +1,6 @@
 use std::{any::type_name, cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
-use deno_core::v8::{self, Local};
+use deno_core::{v8::{self, Local}, serde_v8};
 use mado_deno::Runtime;
 use serde::de::DeserializeOwned;
 use tokio::task::LocalSet;
