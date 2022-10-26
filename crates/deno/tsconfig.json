@@ -15,6 +15,9 @@
     "incremental": true
   },
   "include": ["script/**/*.ts"],
+  "ts-node": {
+      "esm": true
+  },
   "exclude": [
     // "script/**/*.d.ts"
     // "node_modules",
