@@ -1,6 +1,7 @@
 import common from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
-import multiInput from "rollup-plugin-multi-input";
+import multiInputPkg from "rollup-plugin-multi-input";
+const multiInput = multiInputPkg.default;
 import ts from "rollup-plugin-typescript2";
 
 export default {
@@ -8,7 +9,7 @@ export default {
   output: {
     dir: "dist",
     format: "es",
-    chunkFileNames: "chunk/[name].js",
+    // chunkFileNames: "chunk/[name].js",
     sourcemap: 'both',
   },
   watch: {
@@ -17,9 +18,7 @@ export default {
     },
   },
   plugins: [
-    multiInput({
-      relative: "script",
-    }),
+    multiInput({ relative: "script/" }),
     // nodePolyfills(),
     nodeResolve({ browser: true }),
     ts(),
