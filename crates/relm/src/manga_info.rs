@@ -10,8 +10,9 @@ use mado::engine::{
     DownloadRequest, DownloadRequestStatus,
 };
 
-use crate::chapter_list::{ChapterListModel, ChapterListParentModel, VecChapters};
-use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent, ComponentController};
+use crate::chapter_list::{ChapterListModel, ChapterListParentModel};
+use crate::vec_chapters::VecChapters;
+use relm4::{Component, ComponentController, ComponentParts, ComponentSender, SimpleComponent};
 
 #[derive(Debug)]
 pub enum MangaInfoMsg {

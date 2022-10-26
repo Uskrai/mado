@@ -10,7 +10,7 @@ pub struct DownloadItem {
 
 crate::gobject::struct_wrapper!(
     GDownloadItem,
-    crate::download::task_list::DownloadItem,
+    crate::task_list::DownloadItem,
     "MadoRelmDownloadInfo",
     info_wrapper
 );

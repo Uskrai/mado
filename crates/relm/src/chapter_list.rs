@@ -4,7 +4,7 @@ use gtk::{
 };
 use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
 
-use super::{GChapterInfo, GChapterInfoItem, VecChapters};
+use crate::vec_chapters::{GChapterInfo, GChapterInfoItem, VecChapters};
 
 pub trait ChapterListParentModel: Component {
     fn get_vec_chapter_info(&self) -> VecChapters;
@@ -30,7 +30,7 @@ impl ChapterListModel {
     pub fn create_chapter_info(chapter: GChapterInfo) -> gtk::Grid {
         let check = gtk::CheckButton::default();
         let label = gtk::Label::builder()
-            .label(&format!("{}", chapter.borrow().info))
+            .label(&format!("{}", chapter.borrow().info()))
             .build();
 
         let grid = gtk::Grid::builder()
@@ -42,8 +42,7 @@ impl ChapterListModel {
         grid.set_column_spacing(5);
 
         check.connect_toggled(move |it| {
-            chapter.borrow().active.set(it.is_active());
-            // chapter.borrow().active.update(|_| it.is_active());
+            chapter.borrow().set_active(it.is_active());
         });
 
         grid
@@ -97,7 +96,7 @@ impl SimpleComponent for ChapterListModel {
                     .downcast::<gtk::CheckButton>()
                     .unwrap();
 
-                child.set_active(item.data().borrow().active.get());
+                child.set_active(item.data().borrow().active());
             }
             ChapterListMsg::Activate(list) => {
                 let model = list.model().unwrap();
@@ -106,7 +105,7 @@ impl SimpleComponent for ChapterListModel {
                     if selection.contains(i) {
                         let it = it.downcast::<GChapterInfo>().unwrap();
                         let it = it.borrow();
-                        it.active.set(!it.active.get());
+                        it.set_active(!it.active());
 
                         // Notify model that value has changed
                         model.selection_changed(i, 1);
@@ -137,12 +136,8 @@ impl SimpleComponent for ChapterListModel {
                     sender.input(ChapterListMsg::Activate(view.clone()))
                 },
 
-                set_model: Some(&create_selection_model(&model))
+                set_model: Some(&model.chapters.create_selection_model())
             },
         }
     }
-}
-
-fn create_selection_model(model: &ChapterListModel) -> gtk::MultiSelection {
-    gtk::MultiSelection::new(Some(&model.chapters.views.inner))
 }

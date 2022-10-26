@@ -1,5 +1,3 @@
-mod task_list;
-
 use std::sync::Arc;
 
 use gtk::{gio, prelude::WidgetExt};
@@ -8,11 +6,7 @@ use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
 
-use crate::download::task_list::TaskListModel;
-
-use task_list::TaskListParentModel;
-
-use self::task_list::{DownloadItem, GDownloadItem};
+use crate::task_list::{DownloadItem, GDownloadItem, TaskListModel, TaskListParentModel};
 
 #[derive(Debug)]
 pub enum DownloadMsg {
