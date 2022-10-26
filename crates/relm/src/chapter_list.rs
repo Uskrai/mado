@@ -6,10 +6,6 @@ use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
 
 use crate::vec_chapters::{GChapterInfo, GChapterInfoItem, VecChapters};
 
-pub trait ChapterListParentModel: Component {
-    fn get_vec_chapter_info(&self) -> VecChapters;
-}
-
 #[derive(Debug)]
 pub struct ChapterListModel {
     pub(super) chapters: VecChapters,

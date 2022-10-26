@@ -6,7 +6,7 @@ use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
 
-use crate::task_list::{DownloadItem, GDownloadItem, TaskListModel, TaskListParentModel};
+use crate::task_list::{DownloadItem, GDownloadItem, TaskListModel};
 
 #[derive(Debug)]
 pub enum DownloadMsg {
@@ -16,12 +16,6 @@ pub enum DownloadMsg {
 pub struct DownloadModel {
     list: gio::ListStore,
     task_list: Controller<TaskListModel>,
-}
-
-impl TaskListParentModel for DownloadModel {
-    fn get_list(&self) -> gio::ListStore {
-        self.list.clone()
-    }
 }
 
 #[relm4::component(pub)]

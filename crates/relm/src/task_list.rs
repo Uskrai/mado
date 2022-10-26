@@ -16,16 +16,12 @@ crate::gobject::struct_wrapper!(
 );
 pub use info_wrapper::GDownloadItem;
 
-use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
+use relm4::{ComponentParts, ComponentSender, SimpleComponent};
 
 #[derive(Debug)]
 pub enum TaskListMsg {
     Setup(gtk::ListItem),
     Bind(gtk::ListItem),
-}
-
-pub trait TaskListParentModel: Component {
-    fn get_list(&self) -> gio::ListStore;
 }
 
 #[derive(Clone)]

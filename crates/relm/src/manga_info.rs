@@ -10,7 +10,7 @@ use mado::engine::{
     DownloadRequest, DownloadRequestStatus,
 };
 
-use crate::chapter_list::{ChapterListModel, ChapterListParentModel};
+use crate::chapter_list::ChapterListModel;
 use crate::vec_chapters::VecChapters;
 use relm4::{Component, ComponentController, ComponentParts, ComponentSender, SimpleComponent};
 
@@ -40,12 +40,6 @@ pub struct MangaInfoModel {
     manga_info: Option<Arc<MangaAndChaptersInfo>>,
     url: String,
     path: Utf8PathBuf,
-}
-
-impl ChapterListParentModel for MangaInfoModel {
-    fn get_vec_chapter_info(&self) -> VecChapters {
-        self.chapters.clone()
-    }
 }
 
 impl MangaInfoModel {
