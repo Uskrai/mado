@@ -7,8 +7,8 @@ use mado::core::ChapterInfo;
 mod model;
 mod widgets;
 
-pub use model::{ChapterListModel, ChapterListMsg, ChapterListParentModel};
-pub use widgets::ChapterListWidgets;
+pub use model::{ChapterListModel, ChapterListMsg, ChapterListParentModel, ChapterListWidgets};
+// pub use widgets::ChapterListWidgets;
 
 #[derive(Debug, Clone)]
 struct ListStore {

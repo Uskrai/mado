@@ -16,14 +16,15 @@ crate::gobject::struct_wrapper!(
 );
 pub use info_wrapper::GDownloadItem;
 
-use relm4::{send, ComponentUpdate, Model, Widgets};
+use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
 
+#[derive(Debug)]
 pub enum TaskListMsg {
     Setup(gtk::ListItem),
     Bind(gtk::ListItem),
 }
 
-pub trait TaskListParentModel: Model {
+pub trait TaskListParentModel: Component {
     fn get_list(&self) -> gio::ListStore;
 }
 
@@ -32,26 +33,31 @@ pub struct TaskListModel {
     tasks: gio::ListStore,
 }
 
-impl Model for TaskListModel {
-    type Msg = TaskListMsg;
-    type Widgets = TaskListWidgets;
-    type Components = ();
+fn create_selection_model(model: &TaskListModel) -> gtk::MultiSelection {
+    gtk::MultiSelection::new(Some(&model.tasks))
 }
 
-impl<ParentModel: TaskListParentModel> ComponentUpdate<ParentModel> for TaskListModel {
-    fn init_model(parent: &ParentModel) -> Self {
-        Self {
-            tasks: parent.get_list(),
-        }
+#[relm4::component(pub)]
+impl SimpleComponent for TaskListModel {
+    type Widgets = TaskListWidgets;
+
+    type Init = gio::ListStore;
+    type Input = TaskListMsg;
+    type Output = ();
+
+    fn init(
+        tasks: Self::Init,
+        root: &Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        let model = Self { tasks };
+
+        let widgets = view_output!();
+
+        ComponentParts { model, widgets }
     }
 
-    fn update(
-        &mut self,
-        msg: Self::Msg,
-        _: &Self::Components,
-        _: relm4::Sender<Self::Msg>,
-        _: relm4::Sender<ParentModel::Msg>,
-    ) {
+    fn update(&mut self, msg: Self::Input, _: ComponentSender<Self>) {
         match msg {
             TaskListMsg::Setup(item) => {
                 let download = item.item().unwrap().downcast::<GDownloadItem>().unwrap();
@@ -64,27 +70,18 @@ impl<ParentModel: TaskListParentModel> ComponentUpdate<ParentModel> for TaskList
             }
         }
     }
-}
 
-fn create_selection_model(model: &TaskListModel) -> gtk::MultiSelection {
-    gtk::MultiSelection::new(Some(&model.tasks))
-}
-
-#[relm4_macros::widget(pub)]
-impl<ParentModel> Widgets<TaskListModel, ParentModel> for TaskListWidgets
-where
-    ParentModel: Model,
-{
     view! {
         gtk::ListView {
-            set_model: Some(&create_selection_model(model)),
+            set_model: Some(&create_selection_model(&model)),
 
-            set_factory = Some(&gtk::SignalListItemFactory) {
-                connect_setup(sender) => move |_,item| {
-                    send!(sender, TaskListMsg::Setup(item.clone()));
+            #[wrap(Some)]
+            set_factory = &gtk::SignalListItemFactory {
+                connect_setup[sender] => move |_,item| {
+                    sender.input(TaskListMsg::Setup(item.clone()));
                 },
-                connect_bind(sender) => move |_, item| {
-                    send!(sender, TaskListMsg::Bind(item.clone()));
+                connect_bind[sender] => move |_, item| {
+                    sender.input(TaskListMsg::Bind(item.clone()));
                 },
             }
         }

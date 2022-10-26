@@ -162,7 +162,7 @@ macro_rules! struct_wrapper {
 
             impl $name {
                 pub fn to_gobject(dest: $dest) -> Self {
-                    let this = glib::Object::new(&[]).unwrap();
+                    let this = glib::Object::new::<Self>(&[]);
                     let r = imp::$name::from_instance(&this);
                     r.inner.borrow_mut().write(dest);
                     this

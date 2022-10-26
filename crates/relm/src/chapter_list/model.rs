@@ -1,12 +1,12 @@
 use gtk::{
     gio::{prelude::Cast, traits::ListModelExt},
-    prelude::{CheckButtonExt, GridExt, SelectionModelExt},
+    prelude::*,
 };
-use relm4::{ComponentUpdate, Model};
+use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
 
-use super::{ChapterListWidgets, GChapterInfo, GChapterInfoItem, VecChapters};
+use super::{GChapterInfo, GChapterInfoItem, VecChapters};
 
-pub trait ChapterListParentModel: Model {
+pub trait ChapterListParentModel: Component {
     fn get_vec_chapter_info(&self) -> VecChapters;
 }
 
@@ -20,12 +20,6 @@ pub enum ChapterListMsg {
     Setup(GChapterInfoItem),
     Change(GChapterInfoItem),
     Activate(gtk::ListView),
-}
-
-impl Model for ChapterListModel {
-    type Msg = ChapterListMsg;
-    type Widgets = ChapterListWidgets;
-    type Components = ();
 }
 
 const CHECK_BUTTON_ROW: i32 = 0;
@@ -64,23 +58,26 @@ impl ChapterListModel {
     }
 }
 
-impl<ParentModel> ComponentUpdate<ParentModel> for ChapterListModel
-where
-    ParentModel: ChapterListParentModel,
-{
-    fn init_model(parent: &ParentModel) -> Self {
-        Self {
-            chapters: parent.get_vec_chapter_info(),
-        }
+/// Widget that show Chapter with checkbox
+#[relm4::component(pub)]
+impl SimpleComponent for ChapterListModel {
+    type Widgets = ChapterListWidgets;
+    type Init = VecChapters;
+
+    type Input = ChapterListMsg;
+    type Output = ();
+
+    fn init(
+        chapters: Self::Init,
+        root: &Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        let model = ChapterListModel { chapters };
+        let widgets = view_output!();
+        ComponentParts { model, widgets }
     }
 
-    fn update(
-        &mut self,
-        msg: Self::Msg,
-        _: &Self::Components,
-        _: relm4::Sender<Self::Msg>,
-        _: relm4::Sender<ParentModel::Msg>,
-    ) {
+    fn update(&mut self, msg: Self::Input, _: ComponentSender<Self>) {
         match msg {
             // Initialize Children
             ChapterListMsg::Setup(item) => {
@@ -118,4 +115,34 @@ where
             }
         }
     }
+
+    view! {
+        gtk::ScrolledWindow {
+            set_vexpand : true,
+            set_hexpand: true,
+            #[wrap(Some)]
+            set_child = &gtk::ListView {
+                #[wrap(Some)]
+                set_factory = &gtk::SignalListItemFactory {
+                    connect_setup[sender] => move |_, item| {
+                        sender.input(ChapterListMsg::Setup(item.clone().into()))
+                    },
+
+                    connect_bind[sender] => move |_, item| {
+                        sender.input(ChapterListMsg::Change(item.clone().into()))
+                    }
+                },
+                set_single_click_activate: false,
+                connect_activate[sender] => move |view, _| {
+                    sender.input(ChapterListMsg::Activate(view.clone()))
+                },
+
+                set_model: Some(&create_selection_model(&model))
+            },
+        }
+    }
+}
+
+fn create_selection_model(model: &ChapterListModel) -> gtk::MultiSelection {
+    gtk::MultiSelection::new(Some(&model.chapters.views.inner))
 }
