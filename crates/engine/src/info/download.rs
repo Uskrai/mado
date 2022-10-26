@@ -166,6 +166,7 @@ impl DownloadInfo {
     }
 }
 
+#[derive(Debug)]
 pub struct DownloadRequest {
     module: ArcMadoModule,
     manga: Arc<MangaInfo>,
