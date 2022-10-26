@@ -82,9 +82,10 @@ where
 
 impl<T> Drop for MaybeUninit<T> {
     fn drop(&mut self) {
-        check_init!(self);
-        unsafe {
-            drop_in_place(self.inner.as_mut_ptr());
+        if self.initialized == Initialized::Initialized {
+            unsafe {
+                drop_in_place(self.inner.as_mut_ptr());
+            }
         }
     }
 }
@@ -180,6 +181,33 @@ macro_rules! struct_wrapper {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[gtk::test]
+    #[should_panic]
+    fn panic_on_unitialized() {
+        let mut it = MaybeUninit::<bool>::default();
+        it.as_mut();
+    }
+
+    #[gtk::test]
+    fn not_panic_after_initialized() {
+        let mut it = MaybeUninit::<i8>::default();
+        it.write(1);
+        assert_eq!(*it.as_ref(), 1);
+        it.write(2);
+        assert_eq!(*it.as_ref(), 2);
+        assert_eq!(*it.as_mut(), 2);
+    }
+
+    #[gtk::test]
+    fn drop_shouldnt_panic() {
+        MaybeUninit::<bool>::default();
+    }
 }
 
 use std::ops::{Deref, DerefMut};
