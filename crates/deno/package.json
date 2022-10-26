@@ -26,7 +26,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^22.0.2",
     "@rollup/plugin-node-resolve": "^14.1.0",
-    "@rollup/plugin-typescript": "^8.5.0",
+    "@rollup/plugin-typescript": "^9.0.2",
     "@types/deep-equal": "^1.0.1",
     "@types/jsdom": "^20.0.0",
     "@types/node": "^18.7.23",
