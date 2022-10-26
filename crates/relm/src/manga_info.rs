@@ -260,3 +260,113 @@ impl SimpleComponent for MangaInfoModel {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mado::core::{DefaultMadoModuleMap, MutexMadoModuleMap};
+    use mado_core::{ChapterInfo, ChaptersInfo, MangaInfo, MutMadoModuleMap};
+
+    fn run_loop() {
+        let context = gtk::glib::MainContext::thread_default()
+            .unwrap_or_else(gtk::glib::MainContext::default);
+
+        while context.pending() {
+            context.iteration(true);
+        }
+    }
+
+    #[gtk::test]
+    fn test_test() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+
+        let _g = rt.enter();
+
+        let map = DefaultMadoModuleMap::new();
+        let map = MutexMadoModuleMap::new(map);
+        let map = Arc::new(map);
+
+        let (tx, rx) = relm4::channel();
+        let model = MangaInfoModel::builder()
+            .launch(map.clone())
+            .forward(&tx, |msg| msg);
+
+        run_loop();
+
+        {
+            let link = "https".to_string();
+            model.emit(MangaInfoMsg::GetInfo(link.clone()));
+
+            run_loop();
+
+            assert!(matches!(
+                rx.recv_sync().unwrap(),
+                MangaInfoOutput::Error(mado::core::Error::UnsupportedUrl(..))
+            ));
+
+            assert_eq!(model.model().url, link);
+        };
+
+        let mut module = mado_core::MockMadoModule::default();
+        module
+            .expect_uuid()
+            .return_const(mado_core::Uuid::from_u128(1));
+
+        let domain = mado_core::Url::parse("https://localhost").unwrap();
+        module.expect_domain().return_const(domain.clone());
+
+        let info = MangaAndChaptersInfo {
+            manga: Arc::new(MangaInfo {
+                id: "test".to_string(),
+                title: "test title".to_string(),
+                ..Default::default()
+            }),
+            chapters: Arc::new(ChaptersInfo(vec![Arc::new(ChapterInfo {
+                index: Some(1),
+                id: "1".to_string(),
+                title: Some("ch title".to_string()),
+                ..Default::default()
+            })])),
+        };
+
+        let (tx_waiter, rx_waiter) = relm4::channel();
+        let link = domain.join("test").unwrap();
+        let info_ = info.clone();
+        module
+            .expect_get_info()
+            .with(mockall::predicate::eq(link.clone()))
+            .returning(move |_| {
+                tx_waiter.send(());
+                Ok(info_.clone())
+            });
+
+        map.push_mut(Arc::new(module)).unwrap();
+
+        model.emit(MangaInfoMsg::GetInfo(link.to_string()));
+
+        run_loop();
+
+        model
+            .model()
+            .current_handle
+            .as_ref()
+            .expect("handle should exist");
+
+        rt.block_on(rx_waiter.recv());
+
+        run_loop();
+
+        assert!(Arc::ptr_eq(
+            &model.model().manga_info.as_ref().unwrap().manga,
+            &info.manga
+        ));
+
+        assert!(Arc::ptr_eq(
+            &model.model().manga_info.as_ref().unwrap().chapters,
+            &info.chapters
+        ));
+    }
+}
