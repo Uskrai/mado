@@ -3,6 +3,7 @@ use mado::core::{ArcMadoModule, DefaultMadoModuleMap, MutexMadoModuleMap};
 use mado::engine::{
     path::Utf8PathBuf, MadoEngine, MadoEngineState, MadoModuleLoader, ModuleLoadError,
 };
+use mado_relm::AppModel;
 use relm4::RelmApp;
 use tracing_subscriber::{util::SubscriberInitExt, EnvFilter};
 
@@ -110,7 +111,7 @@ pub fn main() {
     channel.connect_only(&state);
 
     let mado = MadoEngine::new(state);
-    let model = mado_relm::AppModel::new(mado.state());
+    let state = mado.state();
 
     let (loader_tx, mut loader_rx) = futures::channel::mpsc::channel(5);
     let deno_loader = Loader(loader_tx);
@@ -142,6 +143,5 @@ pub fn main() {
         channel.run().await.unwrap();
     });
 
-    let app = RelmApp::new(model);
-    app.run();
+    RelmApp::new("").run::<AppModel>(state);
 }

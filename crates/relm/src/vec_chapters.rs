@@ -4,15 +4,9 @@ use std::sync::Arc;
 pub use gtk::{gio, prelude::*, subclass::prelude::*};
 use mado::core::ChapterInfo;
 
-mod model;
-mod widgets;
-
-pub use model::{ChapterListModel, ChapterListMsg, ChapterListParentModel};
-pub use widgets::ChapterListWidgets;
-
 #[derive(Debug, Clone)]
-struct ListStore {
-    inner: gio::ListStore,
+pub struct ListStore {
+    pub inner: gio::ListStore,
 }
 
 impl Default for ListStore {
@@ -36,6 +30,20 @@ pub struct CheckChapterInfo {
     active: Cell<bool>,
 }
 
+impl CheckChapterInfo {
+    pub fn info(&self) -> &ChapterInfo {
+        self.info.as_ref()
+    }
+
+    pub fn active(&self) -> bool {
+        self.active.get()
+    }
+
+    pub fn set_active(&self, val: bool) {
+        self.active.set(val)
+    }
+}
+
 impl From<Arc<ChapterInfo>> for CheckChapterInfo {
     fn from(info: Arc<ChapterInfo>) -> Self {
         Self {
@@ -47,11 +55,11 @@ impl From<Arc<ChapterInfo>> for CheckChapterInfo {
 
 crate::gobject::struct_wrapper!(
     GChapterInfo,
-    crate::chapter_list::CheckChapterInfo,
+    crate::vec_chapters::CheckChapterInfo,
     "MadoRelmChapterInfo",
     info_wrapper
 );
-use info_wrapper::GChapterInfo;
+pub use info_wrapper::GChapterInfo;
 
 #[derive(Debug)]
 pub struct GChapterInfoItem {
@@ -118,5 +126,13 @@ impl VecChapters {
     pub fn clear(&self) {
         self.borrow_mut().clear();
         self.views.remove_all();
+    }
+
+    pub fn views(&self) -> &ListStore {
+        &self.views
+    }
+
+    pub fn create_selection_model(&self) -> gtk::MultiSelection {
+        gtk::MultiSelection::new(Some(&self.views.inner))
     }
 }

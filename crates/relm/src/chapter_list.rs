@@ -1,12 +1,12 @@
 use gtk::{
     gio::{prelude::Cast, traits::ListModelExt},
-    prelude::{CheckButtonExt, GridExt, SelectionModelExt},
+    prelude::*,
 };
-use relm4::{ComponentUpdate, Model};
+use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
 
-use super::{ChapterListWidgets, GChapterInfo, GChapterInfoItem, VecChapters};
+use crate::vec_chapters::{GChapterInfo, GChapterInfoItem, VecChapters};
 
-pub trait ChapterListParentModel: Model {
+pub trait ChapterListParentModel: Component {
     fn get_vec_chapter_info(&self) -> VecChapters;
 }
 
@@ -22,12 +22,6 @@ pub enum ChapterListMsg {
     Activate(gtk::ListView),
 }
 
-impl Model for ChapterListModel {
-    type Msg = ChapterListMsg;
-    type Widgets = ChapterListWidgets;
-    type Components = ();
-}
-
 const CHECK_BUTTON_ROW: i32 = 0;
 const CHECK_BUTTON_COLUMN: i32 = 0;
 
@@ -36,7 +30,7 @@ impl ChapterListModel {
     pub fn create_chapter_info(chapter: GChapterInfo) -> gtk::Grid {
         let check = gtk::CheckButton::default();
         let label = gtk::Label::builder()
-            .label(&format!("{}", chapter.borrow().info))
+            .label(&format!("{}", chapter.borrow().info()))
             .build();
 
         let grid = gtk::Grid::builder()
@@ -48,8 +42,7 @@ impl ChapterListModel {
         grid.set_column_spacing(5);
 
         check.connect_toggled(move |it| {
-            chapter.borrow().active.set(it.is_active());
-            // chapter.borrow().active.update(|_| it.is_active());
+            chapter.borrow().set_active(it.is_active());
         });
 
         grid
@@ -64,23 +57,26 @@ impl ChapterListModel {
     }
 }
 
-impl<ParentModel> ComponentUpdate<ParentModel> for ChapterListModel
-where
-    ParentModel: ChapterListParentModel,
-{
-    fn init_model(parent: &ParentModel) -> Self {
-        Self {
-            chapters: parent.get_vec_chapter_info(),
-        }
+/// Widget that show Chapter with checkbox
+#[relm4::component(pub)]
+impl SimpleComponent for ChapterListModel {
+    type Widgets = ChapterListWidgets;
+    type Init = VecChapters;
+
+    type Input = ChapterListMsg;
+    type Output = ();
+
+    fn init(
+        chapters: Self::Init,
+        root: &Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        let model = ChapterListModel { chapters };
+        let widgets = view_output!();
+        ComponentParts { model, widgets }
     }
 
-    fn update(
-        &mut self,
-        msg: Self::Msg,
-        _: &Self::Components,
-        _: relm4::Sender<Self::Msg>,
-        _: relm4::Sender<ParentModel::Msg>,
-    ) {
+    fn update(&mut self, msg: Self::Input, _: ComponentSender<Self>) {
         match msg {
             // Initialize Children
             ChapterListMsg::Setup(item) => {
@@ -100,7 +96,7 @@ where
                     .downcast::<gtk::CheckButton>()
                     .unwrap();
 
-                child.set_active(item.data().borrow().active.get());
+                child.set_active(item.data().borrow().active());
             }
             ChapterListMsg::Activate(list) => {
                 let model = list.model().unwrap();
@@ -109,13 +105,39 @@ where
                     if selection.contains(i) {
                         let it = it.downcast::<GChapterInfo>().unwrap();
                         let it = it.borrow();
-                        it.active.set(!it.active.get());
+                        it.set_active(!it.active());
 
                         // Notify model that value has changed
                         model.selection_changed(i, 1);
                     }
                 });
             }
+        }
+    }
+
+    view! {
+        gtk::ScrolledWindow {
+            set_vexpand : true,
+            set_hexpand: true,
+            #[wrap(Some)]
+            set_child = &gtk::ListView {
+                #[wrap(Some)]
+                set_factory = &gtk::SignalListItemFactory {
+                    connect_setup[sender] => move |_, item| {
+                        sender.input(ChapterListMsg::Setup(item.clone().into()))
+                    },
+
+                    connect_bind[sender] => move |_, item| {
+                        sender.input(ChapterListMsg::Change(item.clone().into()))
+                    }
+                },
+                set_single_click_activate: false,
+                connect_activate[sender] => move |view, _| {
+                    sender.input(ChapterListMsg::Activate(view.clone()))
+                },
+
+                set_model: Some(&model.chapters.create_selection_model())
+            },
         }
     }
 }
