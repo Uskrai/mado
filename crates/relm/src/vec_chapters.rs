@@ -115,6 +115,10 @@ impl VecChapters {
         self.views.append(&chapter);
     }
 
+    pub fn for_each(&self, mut f: impl FnMut(usize, &GChapterInfo)) {
+        self.borrow().iter().enumerate().for_each(|(i, v)| f(i, v));
+    }
+
     pub fn for_each_selected(&self, mut f: impl FnMut(usize, &Arc<ChapterInfo>)) {
         self.borrow()
             .iter()

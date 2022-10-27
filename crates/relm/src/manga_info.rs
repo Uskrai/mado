@@ -290,75 +290,117 @@ mod tests {
 
         {
             let link = "https".to_string();
-            model.emit(MangaInfoMsg::GetInfo(link.clone()));
+            model.widgets().url_entry.set_text(&link);
+
+            // url_entry.emit_activate doesn't do anything in test
+            // so make sure to call emit_clicked too
+            // and assert that it doesn't run twice below
+            model.widgets().url_entry.emit_activate();
+            model.widgets().enter_button.emit_clicked();
 
             run_loop();
 
-            assert!(matches!(
-                rx.recv_sync().unwrap(),
-                MangaInfoOutput::Error(mado::core::Error::UnsupportedUrl(..))
-            ));
+            rt.block_on(async {
+                assert!(matches!(
+                    try_recv(&rx).await.unwrap(),
+                    MangaInfoOutput::Error(mado::core::Error::UnsupportedUrl(..))
+                ));
+
+                try_recv(&rx).await.expect_err("should not exist");
+            });
 
             assert_eq!(model.model().url, link);
         };
 
         let mut module = mado_core::MockMadoModule::default();
+        let domain = mado_core::Url::parse("https://localhost").unwrap();
         module
             .expect_uuid()
             .return_const(mado_core::Uuid::from_u128(1));
 
-        let domain = mado_core::Url::parse("https://localhost").unwrap();
         module.expect_domain().return_const(domain.clone());
+        {
+            let path = Utf8PathBuf::from("download_path");
+            model.widgets().download_path.set_text(path.as_str());
 
-        let info = MangaAndChaptersInfo {
-            manga: Arc::new(MangaInfo {
-                id: "test".to_string(),
-                title: "test title".to_string(),
-                ..Default::default()
-            }),
-            chapters: Arc::new(ChaptersInfo(vec![Arc::new(ChapterInfo {
-                index: Some(1),
-                id: "1".to_string(),
-                title: Some("ch title".to_string()),
-                ..Default::default()
-            })])),
-        };
+            run_loop();
 
-        let (tx_waiter, rx_waiter) = relm4::channel();
-        let link = domain.join("test").unwrap();
-        let info_ = info.clone();
-        module
-            .expect_get_info()
-            .with(mockall::predicate::eq(link.clone()))
-            .returning(move |_| {
-                tx_waiter.send(());
-                Ok(info_.clone())
+            assert_eq!(model.model().path(), path);
+
+            let info = MangaAndChaptersInfo {
+                manga: Arc::new(MangaInfo {
+                    id: "test".to_string(),
+                    title: "test title".to_string(),
+                    ..Default::default()
+                }),
+                chapters: Arc::new(ChaptersInfo(vec![Arc::new(ChapterInfo {
+                    index: Some(1),
+                    id: "1".to_string(),
+                    title: Some("ch title".to_string()),
+                    ..Default::default()
+                })])),
+            };
+
+            let (tx_waiter, rx_waiter) = relm4::channel();
+            let link = domain.join("test").unwrap();
+            let info_ = info.clone();
+            let tx_waiter_get_info = tx_waiter;
+            module
+                .expect_get_info()
+                .with(mockall::predicate::eq(link.clone()))
+                .returning(move |_| {
+                    tx_waiter_get_info.send(());
+                    Ok(info_.clone())
+                });
+
+            let module: ArcMadoModule = Arc::new(module);
+            map.push_mut(module.clone()).unwrap();
+
+            model.emit(MangaInfoMsg::GetInfo(link.to_string()));
+
+            run_loop();
+
+            model
+                .model()
+                .current_handle
+                .as_ref()
+                .expect("handle should exist");
+
+            rt.block_on(rx_waiter.recv()).unwrap();
+
+            run_loop();
+
+            assert!(Arc::ptr_eq(
+                &model.model().manga_info.as_ref().unwrap().manga,
+                &info.manga
+            ));
+
+            assert!(Arc::ptr_eq(
+                &model.model().manga_info.as_ref().unwrap().chapters,
+                &info.chapters
+            ));
+
+            model.widgets().download_button.emit_clicked();
+
+            run_loop();
+
+            model.model().chapters.for_each(|_, info| {
+                info.borrow_mut().set_active(true);
             });
 
-        map.push_mut(Arc::new(module)).unwrap();
+            model.widgets().download_button.emit_clicked();
 
-        model.emit(MangaInfoMsg::GetInfo(link.to_string()));
+            run_loop();
 
-        run_loop();
+            let request = match rt.block_on(try_recv(&rx)).unwrap() {
+                MangaInfoOutput::DownloadRequest(request) => request,
+                _ => unreachable!(),
+            };
 
-        model
-            .model()
-            .current_handle
-            .as_ref()
-            .expect("handle should exist");
-
-        rt.block_on(rx_waiter.recv());
-
-        run_loop();
-
-        assert!(Arc::ptr_eq(
-            &model.model().manga_info.as_ref().unwrap().manga,
-            &info.manga
-        ));
-
-        assert!(Arc::ptr_eq(
-            &model.model().manga_info.as_ref().unwrap().chapters,
-            &info.chapters
-        ));
+            assert_eq!(request.path(), path.join("test title"));
+            assert_eq!(request.url(), Some(&link));
+            assert_eq!(request.chapters().len(), 1);
+            assert_eq!(request.module().domain(), module.domain());
+        }
     }
 }
