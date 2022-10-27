@@ -264,17 +264,9 @@ impl SimpleComponent for MangaInfoModel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::*;
     use mado::core::{DefaultMadoModuleMap, MutexMadoModuleMap};
     use mado_core::{ChapterInfo, ChaptersInfo, MangaInfo, MutMadoModuleMap};
-
-    fn run_loop() {
-        let context = gtk::glib::MainContext::thread_default()
-            .unwrap_or_else(gtk::glib::MainContext::default);
-
-        while context.pending() {
-            context.iteration(true);
-        }
-    }
 
     #[gtk::test]
     fn test_test() {

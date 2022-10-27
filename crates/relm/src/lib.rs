@@ -42,3 +42,23 @@ impl<R> Drop for AbortOnDropHandle<R> {
         self.0.abort()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    pub fn run_loop() {
+        let context = gtk::glib::MainContext::thread_default()
+            .unwrap_or_else(gtk::glib::MainContext::default);
+
+        while context.pending() {
+            context.iteration(true);
+        }
+    }
+
+    pub async fn try_recv<T>(sender: &relm4::Receiver<T>) -> Result<T, ()> {
+        tokio::time::timeout(std::time::Duration::from_millis(1), sender.recv())
+            .await
+            .transpose()
+            .and_then(|it| it.ok())
+            .ok_or(())
+    }
+}
