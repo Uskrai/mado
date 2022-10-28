@@ -3,6 +3,7 @@ pub mod chapter_list;
 mod download;
 pub mod manga_info;
 mod task_list;
+mod task;
 pub mod vec_chapters;
 
 pub use app::*;

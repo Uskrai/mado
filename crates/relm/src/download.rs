@@ -6,7 +6,8 @@ use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
 
-use crate::task_list::{DownloadItem, GDownloadItem, TaskListModel};
+use crate::task::{DownloadItem, GDownloadItem};
+use crate::task_list::TaskListModel;
 
 #[derive(Debug)]
 pub enum DownloadMsg {
