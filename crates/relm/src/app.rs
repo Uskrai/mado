@@ -136,13 +136,16 @@ impl SimpleComponent for AppModel {
                     set_stack: Some(&stack)
                 },
 
-                append: stack = &gtk::Stack {
+                #[name = "stack"]
+                append = &gtk::Stack {
                     // Download tab
+                    #[name = "download"]
                     add_titled[Some("Download"), "Download"] = &gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
                         append: model.downloads.widget()
                     },
                     // Manga Info tab
+                    #[name = "manga_info"]
                     add_titled[Some("Manga Info"), "Manga Info"] = &gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
                         append: model.manga_info.widget()
@@ -152,5 +155,45 @@ impl SimpleComponent for AppModel {
 
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mado::engine::MadoEngine;
+    use mado_core::{DefaultMadoModuleMap, MangaInfo, MutexMadoModuleMap, Uuid, Url};
+
+    use super::*;
+    use crate::tests::*;
+
+    #[gtk::test]
+    fn test_app() {
+        let map = DefaultMadoModuleMap::new();
+        let map = MutexMadoModuleMap::new(map);
+        let map = Arc::new(map);
+        let state = MadoEngineState::new(map, vec![]);
+
+        let mado = MadoEngine::new(state);
+        let app = AppModel::builder().launch(mado.state()).detach();
+
+        let mut module = mado_core::MockMadoModule::new();
+        module.expect_uuid().return_const(Uuid::from_u128(1));
+        module.expect_domain().return_const(Url::parse("https://localhost").unwrap());
+
+        let module = Arc::new(module);
+
+        mado.state().push_module(module.clone()).unwrap();
+
+        app.emit(AppMsg::DownloadRequest(DownloadRequest::new(
+            module,
+            Arc::new(MangaInfo::default()),
+            vec![],
+            "path".into(),
+            None,
+            mado::engine::DownloadRequestStatus::Pause,
+        )));
+        run_loop();
+
+        assert_eq!(app.model().downloads.model().task_len(), 1);
     }
 }

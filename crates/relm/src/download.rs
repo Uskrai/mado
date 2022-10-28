@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use gtk::prelude::ListModelExt;
 use gtk::{gio, prelude::WidgetExt};
 use mado::engine::DownloadInfo;
 use relm4::{
@@ -60,5 +61,11 @@ impl SimpleComponent for DownloadModel {
             set_hexpand: true,
             set_child: Some(model.task_list.widget())
         }
+    }
+}
+
+impl DownloadModel {
+    pub fn task_len(&self) -> u32{
+        self.list.n_items()
     }
 }
