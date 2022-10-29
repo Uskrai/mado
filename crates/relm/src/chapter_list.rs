@@ -87,6 +87,7 @@ impl SimpleComponent for ChapterListModel {
         match msg {
             // Initialize Children
             ChapterListMsg::Setup(item) => {
+                println!("setup");
                 let grid = Self::create_chapter_info(item.data());
                 item.set_child(Some(&grid));
             }
@@ -170,7 +171,10 @@ mod tests {
     #[gtk::test]
     fn test_model() {
         let vec = VecChapters::default();
+
+        let window = gtk::ApplicationWindow::default();
         let model = ChapterListModel::builder().launch(vec.clone()).detach();
+        window.set_child(Some(model.widget()));
 
         vec.push(Arc::new(ChapterInfo {
             id: "id".to_string(),
