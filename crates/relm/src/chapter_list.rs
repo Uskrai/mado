@@ -8,6 +8,7 @@ use crate::vec_chapters::{GChapterInfo, GChapterInfoItem, VecChapters};
 
 #[derive(Debug)]
 pub struct ChapterListModel {
+    #[allow(dead_code)]
     chapters: VecChapters,
     selection_model: gtk::MultiSelection,
 }
