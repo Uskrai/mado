@@ -72,11 +72,12 @@ where
     T: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        check_init!(self);
-        f.debug_struct("MaybeUninit")
-            .field("initialized", &self.initialized)
-            .field("inner", self.as_ref())
-            .finish()
+        let mut i = f.debug_struct("MaybeUninit");
+        i.field("initialized", &self.initialized);
+        if let Initialized::Initialized = self.initialized {
+            i.field("inner", self.as_ref());
+        }
+        i.finish()
     }
 }
 
@@ -207,6 +208,37 @@ mod tests {
     #[gtk::test]
     fn drop_shouldnt_panic() {
         MaybeUninit::<bool>::default();
+    }
+
+    #[gtk::test]
+    fn test_new() {
+        let it = MaybeUninit::<bool>::new(true);
+        assert!(*it.as_ref());
+    }
+
+    #[gtk::test]
+    fn test_deref_mut() {
+        let mut it = MaybeUninit::<bool>::new(true);
+        *it.as_mut() = false;
+        assert!(!it.as_ref());
+    }
+
+    #[gtk::test]
+    fn test_debug() {
+        {
+            let it = MaybeUninit::<bool>::default();
+            assert_eq!(
+                format!("{:?}", it),
+                "MaybeUninit { initialized: Uninitalized }"
+            );
+        }
+        {
+            let it = MaybeUninit::<bool>::new(true);
+            assert_eq!(
+                format!("{:?}", it),
+                "MaybeUninit { initialized: Initialized, inner: true }"
+            );
+        }
     }
 }
 
