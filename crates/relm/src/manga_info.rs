@@ -322,6 +322,52 @@ mod tests {
             .return_const(mado_core::Uuid::from_u128(1));
 
         module.expect_domain().return_const(domain.clone());
+
+        let info = MangaAndChaptersInfo {
+            manga: Arc::new(MangaInfo {
+                id: "test".to_string(),
+                title: "test title".to_string(),
+                ..Default::default()
+            }),
+            chapters: Arc::new(ChaptersInfo(vec![Arc::new(ChapterInfo {
+                index: Some(1),
+                id: "1".to_string(),
+                title: Some("ch title".to_string()),
+                ..Default::default()
+            })])),
+        };
+        let get_info_link = domain.join("test").unwrap();
+        let info_ = info.clone();
+        let (tx_waiter_get_info, rx_waiter_get_info) = relm4::channel();
+        module
+            .expect_get_info()
+            .with(mockall::predicate::eq(get_info_link.clone()))
+            .returning(move |_| {
+                tx_waiter_get_info.send(());
+                Ok(info_.clone())
+            });
+
+        // duplicate because cannot clone mado_core::Error
+        let errrr = mado_core::Error::RequestError {
+            url: "error".to_string(),
+            message: "error".to_string(),
+        };
+
+        let get_info_error_link = domain.join("error").unwrap();
+        let (tx_waiter_get_info_err, rx_waiter_get_info_err) = relm4::channel();
+        module
+            .expect_get_info()
+            .with(mockall::predicate::eq(get_info_error_link.clone()))
+            .returning(move |_| {
+                tx_waiter_get_info_err.send(());
+                Err(mado_core::Error::RequestError {
+                    url: "error".to_string(),
+                    message: "error".to_string(),
+                })
+            });
+
+        let module: ArcMadoModule = Arc::new(module);
+        map.push_mut(module.clone()).unwrap();
         {
             let path = Utf8PathBuf::from("download_path");
             model.widgets().download_path.set_text(path.as_str());
@@ -330,36 +376,7 @@ mod tests {
 
             assert_eq!(model.model().path(), path);
 
-            let info = MangaAndChaptersInfo {
-                manga: Arc::new(MangaInfo {
-                    id: "test".to_string(),
-                    title: "test title".to_string(),
-                    ..Default::default()
-                }),
-                chapters: Arc::new(ChaptersInfo(vec![Arc::new(ChapterInfo {
-                    index: Some(1),
-                    id: "1".to_string(),
-                    title: Some("ch title".to_string()),
-                    ..Default::default()
-                })])),
-            };
-
-            let (tx_waiter, rx_waiter) = relm4::channel();
-            let link = domain.join("test").unwrap();
-            let info_ = info.clone();
-            let tx_waiter_get_info = tx_waiter;
-            module
-                .expect_get_info()
-                .with(mockall::predicate::eq(link.clone()))
-                .returning(move |_| {
-                    tx_waiter_get_info.send(());
-                    Ok(info_.clone())
-                });
-
-            let module: ArcMadoModule = Arc::new(module);
-            map.push_mut(module.clone()).unwrap();
-
-            model.emit(MangaInfoMsg::GetInfo(link.to_string()));
+            model.emit(MangaInfoMsg::GetInfo(get_info_link.to_string()));
 
             run_loop();
 
@@ -369,7 +386,7 @@ mod tests {
                 .as_ref()
                 .expect("handle should exist");
 
-            rt.block_on(rx_waiter.recv()).unwrap();
+            rt.block_on(rx_waiter_get_info.recv()).unwrap();
 
             run_loop();
 
@@ -401,9 +418,46 @@ mod tests {
             };
 
             assert_eq!(request.path(), path.join("test title"));
-            assert_eq!(request.url(), Some(&link));
+            assert_eq!(request.url(), Some(&get_info_link));
             assert_eq!(request.chapters().len(), 1);
             assert_eq!(request.module().domain(), module.domain());
+
+            run_loop();
+
+            model.emit(MangaInfoMsg::GetInfo(get_info_error_link.to_string()));
+
+            run_loop();
+
+            model
+                .model()
+                .current_handle
+                .as_ref()
+                .expect("handle should exist");
+
+            rt.block_on(rx_waiter_get_info_err.recv()).unwrap();
+
+            run_loop();
+
+            let it = rt.block_on(try_recv(&rx)).unwrap();
+
+            assert!(matches!(
+                it,
+                MangaInfoOutput::Error(mado_core::Error::RequestError { .. })
+            ));
+
+            match (it, errrr) {
+                (
+                    MangaInfoOutput::Error(mado_core::Error::RequestError { url, message }),
+                    mado_core::Error::RequestError {
+                        url: eurl,
+                        message: emessage,
+                    },
+                ) => {
+                    assert_eq!(url, eurl);
+                    assert_eq!(message, emessage);
+                }
+                _ => unreachable!(),
+            };
         }
     }
 }
