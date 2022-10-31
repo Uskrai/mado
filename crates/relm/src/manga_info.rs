@@ -22,7 +22,7 @@ pub enum MangaInfoMsg {
     /// Get info from string
     /// string should be convertible to URL
     GetInfo(String),
-    Update(MangaAndChaptersInfo),
+    Update(ArcMadoModule, Url, MangaAndChaptersInfo),
     Clear,
 }
 
@@ -36,15 +36,20 @@ pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
     chapters: VecChapters,
     chapter_list: relm4::Controller<ChapterListModel>,
-    current_handle: Option<(ArcMadoModule, Url, AbortOnDropHandle<()>)>,
-    manga_info: Option<Arc<MangaAndChaptersInfo>>,
+    manga_info: Option<(ArcMadoModule, Url, Arc<MangaAndChaptersInfo>)>,
     url: String,
     path: Utf8PathBuf,
+
+    current_handle: Option<AbortOnDropHandle<()>>,
 }
 
 impl MangaInfoModel {
     pub fn path(&self) -> &Utf8Path {
         &self.path
+    }
+
+    pub fn manga_and_chapters(&self) -> Option<&MangaAndChaptersInfo> {
+        self.manga_info.as_ref().map(|it| it.2.as_ref())
     }
 
     fn get_module(&self, link: &str) -> Result<(Url, ArcMadoModule), Error> {
@@ -84,7 +89,7 @@ impl MangaInfoModel {
 
         self.url = url.to_string();
 
-        let task = Self::get_info(module.clone(), url.clone(), sender);
+        let task = Self::get_info(module, url, sender);
 
         // reset current handle.
         // handle is automatically aborted when droped
@@ -92,13 +97,11 @@ impl MangaInfoModel {
         // by making it None first
         self.current_handle = None;
         // then we can spawn new task
-        self.current_handle = Some((module, url, tokio::spawn(task).into()));
+        self.current_handle = Some(tokio::spawn(task).into());
     }
 
     pub fn create_download_request(&self) -> Option<DownloadRequest> {
-        let (module, url, _) = self.current_handle.as_ref()?;
-
-        let manga_info = self.manga_info.as_ref()?;
+        let (module, url, manga_info) = self.manga_info.as_ref()?;
 
         let mut selected = Vec::new();
         self.chapters.for_each_selected(|_, it| {
@@ -124,11 +127,11 @@ impl MangaInfoModel {
     }
 
     pub async fn get_info(module: ArcMadoModule, url: Url, sender: relm4::ComponentSender<Self>) {
-        let manga = module.get_info(url).await;
+        let manga = module.get_info(url.clone()).await;
 
         match manga {
             Ok(manga) => {
-                sender.input(MangaInfoMsg::Update(manga));
+                sender.input(MangaInfoMsg::Update(module, url, manga));
             }
             Err(err) => {
                 sender.input(MangaInfoMsg::Error(err));
@@ -184,11 +187,11 @@ impl SimpleComponent for MangaInfoModel {
             MangaInfoMsg::GetInfo(url) => {
                 self.spawn_get_info(sender, url);
             }
-            MangaInfoMsg::Update(manga) => {
+            MangaInfoMsg::Update(module, url, manga) => {
                 let manga = Arc::new(manga);
-                self.manga_info.replace(manga);
-                let chapters = &self.manga_info.as_ref().unwrap().chapters;
-                for it in chapters.iter() {
+                self.manga_info.replace((module, url, manga.clone()));
+
+                for it in manga.chapters.iter() {
                     self.chapters.push(it.clone());
                 }
             }
@@ -371,12 +374,12 @@ mod tests {
             run_loop();
 
             assert!(Arc::ptr_eq(
-                &model.model().manga_info.as_ref().unwrap().manga,
+                &model.model().manga_and_chapters().unwrap().manga,
                 &info.manga
             ));
 
             assert!(Arc::ptr_eq(
-                &model.model().manga_info.as_ref().unwrap().chapters,
+                &model.model().manga_and_chapters().unwrap().chapters,
                 &info.chapters
             ));
 
