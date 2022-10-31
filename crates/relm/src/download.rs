@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
+use gtk::prelude::ListModelExt;
 use gtk::{gio, prelude::WidgetExt};
 use mado::engine::DownloadInfo;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
 
-use crate::task_list::{DownloadItem, GDownloadItem, TaskListModel, TaskListParentModel};
+use crate::task::{DownloadItem, GDownloadItem};
+use crate::task_list::TaskListModel;
 
 #[derive(Debug)]
 pub enum DownloadMsg {
@@ -16,12 +18,6 @@ pub enum DownloadMsg {
 pub struct DownloadModel {
     list: gio::ListStore,
     task_list: Controller<TaskListModel>,
-}
-
-impl TaskListParentModel for DownloadModel {
-    fn get_list(&self) -> gio::ListStore {
-        self.list.clone()
-    }
 }
 
 #[relm4::component(pub)]
@@ -65,5 +61,11 @@ impl SimpleComponent for DownloadModel {
             set_hexpand: true,
             set_child: Some(model.task_list.widget())
         }
+    }
+}
+
+impl DownloadModel {
+    pub fn task_len(&self) -> u32{
+        self.list.n_items()
     }
 }

@@ -72,19 +72,21 @@ where
     T: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        check_init!(self);
-        f.debug_struct("MaybeUninit")
-            .field("initialized", &self.initialized)
-            .field("inner", self.as_ref())
-            .finish()
+        let mut i = f.debug_struct("MaybeUninit");
+        i.field("initialized", &self.initialized);
+        if let Initialized::Initialized = self.initialized {
+            i.field("inner", self.as_ref());
+        }
+        i.finish()
     }
 }
 
 impl<T> Drop for MaybeUninit<T> {
     fn drop(&mut self) {
-        check_init!(self);
-        unsafe {
-            drop_in_place(self.inner.as_mut_ptr());
+        if self.initialized == Initialized::Initialized {
+            unsafe {
+                drop_in_place(self.inner.as_mut_ptr());
+            }
         }
     }
 }
@@ -180,6 +182,64 @@ macro_rules! struct_wrapper {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[gtk::test]
+    #[should_panic]
+    fn panic_on_unitialized() {
+        let mut it = MaybeUninit::<bool>::default();
+        it.as_mut();
+    }
+
+    #[gtk::test]
+    fn not_panic_after_initialized() {
+        let mut it = MaybeUninit::<i8>::default();
+        it.write(1);
+        assert_eq!(*it.as_ref(), 1);
+        it.write(2);
+        assert_eq!(*it.as_ref(), 2);
+        assert_eq!(*it.as_mut(), 2);
+    }
+
+    #[gtk::test]
+    fn drop_shouldnt_panic() {
+        MaybeUninit::<bool>::default();
+    }
+
+    #[gtk::test]
+    fn test_new() {
+        let it = MaybeUninit::<bool>::new(true);
+        assert!(*it.as_ref());
+    }
+
+    #[gtk::test]
+    fn test_deref_mut() {
+        let mut it = MaybeUninit::<bool>::new(true);
+        *it.as_mut() = false;
+        assert!(!it.as_ref());
+    }
+
+    #[gtk::test]
+    fn test_debug() {
+        {
+            let it = MaybeUninit::<bool>::default();
+            assert_eq!(
+                format!("{:?}", it),
+                "MaybeUninit { initialized: Uninitalized }"
+            );
+        }
+        {
+            let it = MaybeUninit::<bool>::new(true);
+            assert_eq!(
+                format!("{:?}", it),
+                "MaybeUninit { initialized: Initialized, inner: true }"
+            );
+        }
+    }
 }
 
 use std::ops::{Deref, DerefMut};

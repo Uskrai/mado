@@ -2,24 +2,22 @@ use gtk::{
     gio::{prelude::Cast, traits::ListModelExt},
     prelude::*,
 };
-use relm4::{Component, ComponentParts, ComponentSender, SimpleComponent};
+use relm4::{ComponentParts, ComponentSender, SimpleComponent};
 
 use crate::vec_chapters::{GChapterInfo, GChapterInfoItem, VecChapters};
 
-pub trait ChapterListParentModel: Component {
-    fn get_vec_chapter_info(&self) -> VecChapters;
-}
-
 #[derive(Debug)]
 pub struct ChapterListModel {
-    pub(super) chapters: VecChapters,
+    #[allow(dead_code)]
+    chapters: VecChapters,
+    selection_model: gtk::MultiSelection,
 }
 
 #[derive(Debug)]
 pub enum ChapterListMsg {
     Setup(GChapterInfoItem),
     Change(GChapterInfoItem),
-    Activate(gtk::ListView),
+    Activate,
 }
 
 const CHECK_BUTTON_ROW: i32 = 0;
@@ -48,9 +46,15 @@ impl ChapterListModel {
         grid
     }
 
-    fn for_each(model: &gtk::SelectionModel, call: impl Fn(u32, gtk::glib::Object)) {
+    fn get_check(grid: &gtk::Grid) -> Option<gtk::CheckButton> {
+        grid.child_at(CHECK_BUTTON_COLUMN, CHECK_BUTTON_ROW)?
+            .downcast::<gtk::CheckButton>()
+            .ok()
+    }
+
+    fn for_each(&self, call: impl Fn(u32, gtk::glib::Object)) {
         let mut i = 0;
-        while let Some(it) = model.item(i) {
+        while let Some(it) = self.selection_model.item(i) {
             call(i, it);
             i += 1;
         }
@@ -71,7 +75,11 @@ impl SimpleComponent for ChapterListModel {
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = ChapterListModel { chapters };
+        let selection_model = chapters.create_selection_model();
+        let model = ChapterListModel {
+            chapters,
+            selection_model,
+        };
         let widgets = view_output!();
         ComponentParts { model, widgets }
     }
@@ -80,35 +88,28 @@ impl SimpleComponent for ChapterListModel {
         match msg {
             // Initialize Children
             ChapterListMsg::Setup(item) => {
+                println!("setup");
                 let grid = Self::create_chapter_info(item.data());
                 item.set_child(Some(&grid));
             }
 
             // Sync children with data
             ChapterListMsg::Change(item) => {
-                let child = item
-                    .child()
-                    .unwrap()
-                    .downcast::<gtk::Grid>()
-                    .unwrap()
-                    .child_at(CHECK_BUTTON_COLUMN, CHECK_BUTTON_ROW)
-                    .unwrap()
-                    .downcast::<gtk::CheckButton>()
-                    .unwrap();
+                let child = item.child().unwrap().downcast::<gtk::Grid>().unwrap();
+                let child = Self::get_check(&child).unwrap();
 
                 child.set_active(item.data().borrow().active());
             }
-            ChapterListMsg::Activate(list) => {
-                let model = list.model().unwrap();
-                let selection = model.selection();
-                Self::for_each(&model, |i, it| {
+            ChapterListMsg::Activate => {
+                let selection = self.selection_model.selection();
+                self.for_each(|i, it| {
                     if selection.contains(i) {
                         let it = it.downcast::<GChapterInfo>().unwrap();
                         let it = it.borrow();
                         it.set_active(!it.active());
 
                         // Notify model that value has changed
-                        model.selection_changed(i, 1);
+                        self.selection_model.selection_changed(i, 1);
                     }
                 });
             }
@@ -120,7 +121,7 @@ impl SimpleComponent for ChapterListModel {
             set_vexpand : true,
             set_hexpand: true,
             #[wrap(Some)]
-            set_child = &gtk::ListView {
+            set_child: list = &gtk::ListView {
                 #[wrap(Some)]
                 set_factory = &gtk::SignalListItemFactory {
                     connect_setup[sender] => move |_, item| {
@@ -132,12 +133,71 @@ impl SimpleComponent for ChapterListModel {
                     }
                 },
                 set_single_click_activate: false,
-                connect_activate[sender] => move |view, _| {
-                    sender.input(ChapterListMsg::Activate(view.clone()))
+                connect_activate[sender] => move |_, _| {
+                    sender.input(ChapterListMsg::Activate)
                 },
 
-                set_model: Some(&model.chapters.create_selection_model())
+                set_model: Some(&model.selection_model)
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use mado_core::ChapterInfo;
+    use relm4::{Component, ComponentController};
+
+    use super::*;
+    use crate::{tests::*, vec_chapters::CheckChapterInfo};
+
+    #[gtk::test]
+    fn test_chapter_info() {
+        let chapter = Arc::new(ChapterInfo::default());
+        let chapter = CheckChapterInfo::from(chapter);
+        let chapter = GChapterInfo::to_gobject(chapter);
+
+        let it = ChapterListModel::create_chapter_info(chapter.clone());
+
+        let check = ChapterListModel::get_check(&it).expect("should exist");
+        for i in [true, false] {
+            check.set_active(i);
+            run_loop();
+            assert_eq!(chapter.borrow().active(), i);
+        }
+    }
+
+    #[gtk::test]
+    fn test_model() {
+        let vec = VecChapters::default();
+
+        let window = gtk::ApplicationWindow::default();
+        let model = ChapterListModel::builder().launch(vec.clone()).detach();
+        window.set_child(Some(model.widget()));
+
+        vec.push(Arc::new(ChapterInfo {
+            id: "id".to_string(),
+            ..Default::default()
+        }));
+
+        run_loop();
+
+        assert_eq!(model.model().selection_model.n_items(), 1);
+
+        for i in [true, false] {
+            vec.borrow()[0].borrow().set_active(i);
+            model.emit(ChapterListMsg::Activate);
+            run_loop();
+            assert_eq!(vec.borrow()[0].borrow().active(), i);
+        }
+
+        for i in [true, false] {
+            model.model().selection_model.select_item(0, true);
+            model.emit(ChapterListMsg::Activate);
+            run_loop();
+            assert_eq!(vec.borrow()[0].borrow().active(), i);
         }
     }
 }

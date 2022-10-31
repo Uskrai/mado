@@ -10,7 +10,7 @@ use mado::engine::{
     DownloadRequest, DownloadRequestStatus,
 };
 
-use crate::chapter_list::{ChapterListModel, ChapterListParentModel};
+use crate::chapter_list::ChapterListModel;
 use crate::vec_chapters::VecChapters;
 use relm4::{Component, ComponentController, ComponentParts, ComponentSender, SimpleComponent};
 
@@ -22,7 +22,7 @@ pub enum MangaInfoMsg {
     /// Get info from string
     /// string should be convertible to URL
     GetInfo(String),
-    Update(MangaAndChaptersInfo),
+    Update(ArcMadoModule, Url, MangaAndChaptersInfo),
     Clear,
 }
 
@@ -36,21 +36,20 @@ pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
     chapters: VecChapters,
     chapter_list: relm4::Controller<ChapterListModel>,
-    current_handle: Option<(ArcMadoModule, Url, AbortOnDropHandle<()>)>,
-    manga_info: Option<Arc<MangaAndChaptersInfo>>,
+    manga_info: Option<(ArcMadoModule, Url, Arc<MangaAndChaptersInfo>)>,
     url: String,
     path: Utf8PathBuf,
-}
 
-impl ChapterListParentModel for MangaInfoModel {
-    fn get_vec_chapter_info(&self) -> VecChapters {
-        self.chapters.clone()
-    }
+    current_handle: Option<AbortOnDropHandle<()>>,
 }
 
 impl MangaInfoModel {
     pub fn path(&self) -> &Utf8Path {
         &self.path
+    }
+
+    pub fn manga_and_chapters(&self) -> Option<&MangaAndChaptersInfo> {
+        self.manga_info.as_ref().map(|it| it.2.as_ref())
     }
 
     fn get_module(&self, link: &str) -> Result<(Url, ArcMadoModule), Error> {
@@ -90,7 +89,7 @@ impl MangaInfoModel {
 
         self.url = url.to_string();
 
-        let task = Self::get_info(module.clone(), url.clone(), sender);
+        let task = Self::get_info(module, url, sender);
 
         // reset current handle.
         // handle is automatically aborted when droped
@@ -98,13 +97,11 @@ impl MangaInfoModel {
         // by making it None first
         self.current_handle = None;
         // then we can spawn new task
-        self.current_handle = Some((module, url, tokio::spawn(task).into()));
+        self.current_handle = Some(tokio::spawn(task).into());
     }
 
     pub fn create_download_request(&self) -> Option<DownloadRequest> {
-        let (module, url, _) = self.current_handle.as_ref()?;
-
-        let manga_info = self.manga_info.as_ref()?;
+        let (module, url, manga_info) = self.manga_info.as_ref()?;
 
         let mut selected = Vec::new();
         self.chapters.for_each_selected(|_, it| {
@@ -130,11 +127,11 @@ impl MangaInfoModel {
     }
 
     pub async fn get_info(module: ArcMadoModule, url: Url, sender: relm4::ComponentSender<Self>) {
-        let manga = module.get_info(url).await;
+        let manga = module.get_info(url.clone()).await;
 
         match manga {
             Ok(manga) => {
-                sender.input(MangaInfoMsg::Update(manga));
+                sender.input(MangaInfoMsg::Update(module, url, manga));
             }
             Err(err) => {
                 sender.input(MangaInfoMsg::Error(err));
@@ -190,11 +187,11 @@ impl SimpleComponent for MangaInfoModel {
             MangaInfoMsg::GetInfo(url) => {
                 self.spawn_get_info(sender, url);
             }
-            MangaInfoMsg::Update(manga) => {
+            MangaInfoMsg::Update(module, url, manga) => {
                 let manga = Arc::new(manga);
-                self.manga_info.replace(manga);
-                let chapters = &self.manga_info.as_ref().unwrap().chapters;
-                for it in chapters.iter() {
+                self.manga_info.replace((module, url, manga.clone()));
+
+                for it in manga.chapters.iter() {
                     self.chapters.push(it.clone());
                 }
             }
@@ -263,6 +260,204 @@ impl SimpleComponent for MangaInfoModel {
                     }
                 }
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+    use mado::core::{DefaultMadoModuleMap, MutexMadoModuleMap};
+    use mado_core::{ChapterInfo, ChaptersInfo, MangaInfo, MutMadoModuleMap};
+
+    #[gtk::test]
+    fn test_test() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+
+        let _g = rt.enter();
+
+        let map = DefaultMadoModuleMap::new();
+        let map = MutexMadoModuleMap::new(map);
+        let map = Arc::new(map);
+
+        let (tx, rx) = relm4::channel();
+        let model = MangaInfoModel::builder()
+            .launch(map.clone())
+            .forward(&tx, |msg| msg);
+
+        run_loop();
+
+        {
+            let link = "https".to_string();
+            model.widgets().url_entry.set_text(&link);
+
+            // url_entry.emit_activate doesn't do anything in test
+            // so make sure to call emit_clicked too
+            // and assert that it doesn't run twice below
+            model.widgets().url_entry.emit_activate();
+            model.widgets().enter_button.emit_clicked();
+
+            run_loop();
+
+            rt.block_on(async {
+                assert!(matches!(
+                    try_recv(&rx).await.unwrap(),
+                    MangaInfoOutput::Error(mado::core::Error::UnsupportedUrl(..))
+                ));
+
+                try_recv(&rx).await.expect_err("should not exist");
+            });
+
+            assert_eq!(model.model().url, link);
+        };
+
+        let mut module = mado_core::MockMadoModule::default();
+        let domain = mado_core::Url::parse("https://localhost").unwrap();
+        module
+            .expect_uuid()
+            .return_const(mado_core::Uuid::from_u128(1));
+
+        module.expect_domain().return_const(domain.clone());
+
+        let info = MangaAndChaptersInfo {
+            manga: Arc::new(MangaInfo {
+                id: "test".to_string(),
+                title: "test title".to_string(),
+                ..Default::default()
+            }),
+            chapters: Arc::new(ChaptersInfo(vec![Arc::new(ChapterInfo {
+                index: Some(1),
+                id: "1".to_string(),
+                title: Some("ch title".to_string()),
+                ..Default::default()
+            })])),
+        };
+        let get_info_link = domain.join("test").unwrap();
+        let info_ = info.clone();
+        let (tx_waiter_get_info, rx_waiter_get_info) = relm4::channel();
+        module
+            .expect_get_info()
+            .with(mockall::predicate::eq(get_info_link.clone()))
+            .returning(move |_| {
+                tx_waiter_get_info.send(());
+                Ok(info_.clone())
+            });
+
+        // duplicate because cannot clone mado_core::Error
+        let errrr = mado_core::Error::RequestError {
+            url: "error".to_string(),
+            message: "error".to_string(),
+        };
+
+        let get_info_error_link = domain.join("error").unwrap();
+        let (tx_waiter_get_info_err, rx_waiter_get_info_err) = relm4::channel();
+        module
+            .expect_get_info()
+            .with(mockall::predicate::eq(get_info_error_link.clone()))
+            .returning(move |_| {
+                tx_waiter_get_info_err.send(());
+                Err(mado_core::Error::RequestError {
+                    url: "error".to_string(),
+                    message: "error".to_string(),
+                })
+            });
+
+        let module: ArcMadoModule = Arc::new(module);
+        map.push_mut(module.clone()).unwrap();
+        {
+            let path = Utf8PathBuf::from("download_path");
+            model.widgets().download_path.set_text(path.as_str());
+
+            run_loop();
+
+            assert_eq!(model.model().path(), path);
+
+            model.emit(MangaInfoMsg::GetInfo(get_info_link.to_string()));
+
+            run_loop();
+
+            model
+                .model()
+                .current_handle
+                .as_ref()
+                .expect("handle should exist");
+
+            rt.block_on(rx_waiter_get_info.recv()).unwrap();
+
+            run_loop();
+
+            assert!(Arc::ptr_eq(
+                &model.model().manga_and_chapters().unwrap().manga,
+                &info.manga
+            ));
+
+            assert!(Arc::ptr_eq(
+                &model.model().manga_and_chapters().unwrap().chapters,
+                &info.chapters
+            ));
+
+            model.widgets().download_button.emit_clicked();
+
+            run_loop();
+
+            model.model().chapters.for_each(|_, info| {
+                info.borrow_mut().set_active(true);
+            });
+
+            model.widgets().download_button.emit_clicked();
+
+            run_loop();
+
+            let request = match rt.block_on(try_recv(&rx)).unwrap() {
+                MangaInfoOutput::DownloadRequest(request) => request,
+                _ => unreachable!(),
+            };
+
+            assert_eq!(request.path(), path.join("test title"));
+            assert_eq!(request.url(), Some(&get_info_link));
+            assert_eq!(request.chapters().len(), 1);
+            assert_eq!(request.module().domain(), module.domain());
+
+            run_loop();
+
+            model.emit(MangaInfoMsg::GetInfo(get_info_error_link.to_string()));
+
+            run_loop();
+
+            model
+                .model()
+                .current_handle
+                .as_ref()
+                .expect("handle should exist");
+
+            rt.block_on(rx_waiter_get_info_err.recv()).unwrap();
+
+            run_loop();
+
+            let it = rt.block_on(try_recv(&rx)).unwrap();
+
+            assert!(matches!(
+                it,
+                MangaInfoOutput::Error(mado_core::Error::RequestError { .. })
+            ));
+
+            match (it, errrr) {
+                (
+                    MangaInfoOutput::Error(mado_core::Error::RequestError { url, message }),
+                    mado_core::Error::RequestError {
+                        url: eurl,
+                        message: emessage,
+                    },
+                ) => {
+                    assert_eq!(url, eurl);
+                    assert_eq!(message, emessage);
+                }
+                _ => unreachable!(),
+            };
         }
     }
 }

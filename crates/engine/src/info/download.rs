@@ -211,6 +211,22 @@ impl DownloadRequest {
             url,
         }
     }
+
+    pub fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+
+    pub fn url(&self) -> Option<&Url> {
+        self.url.as_ref()
+    }
+
+    pub fn chapters(&self) -> &[Arc<ChapterInfo>] {
+        self.chapters.as_ref()
+    }
+
+    pub fn module(&self) -> &ArcMadoModule {
+        &self.module
+    }
 }
 
 #[cfg(test)]

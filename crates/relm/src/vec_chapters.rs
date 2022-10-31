@@ -1,4 +1,4 @@
-use std::cell::{Cell, Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell};
 use std::sync::Arc;
 
 pub use gtk::{gio, prelude::*, subclass::prelude::*};
@@ -96,27 +96,28 @@ impl From<gtk::ListItem> for GChapterInfoItem {
 
 #[derive(Default, Clone, Debug)]
 pub struct VecChapters {
-    inner: RefCell<Vec<GChapterInfo>>,
+    gvec: RefCell<Vec<GChapterInfo>>,
     views: ListStore,
 }
 
 impl VecChapters {
-    fn borrow_mut(&self) -> RefMut<Vec<GChapterInfo>> {
-        self.inner.borrow_mut()
-    }
-
-    fn borrow(&self) -> Ref<Vec<GChapterInfo>> {
-        self.inner.borrow()
-    }
-
     pub fn push(&self, chapter: Arc<ChapterInfo>) {
         let chapter = GChapterInfo::to_gobject(CheckChapterInfo::from(chapter));
-        self.borrow_mut().push(chapter.clone());
+        self.gvec.borrow_mut().push(chapter.clone());
         self.views.append(&chapter);
     }
 
+    pub fn for_each(&self, mut f: impl FnMut(usize, &GChapterInfo)) {
+        self.gvec
+            .borrow()
+            .iter()
+            .enumerate()
+            .for_each(|(i, v)| f(i, v));
+    }
+
     pub fn for_each_selected(&self, mut f: impl FnMut(usize, &Arc<ChapterInfo>)) {
-        self.borrow()
+        self.gvec
+            .borrow()
             .iter()
             .enumerate()
             .filter(|(_, v)| v.borrow().active.get())
@@ -124,15 +125,15 @@ impl VecChapters {
     }
 
     pub fn clear(&self) {
-        self.borrow_mut().clear();
+        self.gvec.borrow_mut().clear();
         self.views.remove_all();
-    }
-
-    pub fn views(&self) -> &ListStore {
-        &self.views
     }
 
     pub fn create_selection_model(&self) -> gtk::MultiSelection {
         gtk::MultiSelection::new(Some(&self.views.inner))
+    }
+
+    pub fn borrow(&self) -> Ref<'_, Vec<GChapterInfo>> {
+        self.gvec.borrow()
     }
 }

@@ -13,7 +13,6 @@ jobs:
   build:
 
     runs-on: ubuntu-22.04
-
     steps:
     - uses: actions/checkout@v3
       
@@ -32,7 +31,7 @@ jobs:
     - uses: ./.github/actions/init-deno
 
     - name: Dependency
-      run: sudo apt-get install libgtk-4-dev
+      run: sudo apt-get install libgtk-4-dev xvfb
 
     - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
@@ -45,7 +44,7 @@ jobs:
 
     - name: Generate code coverage
       run: |
-        cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
+        xvfb-run --auto-servernum cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
       env:
         RUST_BACKTRACE: 1
 
@@ -77,3 +76,5 @@ jobs:
         path: |
           cobertura.xml
           deno_coverage.lcov
+
+    - uses: bcomnes/cleanup-xvfb@v1

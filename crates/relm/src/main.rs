@@ -19,7 +19,8 @@ pub struct Loader(futures::channel::mpsc::Sender<LoaderMsg>);
 #[async_trait::async_trait]
 impl MadoModuleLoader for Loader {
     async fn get_paths(&self) -> Vec<Utf8PathBuf> {
-        let mut dir = tokio::fs::read_dir("../deno/dist/module").await.unwrap();
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../deno/dist/module");
+        let mut dir = tokio::fs::read_dir(dir).await.unwrap();
 
         let mut paths = Vec::new();
         loop {
