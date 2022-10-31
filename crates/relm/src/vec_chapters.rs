@@ -129,10 +129,6 @@ impl VecChapters {
         self.views.remove_all();
     }
 
-    pub fn views(&self) -> &ListStore {
-        &self.views
-    }
-
     pub fn create_selection_model(&self) -> gtk::MultiSelection {
         gtk::MultiSelection::new(Some(&self.views.inner))
     }
