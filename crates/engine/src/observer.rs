@@ -1,22 +1,20 @@
 use parking_lot::Mutex;
 use std::{
-    collections::HashMap,
     fmt::Debug,
-    sync::{atomic::AtomicUsize, Arc, Weak},
+    sync::{Arc, Weak},
 };
 
-type ObserverMap<T> = Mutex<HashMap<usize, T>>;
+type ObserverMap<T> = Mutex<slab::Slab<T>>;
 
 pub struct Observers<T> {
     observers: Arc<ObserverMap<T>>,
-    last_insert_id: AtomicUsize,
 }
 
 impl<T> Debug for Observers<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Observers")
-            .field("last_insert_id", &self.last_insert_id)
-            .finish_non_exhaustive()
+        let mut d = f.debug_struct("Observers");
+
+        d.finish()
     }
 }
 
@@ -24,7 +22,6 @@ impl<T> Default for Observers<T> {
     fn default() -> Self {
         Self {
             observers: Default::default(),
-            last_insert_id: Default::default(),
         }
     }
 }
@@ -35,15 +32,12 @@ impl<T> Observers<T> {
     }
 
     pub fn connect(&self, observer: T) -> ObserverHandle<T> {
-        let id = self.last_insert_id.fetch_add(1, atomic::Ordering::Relaxed);
+        let id = self.observers.lock().insert(observer);
 
-        let handle = ObserverHandle {
+        ObserverHandle {
             observers: Arc::downgrade(&self.observers),
-            id,
-        };
-        self.observers.lock().insert(id, observer);
-
-        handle
+            id: Arc::new(Mutex::new(Some(id))),
+        }
     }
 
     pub fn emit(&self, mut f: impl FnMut(&mut T)) {
@@ -55,17 +49,20 @@ impl<T> Observers<T> {
 
 #[derive(Debug, Clone)]
 pub struct ObserverHandle<T> {
-    id: usize,
+    id: Arc<Mutex<Option<usize>>>,
     observers: Weak<ObserverMap<T>>,
 }
 
 impl<T> ObserverHandle<T> {
     pub fn disconnect(self) -> Option<T> {
-        self.observers.disconnect(self.id)
+        self.id
+            .lock()
+            .take()
+            .and_then(|it| self.observers.disconnect(it))
     }
 
     pub fn is_disconnected(&self) -> bool {
-        self.observers.is_disconnected(self.id)
+        self.id.lock().is_none()
     }
 }
 
@@ -91,13 +88,13 @@ pub trait TypedObserverMapTrait: ObserverMapTrait {
 impl<T> ObserverMapTrait for Weak<ObserverMap<T>> {
     fn disconnect_any(&self, id: usize) -> bool {
         self.upgrade()
-            .and_then(|it| it.lock().remove(&id))
+            .and_then(|it| it.lock().try_remove(id))
             .is_some()
     }
 
     fn is_disconnected(&self, id: usize) -> bool {
         self.upgrade()
-            .and_then(|it| it.lock().get(&id).map(|_| false))
+            .and_then(|it| it.lock().get(id).map(|_| false))
             .unwrap_or(true)
     }
 }
@@ -105,22 +102,26 @@ impl<T> ObserverMapTrait for Weak<ObserverMap<T>> {
 impl<T> TypedObserverMapTrait for Weak<ObserverMap<T>> {
     type Out = Option<T>;
     fn disconnect(&self, id: usize) -> Self::Out {
-        self.upgrade().and_then(|it| it.lock().remove(&id))
+        self.upgrade().and_then(|it| it.lock().try_remove(id))
     }
 }
 
 pub struct AnyObserverHandleSend {
     map: Box<dyn ObserverMapTrait + Send>,
-    id: usize,
+    id: Arc<Mutex<Option<usize>>>,
 }
 
 impl AnyObserverHandleSend {
     pub fn is_disconnected(&self) -> bool {
-        self.map.is_disconnected(self.id)
+        self.id.lock().is_none()
     }
 
     pub fn disconnect(self) -> bool {
-        self.map.disconnect_any(self.id)
+        self.id
+            .lock()
+            .take()
+            .map(|it| self.map.disconnect_any(it))
+            .unwrap_or(false)
     }
 }
 
@@ -173,9 +174,6 @@ mod tests {
     #[test]
     fn observer_debug() {
         let observer = Observers::<()>::new();
-        assert_eq!(
-            format!("{:?}", observer),
-            "Observers { last_insert_id: 0, .. }"
-        );
+        assert_eq!(format!("{:?}", observer), "Observers");
     }
 }
