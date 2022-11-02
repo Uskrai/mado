@@ -275,7 +275,7 @@ mod tests {
 
                 StreamBuilder::new()
                     .body("test")
-                    .delay(Duration::from_millis(10))
+                    .delay(Duration::from_millis(30))
                     .inspect(move || {
                         assert_eq!(buff.to_string(), "test");
                     })
@@ -289,7 +289,7 @@ mod tests {
 
         futures::executor::block_on(async {
             let request = client.get(server_url.join("/test").unwrap());
-            download_http(request, &mut buffer, || Duration::from_millis(20))
+            download_http(request, &mut buffer, || Duration::from_millis(50))
                 .await
                 .unwrap();
             assert_eq!(buffer.to_string(), "testtest");
