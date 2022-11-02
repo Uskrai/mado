@@ -27,7 +27,12 @@ impl DownloadStatus {
         matches!(self, Self::InProgress(DownloadProgressStatus::Paused))
     }
 
+    #[deprecated = "use is_finished"]
     pub fn is_completed(&self) -> bool {
+        self.is_finished()
+    }
+
+    pub fn is_finished(&self) -> bool {
         matches!(self, Self::Finished)
     }
 
