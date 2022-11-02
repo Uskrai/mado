@@ -47,10 +47,19 @@ impl<T> Observers<T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ObserverHandle<T> {
     id: Arc<Mutex<Option<usize>>>,
     observers: Weak<ObserverMap<T>>,
+}
+
+impl<T> Clone for ObserverHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            observers: self.observers.clone(),
+        }
+    }
 }
 
 impl<T> ObserverHandle<T> {
