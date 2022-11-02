@@ -46,7 +46,7 @@ mod tests {
     }
 
     pub async fn try_recv<T>(sender: &relm4::Receiver<T>) -> Result<T, ()> {
-        tokio::time::timeout(std::time::Duration::from_millis(1), sender.recv())
+        mado::engine::timer::timeout(std::time::Duration::from_millis(1), sender.recv())
             .await
             .transpose()
             .and_then(|it| it.ok())
