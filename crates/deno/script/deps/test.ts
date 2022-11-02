@@ -18,3 +18,13 @@ export function assertOk<T>(actual: Result<T>) {
     throw Errors.message(`expected: Ok, found: ${inspect(actual)}`);
   }
 }
+
+export function assertThrow(fun: () => void) {
+  try {
+    fun();
+  } catch (e) {
+    return e;
+  }
+
+  throw Errors.message(`expected: throw, found: not throw`);
+}
