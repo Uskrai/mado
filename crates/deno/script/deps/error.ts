@@ -1,10 +1,9 @@
 export abstract class ResultBase<O> {
   content: O | Errors;
 
-  isError(): boolean {
-    return !this.isOk();
-  }
-  abstract isOk(): boolean;
+  abstract isError(): this is ResultError<O>;
+
+  abstract isOk(): this is ResultOk<O>;
 
   abstract throw(): O;
   abstract throwDebug(): O;
@@ -35,6 +34,14 @@ export abstract class ResultBase<O> {
   get data(): O {
     return this.throw();
   }
+
+  get error(): Errors {
+    if (this.isError()) {
+      return this.content;
+    } else {
+      throw Errors.message("This is not error");
+    }
+  }
 }
 
 export type Result<T> = ResultBase<T>;
@@ -43,14 +50,18 @@ export const Ok = <T>(data: T): Result<T> => {
   return new ResultOk(data);
 };
 
-export const Err = (error: Errors): Result<never> => {
-  return new ResultError<never>(error);
+export const Err = <T>(error: Errors): Result<T> => {
+  return new ResultError<T>(error);
 };
 
 export class ResultError<T> extends ResultBase<T> {
   type = "Err";
   constructor(public content: Errors) {
     super();
+  }
+
+  isError() {
+    return true;
   }
 
   isOk() {
@@ -73,7 +84,10 @@ export class ResultOk<T> extends ResultBase<T> {
   constructor(public content: T) {
     super();
   }
-  isOk(): boolean {
+  isError() {
+    return false;
+  }
+  isOk() {
     return true;
   }
   throw(): T {
@@ -93,6 +107,8 @@ export async function catchAndReturn<T>(
     .catch((it) => {
       if (it instanceof Errors) {
         return Err(it);
+      } else if (it instanceof ResultError) {
+        return it;
       } else {
         return Err(Errors.fromCatch(it));
       }
