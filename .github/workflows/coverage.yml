@@ -44,7 +44,7 @@ jobs:
 
     - name: Generate code coverage
       run: |
-        xvfb-run --auto-servernum cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out Xml --out Html
+        xvfb-run --auto-servernum cargo tarpaulin --verbose --all-features --skip-clean --workspace --timeout 120 --out Xml --out Html
       env:
         RUST_BACKTRACE: 1
 
