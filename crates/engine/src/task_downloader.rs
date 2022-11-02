@@ -113,14 +113,14 @@ impl TaskDownloader {
 
     pub async fn download_image(
         &self,
-        image: Arc<DownloadChapterImageInfo>,
+        download: Arc<DownloadChapterImageInfo>,
     ) -> Result<(), mado_core::Error> {
         let module = self.info.wait_module().await;
         self.info
             .set_status(DownloadStatus::resumed(DownloadResumedStatus::Downloading));
 
-        let path = image.path();
-        let image = image.image();
+        let path = download.path();
+        let image = download.image();
         let exists = path.exists();
 
         const RETRY_LIMIT: usize = 10;
@@ -142,12 +142,13 @@ impl TaskDownloader {
             }
 
             let mut file = std::fs::File::create(path).unwrap();
+
             file.write_all(&buffer)?;
-            self.info.set_status(DownloadStatus::finished());
             tracing::trace!("Finished writing to {}", path);
         } else {
             tracing::trace!("File {} already exists, skipping...", path);
         }
+        download.set_status(DownloadStatus::finished());
         Ok(())
     }
 }
@@ -288,7 +289,7 @@ mod tests {
         let info = Arc::new(DownloadInfo::new(
             module.into(),
             "title".to_string(),
-            vec![chapter],
+            vec![chapter.clone()],
             path.clone(),
             None,
             DownloadStatus::waiting(),
@@ -306,8 +307,6 @@ mod tests {
             futures::pin_mut!(fut);
             futures::pin_mut!(runner);
             let _ = futures::future::select(fut, runner).await;
-
-            assert_eq!(*info.status(), DownloadStatus::finished());
         });
 
         assert_eq!(
@@ -321,6 +320,11 @@ mod tests {
             info.chapters()[0].images()[0].path(),
             path.join("1").join("0001.png")
         );
+
+        assert_eq!(*info.status(), DownloadStatus::finished());
+        assert_eq!(*chapter.status(), DownloadStatus::finished());
+        assert_eq!(*chapter.images()[0].status(), DownloadStatus::finished());
+
         temp.close().unwrap();
     }
 
