@@ -78,7 +78,7 @@ impl<T> ObserverHandle<T> {
 impl<T: Send + 'static> ObserverHandle<T> {
     pub fn send_handle_any(self) -> AnyObserverHandleSend {
         AnyObserverHandleSend {
-            map: Box::new(self.observers),
+            map: Arc::new(self.observers),
             id: self.id,
         }
     }
@@ -115,8 +115,9 @@ impl<T> TypedObserverMapTrait for Weak<ObserverMap<T>> {
     }
 }
 
+#[derive(Clone)]
 pub struct AnyObserverHandleSend {
-    map: Box<dyn ObserverMapTrait + Send>,
+    map: Arc<dyn ObserverMapTrait + Send + Sync>,
     id: Arc<Mutex<Option<usize>>>,
 }
 
