@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use mado_engine::{
     core::{ArcMadoModuleMap, ChapterImageInfo},
+    path::Utf8PathBuf,
     DownloadChapterImageInfo, DownloadChapterInfo, DownloadInfo, LateBindingModule,
 };
 use rusqlite::{Connection, Error};
@@ -99,6 +100,14 @@ pub struct DownloadChapterImageInfoJoin {
     pub image: Arc<DownloadChapterImageInfo>,
 }
 
+pub fn from_relative(relative: bool, parent: &Utf8PathBuf, child: &Utf8PathBuf) -> Utf8PathBuf {
+    if relative {
+        parent.join(child)
+    } else {
+        child.clone()
+    }
+}
+
 pub fn load_download_info_join(
     conn: &Connection,
     module_map: ArcMadoModuleMap,
@@ -135,6 +144,8 @@ pub fn load_download_info_join(
                     .into_iter()
                     .map(|it| {
                         let pk = it.image.pk;
+                        let path =
+                            from_relative(it.image.path_relative, chapter.path(), &it.image.path);
 
                         let image = it.image;
                         let image = Arc::new(DownloadChapterImageInfo::new(
@@ -143,7 +154,7 @@ pub fn load_download_info_join(
                                 extension: image.extension,
                                 name: image.name,
                             },
-                            image.path,
+                            path,
                             image.status.into(),
                         ));
 

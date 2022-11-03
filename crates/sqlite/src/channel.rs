@@ -24,7 +24,7 @@ pub enum DbMsg {
     PushModule(ArcMadoModule),
     DownloadStatusChanged(DownloadPK, DownloadStatus),
     DownloadChapterStatusChanged(DownloadChapterPK, DownloadStatus),
-    DownloadChapterImagesChanged(DownloadChapterPK, Vec<Arc<DownloadChapterImageInfo>>),
+    DownloadChapterImagesChanged(DownloadChapterPK, Arc<DownloadChapterInfo>),
     DownloadChapterImageStatusChanged(DownloadChapterImagePK, DownloadStatus),
     Close,
 }
@@ -36,7 +36,8 @@ pub struct Channel {
     tx: mpsc::UnboundedSender<DbMsg>,
     db: Database,
     module: HashMap<Uuid, Module>,
-    download_chapter_images: Mutex<HashMap<DownloadChapterPK, Vec<mado_engine::AnyObserverHandleSend>>>,
+    download_chapter_images:
+        Mutex<HashMap<DownloadChapterPK, Vec<mado_engine::AnyObserverHandleSend>>>,
 }
 
 pub fn channel(db: Database) -> Channel {
@@ -94,7 +95,7 @@ impl Channel {
                 self.db.update_download_chapter_status(pk, status)?;
             }
             DbMsg::DownloadChapterImagesChanged(ch_pk, images) => {
-                let image = self.db.update_download_chapter_images(ch_pk, images)?;
+                let image = self.db.update_download_chapter_images(ch_pk, &images)?;
 
                 self.connect_download_chapter_images(ch_pk, image);
             }
@@ -194,16 +195,19 @@ impl Channel {
 
     fn connect_download_chapter(&self, pk: DownloadChapterPK, info: Arc<DownloadChapterInfo>) {
         let tx = self.tx.clone();
+        let chapter = Arc::downgrade(&info);
         info.connect_only(move |msg| {
-            match msg {
-                DownloadChapterInfoMsg::StatusChanged(status) => {
-                    tx.unbounded_send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
+            if let Some(chapter) = chapter.upgrade() {
+                match msg {
+                    DownloadChapterInfoMsg::StatusChanged(status) => {
+                        tx.unbounded_send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
+                    }
+                    DownloadChapterInfoMsg::DownloadImagesChanged(_) => {
+                        tx.unbounded_send(DbMsg::DownloadChapterImagesChanged(pk, chapter))
+                    }
                 }
-                DownloadChapterInfoMsg::DownloadImagesChanged(images) => {
-                    tx.unbounded_send(DbMsg::DownloadChapterImagesChanged(pk, images.clone()))
-                }
+                .ok();
             }
-            .ok();
         });
     }
 
