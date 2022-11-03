@@ -7,7 +7,7 @@ use std::{
 };
 
 use event_listener::Event;
-use futures::{channel::mpsc, FutureExt, StreamExt};
+use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
 
 use crate::{DownloadChapterImageInfo, DownloadChapterInfo, DownloadStatus};
 
@@ -55,19 +55,32 @@ impl TaskDownloader {
     }
 
     async fn download_chapter(&self, it: Arc<DownloadChapterInfo>) -> Result<(), mado_core::Error> {
-        if it.status().is_completed() {
+        if it.status().is_finished() {
             return Ok(());
         }
 
-        let mut get_images = self.get_chapter_images(it.clone()).await;
-
+        let (image_tx, mut image_rx) = mpsc::unbounded();
         let mut images = vec![];
-        while let Some(image) = get_images.next().await {
-            let image = image?;
-            self.download_image(image.clone()).await?;
-            images.push(image);
-            it.set_images(images.clone());
-        }
+        let get_images = self
+            .get_chapter_images(it.clone())
+            .await
+            .inspect(|image| {
+                if let Ok(image) = image {
+                    images.push(image.clone());
+                    it.set_images(images.clone());
+                }
+            })
+            .forward(image_tx.sink_map_err(|err| mado_core::Error::ExternalError(err.into())));
+
+        let fut = async move {
+            while let Some(image) = image_rx.next().await {
+                let image = image;
+                self.download_image(image.clone()).await?;
+            }
+            Ok::<_, mado_core::Error>(())
+        };
+
+        let _ = futures::future::try_join(get_images, fut).await?;
 
         it.set_status(DownloadStatus::Finished);
 

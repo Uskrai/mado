@@ -47,10 +47,19 @@ impl<T> Observers<T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ObserverHandle<T> {
     id: Arc<Mutex<Option<usize>>>,
     observers: Weak<ObserverMap<T>>,
+}
+
+impl<T> Clone for ObserverHandle<T> {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            observers: self.observers.clone(),
+        }
+    }
 }
 
 impl<T> ObserverHandle<T> {
@@ -69,7 +78,7 @@ impl<T> ObserverHandle<T> {
 impl<T: Send + 'static> ObserverHandle<T> {
     pub fn send_handle_any(self) -> AnyObserverHandleSend {
         AnyObserverHandleSend {
-            map: Box::new(self.observers),
+            map: Arc::new(self.observers),
             id: self.id,
         }
     }
@@ -106,8 +115,9 @@ impl<T> TypedObserverMapTrait for Weak<ObserverMap<T>> {
     }
 }
 
+#[derive(Clone)]
 pub struct AnyObserverHandleSend {
-    map: Box<dyn ObserverMapTrait + Send>,
+    map: Arc<dyn ObserverMapTrait + Send + Sync>,
     id: Arc<Mutex<Option<usize>>>,
 }
 

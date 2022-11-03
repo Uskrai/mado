@@ -115,6 +115,7 @@ pub fn setup_schema_version(conn: &Connection, version: i64) -> Result<(), Error
 pub fn setup_schema(conn: &Connection) -> Result<(), Error> {
     let version = create_migration(conn)?;
     setup_schema_version(conn, version)?;
+    conn.execute("PRAGMA foreign_keys = ON;", []).unwrap();
 
     Ok(())
 }

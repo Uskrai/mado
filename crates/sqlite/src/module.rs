@@ -21,17 +21,21 @@ pub struct InsertModule<'a> {
     pub name: &'a str,
 }
 
-pub fn insert(conn: &Connection, model: InsertModule<'_>) -> Result<usize, Error> {
-    conn.execute(
+pub fn insert(conn: &Connection, model: InsertModule<'_>) -> Result<i64, Error> {
+    let mut stmt = conn.prepare(
         "INSERT INTO modules (uuid, name)
             VALUES (:uuid, :name)
             ON CONFLICT(uuid)
-                DO UPDATE SET name=:name;",
-        rusqlite::named_params! {
-            ":uuid": model.uuid,
-            ":name": model.name,
-        },
-    )
+                DO UPDATE SET name=:name
+            RETURNING id, uuid, name;",
+    )?;
+    let mut ex = stmt.query(rusqlite::named_params! {
+        ":uuid": model.uuid,
+        ":name": model.name,
+    })?;
+
+    let it = ex.next()?.unwrap();
+    it.get("id")
 }
 
 pub fn insert_info(conn: &mut Connection, module: ArcMadoModule) -> Result<Module, Error> {
@@ -52,9 +56,8 @@ pub fn insert_info(conn: &mut Connection, module: ArcMadoModule) -> Result<Modul
 
 pub fn insert_pk(conn: &mut Connection, model: InsertModule<'_>) -> Result<ModulePK, Error> {
     let conn = conn.transaction()?;
-    insert(&conn, model)?;
+    let id = insert(&conn, model)?;
 
-    let id = conn.last_insert_rowid();
     conn.commit()?;
 
     Ok(ModulePK { id })
@@ -97,8 +100,14 @@ mod tests {
     pub fn insert_test() {
         let mut conn = connection();
         let mut module = MockMadoModule::new();
-        module.expect_name().times(0..).return_const("Module".to_string());
-        module.expect_uuid().times(0..).return_const(Uuid::from_u128(1));
+        module
+            .expect_name()
+            .times(0..)
+            .return_const("Module".to_string());
+        module
+            .expect_uuid()
+            .times(0..)
+            .return_const(Uuid::from_u128(1));
         let module = Arc::new(module);
 
         insert(
@@ -126,10 +135,10 @@ mod tests {
         )
         .unwrap();
 
-        let it = insert_info(&mut conn, module.clone()).unwrap();
-        assert_eq!(it.name, module.name().to_string());
-        assert_eq!(it.uuid, module.uuid());
-
-        insert_info(&mut conn, module).unwrap();
+        for _ in 0..2 {
+            let it = insert_info(&mut conn, module.clone()).unwrap();
+            assert_eq!(it.name, module.name().to_string());
+            assert_eq!(it.uuid, module.uuid());
+        }
     }
 }

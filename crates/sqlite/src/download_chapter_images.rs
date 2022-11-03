@@ -161,11 +161,19 @@ mod tests {
     fn insert_test() {
         let mut db = connection();
 
+        let module_id = crate::module::insert(
+            &db,
+            crate::module::InsertModule {
+                uuid: &Default::default(),
+                name: "Test Module",
+            },
+        ).unwrap();
+
         crate::downloads::insert(
             &db,
             InsertDownload {
                 title: "title",
-                module_id: &Default::default(),
+                module_id: &module_id,
                 path: "path",
                 url: None,
                 status: "Finished".into(),

@@ -84,7 +84,6 @@ pub fn insert_info(
             })
             .collect::<Result<Vec<_>, Error>>()?;
 
-
         chapters.push(DownloadChapterInfoJoin {
             pk,
             chapter: it.clone(),
@@ -157,11 +156,19 @@ mod tests {
     fn insert_test() {
         let db = connection();
 
+        let module_id = crate::module::insert(
+            &db,
+            crate::module::InsertModule {
+                uuid: &Default::default(),
+                name: "",
+            },
+        ).unwrap();
+
         insert(
             &db,
             InsertDownload {
                 title: "title",
-                module_id: &Default::default(),
+                module_id: &module_id,
                 path: "path",
                 url: None,
                 status: "Paused".into(),
@@ -173,8 +180,9 @@ mod tests {
 
         assert_eq!(vec.len(), 1);
         let it = &vec[0];
+        println!("{:?} {}", it.module_pk, module_id);
         assert_eq!(it.title, "title");
-        assert_eq!(it.module_pk, Default::default());
+        assert_eq!(it.module_pk.id, module_id);
         assert_eq!(it.path, "path");
         assert_eq!(it.url, None);
         assert_eq!(it.status, "Paused".into());
@@ -183,7 +191,7 @@ mod tests {
             &db,
             InsertDownload {
                 title: "title",
-                module_id: &Default::default(),
+                module_id: &module_id,
                 path: "path",
                 url: Some(&"https://url.com".parse().unwrap()),
                 status: "Finished".into(),
@@ -195,7 +203,7 @@ mod tests {
         assert_eq!(vec.len(), 2);
         let it = &vec[1];
         assert_eq!(it.title, "title");
-        assert_eq!(it.module_pk, Default::default());
+        assert_eq!(it.module_pk.id, module_id);
         assert_eq!(it.path, "path");
         assert_eq!(it.url, Some("https://url.com".parse().unwrap()));
         assert_eq!(it.status, "Finished".into());
