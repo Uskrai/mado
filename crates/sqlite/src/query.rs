@@ -184,6 +184,21 @@ pub fn load_download_info_join(
     Ok(downloads)
 }
 
+pub fn delete_finished_image(conn: &Connection) -> Result<usize, Error> {
+    conn.execute(
+        r#"
+        DELETE FROM download_chapter_images
+        WHERE id IN (
+            SELECT image.id FROM download_chapter_images image
+                INNER JOIN download_chapters chapter ON image.download_chapter_id = chapter.id
+            WHERE chapter.status = "Finished" AND image.status = "Finished"
+        );
+    "#,
+        [],
+    )
+    .map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

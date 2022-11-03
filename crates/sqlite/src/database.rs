@@ -124,6 +124,14 @@ impl Database {
         //
         // Ok(downloads)
     }
+
+    pub fn delete_finished_image(&self) -> Result<usize, Error> {
+        crate::query::delete_finished_image(&self.conn)
+    }
+
+    pub fn vacuum(&self) -> Result<usize, Error> {
+        self.conn.execute("VACUUM;", [])
+    }
 }
 
 #[cfg(test)]
