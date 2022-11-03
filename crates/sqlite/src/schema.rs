@@ -78,6 +78,7 @@ fn v1_download_chapter_images() -> &'static str {
         extension TEXT NOT NULL,
         name TEXT,
         path TEXT NOT NULL,
+        path_relative BOOLEAN NOT NULL,
         status TEXT NOT NULL,
 
         FOREIGN KEY (download_chapter_id)

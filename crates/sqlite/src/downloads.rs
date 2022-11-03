@@ -68,14 +68,14 @@ pub fn insert_info(
     let dl_pk = DownloadPK::new(download_id);
 
     let mut chapters = Vec::new();
-    for it in info.chapters() {
-        let pk = crate::download_chapters::insert_info(&transaction, dl_pk, it).unwrap();
+    for chapter in info.chapters() {
+        let pk = crate::download_chapters::insert_info(&transaction, dl_pk, chapter).unwrap();
 
-        let images = it
+        let images = chapter
             .images()
             .iter()
             .map(|img| {
-                let pk = crate::download_chapter_images::insert_info(&transaction, pk, img)?;
+                let pk = crate::download_chapter_images::insert_info(&transaction, pk, chapter, img)?;
 
                 Ok(DownloadChapterImageInfoJoin {
                     pk,
@@ -87,7 +87,7 @@ pub fn insert_info(
 
         chapters.push(DownloadChapterInfoJoin {
             pk,
-            chapter: it.clone(),
+            chapter: chapter.clone(),
             images,
         });
     }
