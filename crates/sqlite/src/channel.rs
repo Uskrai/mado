@@ -70,6 +70,8 @@ impl Channel {
         while let Some(msg) = self.rx.next().await {
             self.handle_msg(msg)?;
         }
+        self.db.delete_finished_image()?;
+        self.db.vacuum()?;
 
         Ok(())
     }
