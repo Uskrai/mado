@@ -1,4 +1,4 @@
-use futures::{channel::mpsc, StreamExt};
+use crossbeam_channel as mpsc;
 use parking_lot::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
@@ -29,18 +29,44 @@ pub enum DbMsg {
     Close,
 }
 
-pub struct Sender {}
+pub struct Sender<T>(mpsc::Sender<T>);
+impl<T> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+#[derive(Debug)]
+pub struct SendError<T>(pub T);
+impl<T> Sender<T> {
+    pub fn send(&self, v: T) -> Result<(), SendError<T>> {
+        self.0.send(v).map_err(|it| SendError(it.into_inner()))
+    }
+}
+
+pub struct Receiver<T>(mpsc::Receiver<T>);
+
+impl<T> Receiver<T> {
+    pub fn recv(&self) -> Result<T, mpsc::RecvError> {
+        self.0.recv()
+    }
+
+    pub fn try_recv(&self) -> Result<T, mpsc::TryRecvError> {
+        self.0.try_recv()
+    }
+}
 
 pub struct Channel {
-    rx: mpsc::UnboundedReceiver<DbMsg>,
-    tx: mpsc::UnboundedSender<DbMsg>,
+    rx: Receiver<DbMsg>,
+    tx: Sender<DbMsg>,
     db: Database,
     module: HashMap<Uuid, Module>,
-    download_chapter_images: Mutex<HashMap<DownloadChapterPK, Vec<mado_engine::AnyObserverHandleSend>>>,
+    download_chapter_images:
+        Mutex<HashMap<DownloadChapterPK, Vec<mado_engine::AnyObserverHandleSend>>>,
 }
 
 pub fn channel(db: Database) -> Channel {
     let (tx, rx) = mpsc::unbounded();
+    let (tx, rx) = (Sender(tx), Receiver(rx));
     Channel {
         db,
         rx,
@@ -53,7 +79,7 @@ pub fn channel(db: Database) -> Channel {
 impl Channel {
     /// Handle next message.
     pub fn try_next(&mut self) -> Result<bool, rusqlite::Error> {
-        if let Ok(Some(msg)) = self.rx.try_next() {
+        if let Ok(msg) = self.rx.try_recv() {
             self.handle_msg(msg).map(|_| true)
         } else {
             Ok(false)
@@ -66,9 +92,11 @@ impl Channel {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<(), rusqlite::Error> {
-        while let Some(msg) = self.rx.next().await {
-            self.handle_msg(msg)?;
+    pub fn run(&mut self) -> Result<(), rusqlite::Error> {
+        while let Ok(msg) = self.rx.recv() {
+            if !self.handle_msg(msg)? {
+                break;
+            }
         }
         self.db.delete_finished_image()?;
         self.db.vacuum()?;
@@ -76,7 +104,7 @@ impl Channel {
         Ok(())
     }
 
-    pub fn handle_msg(&mut self, msg: DbMsg) -> Result<(), rusqlite::Error> {
+    pub fn handle_msg(&mut self, msg: DbMsg) -> Result<bool, rusqlite::Error> {
         match msg {
             DbMsg::NewDownload(info) => {
                 let module = &self.module[info.module_uuid()];
@@ -104,11 +132,11 @@ impl Channel {
                 self.db.update_download_chapter_image_status(pk, status)?;
             }
             DbMsg::Close => {
-                self.sender().close_channel();
+                return Ok(false);
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     pub fn push_module(&mut self, module: InsertModule<'_>) -> Result<(), rusqlite::Error> {
@@ -164,34 +192,32 @@ impl Channel {
         join.info.connect_only(move |msg| {
             match msg {
                 mado_engine::DownloadInfoMsg::StatusChanged(status) => tx
-                    .unbounded_send(DbMsg::DownloadStatusChanged(dl_pk, status.into()))
+                    .send(DbMsg::DownloadStatusChanged(dl_pk, status.into()))
                     .ok(),
             };
         });
     }
 
     pub fn connect_only(&self, state: &MadoEngineState) {
-        let sender = self.sender();
+        let tx = self.sender();
         state.connect_only({
             move |msg| match msg {
                 MadoEngineStateMsg::Download(info) => {
-                    sender.unbounded_send(DbMsg::NewDownload(info.clone())).ok();
+                    tx.send(DbMsg::NewDownload(info.clone())).ok();
                 }
                 MadoEngineStateMsg::PushModule(module) => {
-                    sender
-                        .unbounded_send(DbMsg::PushModule(module.clone()))
-                        .ok();
+                    tx.send(DbMsg::PushModule(module.clone())).ok();
                 }
             }
         });
     }
 
-    pub fn sender(&self) -> mpsc::UnboundedSender<DbMsg> {
+    pub fn sender(&self) -> Sender<DbMsg> {
         self.tx.clone()
     }
 
-    pub fn send(&self, msg: DbMsg) -> Result<(), mpsc::TrySendError<DbMsg>> {
-        self.tx.unbounded_send(msg)
+    pub fn send(&self, msg: DbMsg) -> Result<(), SendError<DbMsg>> {
+        self.tx.send(msg)
     }
 
     fn connect_download_chapter(&self, pk: DownloadChapterPK, info: Arc<DownloadChapterInfo>) {
@@ -199,10 +225,10 @@ impl Channel {
         info.connect_only(move |msg| {
             match msg {
                 DownloadChapterInfoMsg::StatusChanged(status) => {
-                    tx.unbounded_send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
+                    tx.send(DbMsg::DownloadChapterStatusChanged(pk, status.into()))
                 }
                 DownloadChapterInfoMsg::DownloadImagesChanged(images) => {
-                    tx.unbounded_send(DbMsg::DownloadChapterImagesChanged(pk, images.clone()))
+                    tx.send(DbMsg::DownloadChapterImagesChanged(pk, images.clone()))
                 }
             }
             .ok();
@@ -240,7 +266,7 @@ impl Channel {
         info.connect_only(move |msg| {
             match msg {
                 mado_engine::DownloadChapterImageInfoMsg::StatusChanged(status) => {
-                    tx.unbounded_send(DbMsg::DownloadChapterImageStatusChanged(pk, status.into()))
+                    tx.send(DbMsg::DownloadChapterImageStatusChanged(pk, status.into()))
                 }
             }
             .ok();
@@ -388,16 +414,14 @@ mod tests {
     #[test]
     #[ntest::timeout(1000)]
     pub fn close_test() {
-        futures::executor::block_on(async {
-            let db = connection();
+        let db = connection();
 
-            let state = State::default();
+        let state = State::default();
 
-            let mut rx = channel(Database::new(db).unwrap());
-            rx.connect_only(&state.engine);
+        let mut rx = channel(Database::new(db).unwrap());
+        rx.connect_only(&state.engine);
 
-            rx.send(DbMsg::Close).unwrap();
-            rx.run().await.unwrap();
-        });
+        rx.send(DbMsg::Close).unwrap();
+        rx.run().unwrap();
     }
 }

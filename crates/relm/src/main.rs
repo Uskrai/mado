@@ -139,9 +139,13 @@ pub fn main() {
 
     tokio::spawn(mado.load_module(deno_loader));
     tokio::spawn(mado.run());
-    tokio::spawn(async {
+
+    let _guard = scopeguard::guard(channel.sender(), |sender| {
+        sender.send(mado_sqlite::DbMsg::Close).unwrap();
+    });
+    runtime.spawn_blocking(|| {
         let mut channel = channel;
-        channel.run().await.unwrap();
+        channel.run().unwrap();
     });
 
     RelmApp::new("").run::<AppModel>(state);

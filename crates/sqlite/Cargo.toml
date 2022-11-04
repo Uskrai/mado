@@ -6,7 +6,7 @@ license = "MIT"
 
 [dependencies]
 mado-engine = { path = "../engine" }
-futures = "0.3.0"
+crossbeam-channel = "0.5"
 parking_lot = "0.12.0"
 
 [dependencies.rusqlite]
