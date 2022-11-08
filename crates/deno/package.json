@@ -13,7 +13,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@xmldom/xmldom": "^0.8.5",
+    "@xmldom/xmldom": "^0.8.6",
     "deep-equal": "^2.1.0",
     "esbuild": "^0.15.12",
     "fast-glob": "^3.2.12",
