@@ -17,6 +17,7 @@ tracing-log = "0.1"
 thiserror = "1.0"
 async-trait = "0.1"
 scopeguard = "1.1.0"
+slab = "0.4.7"
 
 mado = { path = "../mado" }
 # mado-engine = { path = "../engine" }
