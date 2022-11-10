@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use gtk::prelude::ListModelExt;
-use gtk::{gio, prelude::WidgetExt};
+use gtk::prelude::*;
 use mado::engine::DownloadInfo;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
 
-use crate::task::{DownloadItem, GDownloadItem};
+use crate::list_store::ListStore;
+use crate::task::DownloadItem;
 use crate::task_list::TaskListModel;
 
 #[derive(Debug)]
@@ -16,7 +16,7 @@ pub enum DownloadMsg {
 }
 
 pub struct DownloadModel {
-    list: gio::ListStore,
+    list: ListStore<DownloadItem>,
     task_list: Controller<TaskListModel>,
 }
 
@@ -33,11 +33,10 @@ impl SimpleComponent for DownloadModel {
     fn init(
         _: Self::Init,
         root: &Self::Root,
-        _sender: ComponentSender<Self>,
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let list = gio::ListStore::new(gtk::glib::Type::OBJECT);
-
-        let task_list = TaskListModel::builder().launch(list.clone()).detach();
+        let list = ListStore::default();
+        let task_list = TaskListModel::builder().launch(list.base()).detach();
 
         let model = Self { list, task_list };
         let widgets = view_output!();
@@ -49,8 +48,7 @@ impl SimpleComponent for DownloadModel {
         match msg {
             DownloadMsg::CreateDownloadView(info) => {
                 let object = DownloadItem { info };
-                let object = GDownloadItem::to_gobject(object);
-                self.list.append(&object);
+                self.list.push(object);
             }
         }
     }
@@ -65,7 +63,7 @@ impl SimpleComponent for DownloadModel {
 }
 
 impl DownloadModel {
-    pub fn task_len(&self) -> u32{
-        self.list.n_items()
+    pub fn task_len(&self) -> usize {
+        self.list.len()
     }
 }
