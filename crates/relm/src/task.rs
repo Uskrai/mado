@@ -5,14 +5,6 @@ use mado::engine::{
     DownloadInfo, DownloadInfoMsg, DownloadProgressStatus, DownloadResumedStatus, DownloadStatus,
 };
 
-crate::gobject::struct_wrapper!(
-    GDownloadItem,
-    crate::task::DownloadItem,
-    "MadoRelmDownloadInfo",
-    info_wrapper
-);
-pub use info_wrapper::GDownloadItem;
-
 #[derive(Debug)]
 pub struct DownloadItem {
     pub info: Arc<DownloadInfo>,
