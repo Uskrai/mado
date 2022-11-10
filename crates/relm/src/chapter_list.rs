@@ -1,9 +1,6 @@
 use std::{cell::Cell, rc::Rc, sync::Arc};
 
-use gtk::{
-    gio::{prelude::Cast, traits::ListModelExt},
-    prelude::*,
-};
+use gtk::prelude::*;
 use mado_core::ChapterInfo;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent};
 
