@@ -9,7 +9,7 @@ type ResponseDecl = {
 };
 
 export class RustHttpResponse implements HttpResponse {
-  constructor(public result: Result<ResponseDecl>) {  }
+  constructor(public result: Result<ResponseDecl>) {}
 
   get data(): ResponseDecl {
     return this.result.throw();
@@ -28,9 +28,7 @@ export class RustHttpResponse implements HttpResponse {
   }
 
   async text(): Promise<Result<string>> {
-    return ResultFromJson(
-      await Deno.core.opAsync("op_http_response_text", this.rid)
-    );
+    return ResultFromJson(await Deno.core.ops.op_http_response_text(this.rid));
   }
 
   async text_data(): Promise<string> {
@@ -53,7 +51,7 @@ export class RustHttpResponse implements HttpResponse {
 export class RustHttpClient extends Resource implements HttpClient {
   constructor(rid: number = null) {
     if (rid == null) {
-      rid = Deno.core.opSync("op_http_client_new");
+      rid = Deno.core.ops.op_http_client_new();
     }
 
     super(rid, "op_http_client");

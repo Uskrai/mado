@@ -8,15 +8,18 @@ export class RustChapterTask {
   }
 
   static fromRust() {
-    return new RustChapterTask(Deno.core.opSync("op_mado_chapter_task_new"));
+    return new RustChapterTask(Deno.core.ops.op_mado_chapter_task_new());
   }
 
   push(image: object) {
-    return ResultFromJson(Deno.core.opSync("op_mado_chapter_task_add", this.rid, image));
+    return ResultFromJson(
+      Deno.core.ops.op_mado_chapter_task_add(this.rid, image)
+    );
   }
 
   toArray() {
-    return ResultFromJson(Deno.core.opSync("op_mado_chapter_task_to_array", this.rid));
+    return ResultFromJson(
+      Deno.core.ops.op_mado_chapter_task_to_array(this.rid)
+    );
   }
 }
-

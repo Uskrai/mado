@@ -115,11 +115,7 @@ export async function catchAndReturn<T>(
     });
 }
 
-let opSync = Deno.core.opSync;
-
-function op(name: string, ...param: any[]) {
-  let error = opSync(name, ...param);
-
+function fromRust(error: any) {
   return new Errors(error.type, error.content);
 }
 
@@ -137,7 +133,7 @@ export function ResultFromJson(json: any): Result<any> {
 
 export class Errors extends Error {
   constructor(public type: string, public content: any) {
-    super(opSync("op_error_to_string", { type, content }));
+    super(Deno.core.ops.op_error_to_string({ type, content }));
   }
 
   static message(it: string) {
@@ -151,24 +147,24 @@ export class Errors extends Error {
   }
 
   intoString() {
-    return opSync("op_error_to_string", this);
+    return Deno.core.ops.op_error_to_string(this);
   }
 
   intoDebug() {
-    return opSync("op_error_to_debug", this);
+    return Deno.core.ops.op_error_to_debug(this);
   }
 
   close(): Result<any> {
-    return ResultFromJson(opSync("op_error_close", this));
+    return ResultFromJson(Deno.core.ops.op_error_close(this));
   }
 
   static request_error(url: string, message: string) {
-    return op("op_error_request_error", url, message);
+    return fromRust(Deno.core.ops.op_error_request_error(url, message));
   }
   static unexpected_error(url: string, message: string) {
-    return op("op_error_unexpected_error", url, message);
+    return fromRust(Deno.core.ops.op_error_unexpected_error(url, message));
   }
   static invalid_url(url: string) {
-    return op("op_error_invalid_url", url);
+    return fromRust(Deno.core.ops.op_error_invalid_url(url));
   }
 }

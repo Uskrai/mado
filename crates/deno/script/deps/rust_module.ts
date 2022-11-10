@@ -1,8 +1,8 @@
-import { ResultModule } from "./module";
 import { Result, ResultFromJson } from "./error";
 import { HttpRequest } from "./http";
 import { ChapterTask, MangaAndChapters } from "./manga";
-import { RustChapterTask } from './rust_chapter_task';
+import { ResultModule } from "./module";
+import { RustChapterTask } from "./rust_chapter_task";
 
 export class RustModule {
   rid: number;
@@ -11,7 +11,7 @@ export class RustModule {
   }
 
   static fromRust(module: ResultModule): Result<number> {
-    return ResultFromJson(Deno.core.opSync("op_mado_module_new", module));
+    return ResultFromJson(Deno.core.ops.op_mado_module_new(module));
   }
 
   async getInfo(id: string): Promise<Result<MangaAndChapters>> {
@@ -35,11 +35,15 @@ export class RustModule {
   }
 
   async downloadImage(info: object): Promise<Result<HttpRequest>> {
-    return ResultFromJson(await Deno.core.opAsync("op_mado_module_download_image", this.rid, info))
+    return ResultFromJson(
+      await Deno.core.opAsync("op_mado_module_download_image", this.rid, info)
+    );
   }
 
   async close() {
-    let it = ResultFromJson(await Deno.core.opAsync("op_mado_module_close", this.rid));
+    let it = ResultFromJson(
+      await Deno.core.opAsync("op_mado_module_close", this.rid)
+    );
     return it;
   }
 }

@@ -1,6 +1,9 @@
 use std::{any::type_name, cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
-use deno_core::{v8::{self, Local}, serde_v8};
+use deno_core::{
+    serde_v8,
+    v8::{self, Local},
+};
 use mado_deno::Runtime;
 use serde::de::DeserializeOwned;
 use tokio::task::LocalSet;
@@ -18,7 +21,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     let test_set = LocalSet::new();
     let last_set = LocalSet::new();
 
-    let runtime = Runtime::default();
+    let runtime = Runtime::new_with_option(|option| option.inspector = true);
     let inspector = runtime
         .js()
         .borrow_mut()
@@ -155,7 +158,9 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    Err(Box::new(ErrorWrapper(Rc::try_unwrap(errors).unwrap().into_inner())))
+    Err(Box::new(ErrorWrapper(
+        Rc::try_unwrap(errors).unwrap().into_inner(),
+    )))
 }
 
 pub struct ErrorWrapper(Vec<anyhow::Error>);
@@ -184,7 +189,7 @@ impl std::fmt::Debug for ErrorWrapper {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Name {
     filename: String,
     testname: String,

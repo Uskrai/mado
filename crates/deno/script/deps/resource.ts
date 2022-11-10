@@ -4,9 +4,12 @@ function fromPrefix(res: Resource, add: string) {
   return `${res.prefix}_${add}`;
 }
 
+function opFromPrefix(res: Resource, add: string) {
+  return Deno.core.ops[fromPrefix(res, add)];
+}
+
 export class Resource {
-  constructor(public rid: number, public prefix: string) {
-  }
+  constructor(public rid: number, public prefix: string) {}
 
   // get rid() {
   //     let rid = this.strong_rid.at(0);
@@ -19,11 +22,11 @@ export class Resource {
   // }
 
   increment_strong_count() {
-    let rid = ResultFromJson(Deno.core.opSync(fromPrefix(this, "clone"), this.rid)).data;
+    let rid = ResultFromJson(opFromPrefix(this, "clone")(this.rid)).data;
     return rid;
   }
 
-  decrement_strong_count(): Result<void>  {
-    return ResultFromJson(Deno.core.opSync(fromPrefix(this, "close"), this.rid));
+  decrement_strong_count(): Result<void> {
+    return ResultFromJson(opFromPrefix(this, "close")(this.rid));
   }
 }

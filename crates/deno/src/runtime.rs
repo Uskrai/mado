@@ -149,13 +149,7 @@ pub enum ModuleLoadError {
 
 impl Default for Runtime {
     fn default() -> Self {
-        let options = deno_core::RuntimeOptions {
-            module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
-            extensions: crate::extensions(),
-            ..Default::default()
-        };
-
-        Self::new(options)
+        Self::new_with_option(|_| {})
     }
 }
 
@@ -178,6 +172,21 @@ impl Runtime {
             .put(this.clone());
 
         this
+    }
+
+    pub fn new_with_option<F>(option: F) -> Self
+    where
+        F: FnOnce(&mut RuntimeOptions),
+    {
+        let mut options = deno_core::RuntimeOptions {
+            module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
+            extensions: crate::extensions(),
+            ..Default::default()
+        };
+
+        option(&mut options);
+
+        Self::new(options)
     }
 
     fn with_runtime<F, R>(&mut self, fun: F) -> R
