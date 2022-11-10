@@ -3,6 +3,8 @@ use mado::core::ArcMadoModuleMap;
 use gtk::prelude::*;
 use std::sync::Arc;
 
+use crate::list_model::ListModelBaseExt;
+use crate::list_store::ListStore;
 use crate::AbortOnDropHandle;
 use mado::core::{url::Url, ArcMadoModule, Error, MangaAndChaptersInfo};
 use mado::engine::{
@@ -10,8 +12,7 @@ use mado::engine::{
     DownloadRequest, DownloadRequestStatus,
 };
 
-use crate::chapter_list::ChapterListModel;
-use crate::vec_chapters::VecChapters;
+use crate::chapter_list::{ChapterListModel, CheckChapterInfo};
 use relm4::{Component, ComponentController, ComponentParts, ComponentSender, SimpleComponent};
 
 #[derive(Debug)]
@@ -34,7 +35,7 @@ pub enum MangaInfoOutput {
 
 pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
-    chapters: VecChapters,
+    chapters: ListStore<CheckChapterInfo>,
     chapter_list: relm4::Controller<ChapterListModel>,
     manga_info: Option<(ArcMadoModule, Url, Arc<MangaAndChaptersInfo>)>,
     url: String,
@@ -104,8 +105,10 @@ impl MangaInfoModel {
         let (module, url, manga_info) = self.manga_info.as_ref()?;
 
         let mut selected = Vec::new();
-        self.chapters.for_each_selected(|_, it| {
-            selected.push(it.clone());
+        self.chapters.for_each(|it| {
+            if it.active() {
+                selected.push(it.info().clone());
+            }
         });
 
         if selected.is_empty() {
@@ -153,11 +156,9 @@ impl SimpleComponent for MangaInfoModel {
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let chapters = VecChapters::default();
+        let chapters = ListStore::default();
 
-        let chapter_list = ChapterListModel::builder()
-            .launch(chapters.clone())
-            .detach();
+        let chapter_list = ChapterListModel::builder().launch(chapters.base()).detach();
 
         let model = Self {
             modules,
@@ -192,7 +193,7 @@ impl SimpleComponent for MangaInfoModel {
                 self.manga_info.replace((module, url, manga.clone()));
 
                 for it in manga.chapters.iter() {
-                    self.chapters.push(it.clone());
+                    self.chapters.push(CheckChapterInfo::new(it.clone(), false));
                 }
             }
             MangaInfoMsg::DownloadPathChanged(path) => {
@@ -267,7 +268,7 @@ impl SimpleComponent for MangaInfoModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::*;
+    use crate::{list_model::ListModelBaseExt, tests::*};
     use mado::core::{DefaultMadoModuleMap, MutexMadoModuleMap};
     use mado_core::{ChapterInfo, ChaptersInfo, MangaInfo, MutMadoModuleMap};
 
@@ -404,8 +405,8 @@ mod tests {
 
             run_loop();
 
-            model.model().chapters.for_each(|_, info| {
-                info.borrow_mut().set_active(true);
+            model.model().chapters.for_each(|info| {
+                info.set_active(true);
             });
 
             model.widgets().download_button.emit_clicked();

@@ -1,8 +1,9 @@
-use gtk::{gio, prelude::*};
-
 use relm4::{ComponentParts, ComponentSender, SimpleComponent};
 
-use crate::task::{DownloadView, DownloadViewController, GDownloadItem};
+use crate::{
+    list_model::{ListModel, ListModelBase},
+    task::{DownloadItem, DownloadView, DownloadViewController},
+};
 
 #[derive(Debug)]
 pub enum TaskListMsg {
@@ -12,18 +13,19 @@ pub enum TaskListMsg {
 
 #[derive(Clone)]
 pub struct TaskListModel {
-    tasks: gio::ListStore,
+    tasks: ListModel<DownloadItem>,
+    pub selection: gtk::MultiSelection,
 }
 
-fn create_selection_model(model: &TaskListModel) -> gtk::MultiSelection {
-    gtk::MultiSelection::new(Some(&model.tasks))
+fn create_selection_model(model: &ListModel<DownloadItem>) -> gtk::MultiSelection {
+    gtk::MultiSelection::new(Some(&model.list_model()))
 }
 
 #[relm4::component(pub)]
 impl SimpleComponent for TaskListModel {
     type Widgets = TaskListWidgets;
 
-    type Init = gio::ListStore;
+    type Init = ListModel<DownloadItem>;
     type Input = TaskListMsg;
     type Output = ();
 
@@ -32,7 +34,8 @@ impl SimpleComponent for TaskListModel {
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Self { tasks };
+        let selection = create_selection_model(&tasks);
+        let model = Self { tasks, selection };
 
         let widgets = view_output!();
 
@@ -42,12 +45,12 @@ impl SimpleComponent for TaskListModel {
     fn update(&mut self, msg: Self::Input, _: ComponentSender<Self>) {
         match msg {
             TaskListMsg::Setup(item) => {
-                let download = item.item().unwrap().downcast::<GDownloadItem>().unwrap();
-                let info = download.borrow();
-                let info = &info.info;
-                let view = DownloadView::from(info.as_ref());
-                let _ = DownloadViewController::connect(view.clone(), info.clone());
-                item.set_child(Some(&view.widget));
+                if let Some(data) = self.tasks.get_by_object(&item.item().unwrap()) {
+                    let info = &data.info;
+                    let view = DownloadView::from(info.as_ref());
+                    let _ = DownloadViewController::connect(view.clone(), info.clone());
+                    item.set_child(Some(&view.widget));
+                }
             }
             TaskListMsg::Bind(_) => {
                 //
@@ -57,7 +60,7 @@ impl SimpleComponent for TaskListModel {
 
     view! {
         gtk::ListView {
-            set_model: Some(&create_selection_model(&model)),
+            set_model: Some(&model.selection),
 
             #[wrap(Some)]
             set_factory = &gtk::SignalListItemFactory {

@@ -4,7 +4,6 @@ pub mod download;
 pub mod manga_info;
 pub mod task_list;
 pub mod task;
-pub mod vec_chapters;
 pub mod list_store;
 pub mod list_model;
 
