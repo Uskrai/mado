@@ -11,7 +11,7 @@ use std::{
 
 use gtk::prelude::*;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ListIndex(usize);
 
 impl ListIndex {
@@ -20,6 +20,7 @@ impl ListIndex {
     }
 }
 
+#[derive(Debug)]
 struct Inner<T> {
     list: gtk::gio::ListStore,
     map_index: RefCell<HashMap<ListIndex, u32>>,
@@ -167,26 +168,32 @@ impl<T: 'static> ListStore<T> {
         Some(it)
     }
 
-    fn get_by_object(&self, index: &gtk::glib::Object) -> Option<RefGuard<T>> {
+    pub fn get_by_object(&self, index: &gtk::glib::Object) -> Option<RefGuard<T>> {
         let index = *object_gusize(index)?.borrow();
 
         index.and_then(|index| self.get(&ListIndex(index)))
     }
 
-    fn get_mut_by_object(&self, index: &gtk::glib::Object) -> Option<MutexGuard<T>> {
+    pub fn get_mut_by_object(&self, index: &gtk::glib::Object) -> Option<MutexGuard<T>> {
         let index = *object_gusize(index)?.borrow();
 
         index.and_then(|index| self.get_mut(&ListIndex(index)))
     }
 
-    fn notify_changed(&self, index: &ListIndex) {
+    pub fn notify_changed(&self, index: &ListIndex) {
         if let Some(it) = self.map_index().get(index) {
             self.list().items_changed(*it, 1, 1);
         }
     }
 
-    fn base(&self) -> ListModel<T> {
+    pub fn base(&self) -> ListModel<T> {
         ListModel::new_with(self.clone())
+    }
+
+    pub fn clear(&self) {
+        self.list().remove_all();
+        self.container().clear();
+        self.map_index().clear();
     }
 }
 

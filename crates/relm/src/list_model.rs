@@ -6,6 +6,12 @@ use std::{
 #[derive(Clone)]
 pub struct ListModel<T>(Arc<dyn ListModelBase<T>>);
 
+// impl<T> std::fmt::Debug for ListModel<T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.debug_tuple("ListModel").finish()
+//     }
+// }
+
 impl<T> ListModel<T> {
     pub fn new_with<R>(val: R) -> ListModel<T>
     where
@@ -135,6 +141,18 @@ pub trait ListModelBaseExt<T>: ListModelBase<T> + Clone + 'static {
             }
         })
     }
-}
 
+    fn for_each<F>(&self, mut closure: F)
+    where
+        F: FnMut(ListModelBorrow<T>),
+    {
+        for it in self.list_model().into_iter() {
+            let it = it.unwrap();
+
+            if let Some(it) = self.get_by_object(&it) {
+                closure(it)
+            }
+        }
+    }
+}
 impl<L, T> ListModelBaseExt<T> for L where L: ListModelBase<T> + Clone + 'static {}
