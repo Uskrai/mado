@@ -3,8 +3,13 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone)]
 pub struct ListModel<T>(Arc<dyn ListModelBase<T>>);
+
+impl<T> Clone for ListModel<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
 // impl<T> std::fmt::Debug for ListModel<T> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
