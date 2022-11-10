@@ -195,6 +195,14 @@ impl<T: 'static> ListStore<T> {
         self.container().clear();
         self.map_index().clear();
     }
+
+    pub fn len(&self) -> usize {
+        self.0.container.borrow().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.container.borrow().is_empty()
+    }
 }
 
 impl<T> ListModelBase<T> for ListStore<T>
@@ -342,6 +350,7 @@ mod tests {
 
         let second = store.push(2);
         assert_eq!(collect(), [2, 1]);
+        assert_eq!(store.len(), 2);
 
         store.remove(first);
         assert_eq!(collect(), [2]);
@@ -365,6 +374,9 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
+        assert_eq!(store.len(), 0);
+        assert!(store.is_empty());
+
         let first = store.push(1);
         assert_eq!(collect(), [Some(1)]);
         let second = store.push(2);
@@ -373,6 +385,8 @@ mod tests {
         let third = store.push(4);
         let fourth = store.push(3);
         assert_eq!(collect(), [4, 3, 2, 1].map(Some));
+        assert_eq!(store.len(), 4);
+        assert!(!store.is_empty());
 
         store.remove(second);
         assert_eq!(collect(), [Some(4), Some(3), Some(1), None]);
@@ -400,6 +414,9 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
+        assert_eq!(store.len(), 0);
+        assert!(store.is_empty());
+
         let first = store.push(1);
         assert_eq!(collect(), [Some(1)]);
         let second = store.push(2);
@@ -408,6 +425,8 @@ mod tests {
         let third = store.push(4);
         let fourth = store.push(3);
         assert_eq!(collect(), [1, 2, 3, 4].map(Some));
+        assert_eq!(store.len(), 4);
+        assert!(!store.is_empty());
 
         store.remove(second);
         assert_eq!(collect(), [Some(1), Some(3), Some(4), None]);
