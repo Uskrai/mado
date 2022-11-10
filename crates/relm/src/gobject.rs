@@ -186,6 +186,8 @@ macro_rules! struct_wrapper {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use super::*;
 
     #[gtk::test]
@@ -220,7 +222,7 @@ mod tests {
     fn test_deref_mut() {
         let mut it = MaybeUninit::<bool>::new(true);
         *it.as_mut() = false;
-        assert!(!it.as_ref());
+        assert!(!*it.as_mut());
     }
 
     #[gtk::test]
@@ -239,6 +241,35 @@ mod tests {
                 "MaybeUninit { initialized: Initialized, inner: true }"
             );
         }
+    }
+
+    #[gtk::test]
+    fn test_clone() {
+        let first = MaybeUninit::<bool>::new(true);
+        assert!(*first.as_ref());
+        let second = first.clone();
+        assert!(*second.as_ref());
+
+        assert_eq!(*first.as_ref(), *second.as_ref());
+    }
+
+    #[gtk::test]
+    fn ref_test() {
+        let it = RefCell::new(MaybeUninit::new(0));
+        let it = Ref::new(it.borrow());
+        assert_eq!(*it, 0);
+    }
+
+    #[gtk::test]
+    fn ref_mut_test() {
+        let it = RefCell::new(MaybeUninit::new(0));
+        {
+            let mut it = RefMut::new(it.borrow_mut());
+            assert_eq!(*it, 0);
+            *it = 1;
+            assert_eq!(*it, 1);
+        }
+        assert_eq!(*it.borrow().as_ref(), 1);
     }
 }
 
