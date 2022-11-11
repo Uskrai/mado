@@ -180,7 +180,6 @@ mod tests {
 
         assert_eq!(vec.len(), 1);
         let it = &vec[0];
-        println!("{:?} {}", it.module_pk, module_id);
         assert_eq!(it.title, "title");
         assert_eq!(it.module_pk.id, module_id);
         assert_eq!(it.path, "path");
