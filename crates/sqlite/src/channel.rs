@@ -98,8 +98,7 @@ impl Channel {
                 break;
             }
         }
-        self.db.delete_finished_image()?;
-        self.db.vacuum()?;
+        self.db.cleanup()?;
 
         Ok(())
     }

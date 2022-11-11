@@ -12,7 +12,7 @@ pub mod module;
 pub use channel::{channel, Channel, DbMsg, Sender};
 pub use database::Database;
 pub use query::load_download_join;
-pub use schema::{setup_schema, setup_schema_version, SCHEMA_VERSION};
+pub use schema::{setup_schema, setup_schema_version};
 
 #[cfg(test)]
 mod tests {

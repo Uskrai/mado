@@ -1,6 +1,14 @@
 use rusqlite::{Connection, Error};
 
-pub const SCHEMA_VERSION: i64 = 1;
+type SchemaFn = fn(&rusqlite::Connection) -> Result<(), rusqlite::Error>;
+pub const SCHEMA_FUNCTION: [SchemaFn; 2] = [v1_schema, v2_schema];
+
+fn schema_function_with_index() -> impl Iterator<Item = (i64, SchemaFn)> {
+    SCHEMA_FUNCTION
+        .into_iter()
+        .enumerate()
+        .map(|(index, it)| (index as i64 + 1, it))
+}
 
 /// create migration table if doesn't exists
 /// then return the current version (0 if table doesn't exists)
@@ -88,6 +96,18 @@ fn v1_download_chapter_images() -> &'static str {
     "#
 }
 
+fn v2_download_status_index() -> &'static str {
+    r"
+        CREATE INDEX download_status_index ON downloads(status);
+    "
+}
+
+fn v2_download_chapter_status_index() -> &'static str {
+    r"
+        CREATE INDEX download_chapter_status_index ON download_chapters(status);
+    "
+}
+
 fn insert_migration_version(conn: &Connection, version: i64) -> Result<usize, Error> {
     conn.execute("INSERT INTO __migration (version) VALUES (?)", [version])
 }
@@ -103,10 +123,23 @@ fn v1_schema(conn: &Connection) -> Result<(), Error> {
     Ok(())
 }
 
+fn v2_schema(conn: &Connection) -> Result<(), Error> {
+    conn.execute(v2_download_status_index(), []).unwrap();
+    conn.execute(v2_download_chapter_status_index(), [])
+        .unwrap();
+
+    insert_migration_version(conn, 2)?;
+
+    Ok(())
+}
+
 pub fn setup_schema_version(conn: &Connection, version: i64) -> Result<(), Error> {
     create_migration(conn)?;
-    if version < 1 {
-        v1_schema(conn)?;
+
+    for (index, it) in schema_function_with_index() {
+        if version < index {
+            it(conn)?;
+        }
     }
 
     Ok(())
@@ -140,9 +173,9 @@ mod tests {
     fn versioning_test() {
         let conn = Connection::open_in_memory().unwrap();
         create_migration(&conn).unwrap();
-        for it in 0..SCHEMA_VERSION {
-            setup_schema_version(&conn, it).unwrap();
-            assert_eq!(create_migration(&conn).unwrap(), it + 1);
+        for (index, it) in schema_function_with_index() {
+            it(&conn).unwrap();
+            assert_eq!(create_migration(&conn).unwrap(), index);
         }
     }
 

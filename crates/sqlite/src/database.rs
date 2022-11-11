@@ -132,6 +132,26 @@ impl Database {
     pub fn vacuum(&self) -> Result<usize, Error> {
         self.conn.execute("VACUUM;", [])
     }
+
+    pub fn cleanup(&self) -> Result<(), Error> {
+        self.delete_finished_image()?;
+        self.conn.execute(
+            r#"
+                UPDATE download_chapters 
+                    SET status=?
+                    FROM (SELECT id, status FROM downloads) AS download
+                    WHERE 
+                        download.id = download_chapters.download_id 
+                        AND download.status = "Finished" 
+                        AND download_chapters.status != "Finished";
+
+            "#,
+            [DownloadStatus::finished()],
+        )?;
+        self.vacuum()?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
