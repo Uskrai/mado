@@ -1,5 +1,5 @@
 use mado_core::MadoModule;
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 use tokio::task::LocalSet;
 
 #[test]
@@ -11,13 +11,8 @@ pub fn main() {
 
     tokio.block_on(async {
         let local = LocalSet::new();
-        let options = deno_core::RuntimeOptions {
-            module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
-            extensions: mado_deno::extensions(),
-            ..Default::default()
-        };
 
-        let mut runtime = mado_deno::ModuleLoader::new(options);
+        let mut runtime = mado_deno::ModuleLoader::default();
 
         let mut map = HashMap::new();
 

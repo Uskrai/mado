@@ -12,18 +12,13 @@ use tokio::sync::mpsc;
 
 use crate::{DenoMadoModule, ModuleLoop};
 
+#[derive(Default)]
 pub struct ModuleLoader {
     runtime: Runtime,
     max_module: i32,
 }
-impl ModuleLoader {
-    pub fn new(options: RuntimeOptions) -> Self {
-        Self {
-            runtime: Runtime::new(options),
-            max_module: 0,
-        }
-    }
 
+impl ModuleLoader {
     pub fn from_runtime(runtime: Runtime) -> Self {
         Self {
             runtime,
