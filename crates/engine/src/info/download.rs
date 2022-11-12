@@ -347,10 +347,10 @@ mod tests {
         assert!(info.status().is_paused());
 
         info.set_status(DownloadStatus::finished());
-        assert!(info.status().is_completed());
+        assert!(info.status().is_finished());
         info.resume(true);
-        assert!(info.status().is_completed());
+        assert!(info.status().is_finished());
         info.resume(false);
-        assert!(info.status().is_completed());
+        assert!(info.status().is_finished());
     }
 }
