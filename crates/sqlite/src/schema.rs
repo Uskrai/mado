@@ -1,7 +1,10 @@
+// make sure to read https://www.sqlite.org/lang_altertable.html#otheralter
+// before altering existing table and test it to prevent data loss
+
 use rusqlite::{Connection, Error};
 
 type SchemaFn = fn(&rusqlite::Connection) -> Result<(), rusqlite::Error>;
-pub const SCHEMA_FUNCTION: [SchemaFn; 2] = [v1_schema, v2_schema];
+pub const SCHEMA_FUNCTION: [SchemaFn; 3] = [v1_schema, v2_schema, v3_schema];
 
 fn schema_function_with_index() -> impl Iterator<Item = (i64, SchemaFn)> {
     SCHEMA_FUNCTION
@@ -108,6 +111,49 @@ fn v2_download_chapter_status_index() -> &'static str {
     "
 }
 
+fn v3_add_order_to_downloads() -> &'static str {
+    r"
+        PRAGMA foreign_keys = OFF;
+        BEGIN TRANSACTION;
+        CREATE TABLE downloads_temp (
+            id INTEGER PRIMARY KEY,
+            module_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            url TEXT,
+            status TEXT NOT NULL,
+            path TEXT NOT NULL,
+            `order` INTEGER NOT NULL,
+
+            FOREIGN KEY (module_id)
+                REFERENCES modules(id)
+                ON DELETE RESTRICT
+                ON UPDATE RESTRICT
+        );
+
+        INSERT INTO downloads_temp(id, module_id, title, url, status, path, `order`)
+            SELECT id, module_id, title, url, status, path, ROWID as `order`
+                FROM downloads;
+
+        DROP TABLE downloads;
+
+        ALTER TABLE downloads_temp RENAME TO downloads;
+        PRAGMA foreign_key_check;
+
+        COMMIT;
+        PRAGMA foreign_keys = ON;
+    "
+}
+
+fn v3_add_index_on_download_to_order() -> &'static str {
+    r"
+        CREATE INDEX download_order_index ON downloads(`order`);
+    "
+}
+
+fn v3_add_index_on_donwload_to_status() -> &'static str {
+    v2_download_status_index()
+}
+
 fn insert_migration_version(conn: &Connection, version: i64) -> Result<usize, Error> {
     conn.execute("INSERT INTO __migration (version) VALUES (?)", [version])
 }
@@ -133,7 +179,20 @@ fn v2_schema(conn: &Connection) -> Result<(), Error> {
     Ok(())
 }
 
+fn v3_schema(conn: &Connection) -> Result<(), Error> {
+    conn.execute_batch(v3_add_order_to_downloads()).unwrap();
+    conn.execute(v3_add_index_on_donwload_to_status(), [])
+        .unwrap();
+    conn.execute(v3_add_index_on_download_to_order(), [])
+        .unwrap();
+
+    insert_migration_version(conn, 3)?;
+
+    Ok(())
+}
+
 pub fn setup_schema_version(conn: &Connection, version: i64) -> Result<(), Error> {
+    conn.execute("PRAGMA foreign_keys = ON;", []).unwrap();
     create_migration(conn)?;
 
     for (index, it) in schema_function_with_index() {
@@ -148,13 +207,14 @@ pub fn setup_schema_version(conn: &Connection, version: i64) -> Result<(), Error
 pub fn setup_schema(conn: &Connection) -> Result<(), Error> {
     let version = create_migration(conn)?;
     setup_schema_version(conn, version)?;
-    conn.execute("PRAGMA foreign_keys = ON;", []).unwrap();
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use mado_core::Uuid;
+
     use super::*;
 
     #[test]
@@ -183,5 +243,64 @@ mod tests {
     fn setup_test() {
         let conn = Connection::open_in_memory().unwrap();
         setup_schema(&conn).unwrap();
+    }
+
+    #[test]
+    fn test_v3_migrate() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        create_migration(&conn).unwrap();
+        v1_schema(&conn).unwrap();
+        v2_schema(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO modules (uuid, name)
+                VALUES (:uuid, :name);",
+            rusqlite::named_params! {
+                ":uuid": Uuid::from_u128(1),
+                ":name": "Name"
+            },
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO downloads (title, module_id, path, url, status)
+            VALUES (:title, :module, :path, :url, :status)",
+            rusqlite::named_params! {
+                ":title": "title",
+                ":module": 1,
+                ":path": "path",
+                ":url": None::<String>,
+                ":status": "Finished",
+
+            },
+        )
+        .unwrap();
+
+        conn.execute(
+            "INSERT INTO download_chapters (download_id, title, chapter_id, path, status)
+            VALUES (:download_id, :title, :chapter_id, :path, :status)",
+            rusqlite::named_params! {
+                ":download_id": 1,
+                ":title": "title",
+                ":chapter_id": "chapter",
+                ":path": "path",
+                ":status": "Finished"
+            },
+        )
+        .unwrap();
+
+        v3_schema(&conn).unwrap();
+
+        let it = crate::downloads::load(&conn).unwrap();
+        assert_eq!(it.len(), 1);
+        assert_eq!(it[0].title, "title");
+        assert_eq!(it[0].module_pk.id, 1);
+        assert_eq!(it[0].path, "path");
+        assert_eq!(it[0].status, "Finished".into());
+        assert_eq!(it[0].order, 1);
+
+        let it = crate::download_chapters::load(&conn).unwrap();
+        assert_eq!(it.len(), 1);
     }
 }
