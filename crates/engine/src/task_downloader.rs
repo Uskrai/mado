@@ -299,14 +299,15 @@ mod tests {
             path.join("1"),
             DownloadStatus::waiting(),
         ));
-        let info = Arc::new(DownloadInfo::new(
-            module.into(),
-            "title".to_string(),
-            vec![chapter.clone()],
-            path.clone(),
-            None,
-            DownloadStatus::waiting(),
-        ));
+        let info = Arc::new(
+            DownloadInfo::builder()
+                .module(module)
+                .manga_title("title")
+                .chapters(vec![chapter.clone()])
+                .path(path.clone())
+                .status(DownloadStatus::waiting())
+                .build(),
+        );
 
         futures::executor::block_on(async {
             let downloader = TaskDownloader::new(info.clone());
@@ -370,14 +371,13 @@ mod tests {
             Default::default(),
             DownloadStatus::waiting(),
         ));
-        let info = Arc::new(DownloadInfo::new(
-            module.into(),
-            "title".to_string(),
-            vec![chapter.clone()],
-            Default::default(),
-            None,
-            DownloadStatus::waiting(),
-        ));
+        let info = Arc::new(
+            DownloadInfo::builder()
+                .module(module)
+                .chapters(vec![chapter.clone()])
+                .status(DownloadStatus::waiting())
+                .build(),
+        );
 
         let downloader = TaskDownloader::new(info);
 
@@ -402,14 +402,11 @@ mod tests {
         let map = DefaultMadoModuleMap::default();
 
         let module = LateBindingModule::WaitModule(Arc::new(map), Uuid::from_u128(1));
-        let info = DownloadInfo::new(
-            module,
-            "title".to_string(),
-            vec![],
-            Default::default(),
-            None,
-            crate::DownloadStatus::error("Error"),
-        );
+        let info = DownloadInfo::builder()
+            .module(module)
+            .chapters(vec![])
+            .status(crate::DownloadStatus::error("Error"))
+            .build();
 
         let info = Arc::new(info);
         let watcher = DownloadInfoWatcher::connect(info.clone());

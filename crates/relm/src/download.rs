@@ -133,14 +133,13 @@ mod tests {
         let module = LateBindingModule::WaitModule(modulemap, Default::default());
 
         let create = || {
-            Arc::new(DownloadInfo::new(
-                module.clone(),
-                "title".to_string(),
-                vec![],
-                "".into(),
-                None,
-                mado::engine::DownloadStatus::paused(),
-            ))
+            Arc::new(
+                DownloadInfo::builder()
+                    .module(module.clone())
+                    .chapters(vec![])
+                    .status(mado::engine::DownloadStatus::paused())
+                    .build(),
+            )
         };
 
         let first = create();

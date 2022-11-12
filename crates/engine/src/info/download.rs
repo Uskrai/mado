@@ -6,6 +6,7 @@ use crate::{
 };
 use parking_lot::Mutex;
 use std::sync::Arc;
+use typed_builder::TypedBuilder;
 
 macro_rules! ImplObserver {
     () => {
@@ -16,14 +17,22 @@ macro_rules! ImplObserver {
 
 pub type BoxObserver = Box<dyn FnMut(DownloadInfoMsg) + Send + 'static>;
 
-#[derive(Debug)]
+#[derive(Debug, TypedBuilder)]
 pub struct DownloadInfo {
+    #[builder(setter(into))]
     module: ModuleInfo,
-    manga_title: String,
-    chapters: Vec<Arc<DownloadChapterInfo>>,
-    path: Utf8PathBuf,
-    url: Option<Url>,
+    #[builder(setter(into))]
     status: Mutex<DownloadStatus>,
+
+    #[builder(setter(into), default)]
+    path: Utf8PathBuf,
+    #[builder(setter(into), default)]
+    manga_title: String,
+    #[builder(default)]
+    url: Option<Url>,
+    #[builder(default)]
+    chapters: Vec<Arc<DownloadChapterInfo>>,
+    #[builder(default)]
     observers: Observers<BoxObserver>,
 }
 
@@ -42,7 +51,7 @@ impl DownloadInfo {
         status: DownloadStatus,
     ) -> Self {
         Self {
-            module: ModuleInfo::new(module),
+            module: module.into(),
             manga_title: title,
             chapters,
             path,
@@ -259,17 +268,13 @@ mod tests {
 
     #[test]
     fn download_observer() {
-        let info = DownloadInfo::new(
-            LateBindingModule::WaitModule(
+        let info = DownloadInfo::builder()
+            .module(LateBindingModule::WaitModule(
                 Arc::new(DefaultMadoModuleMap::new()),
                 Default::default(),
-            ),
-            Default::default(),
-            Vec::new(),
-            Default::default(),
-            None,
-            DownloadStatus::paused(),
-        );
+            ))
+            .status(DownloadStatus::paused())
+            .build();
 
         {
             let mut mock = MockThing::default();
@@ -329,17 +334,16 @@ mod tests {
 
     #[test]
     fn test_resume() {
-        let info = DownloadInfo::new(
-            LateBindingModule::WaitModule(
+        let info = DownloadInfo::builder()
+            .module(LateBindingModule::WaitModule(
                 Arc::new(DefaultMadoModuleMap::new()),
                 Default::default(),
-            ),
-            Default::default(),
-            Vec::new(),
-            Default::default(),
-            None,
-            DownloadStatus::paused(),
-        );
+            ))
+            .manga_title("Title")
+            .path("path")
+            .status(DownloadStatus::paused())
+            .build();
+        let info = Arc::new(info);
 
         info.resume(true);
         assert!(info.status().is_resumed());

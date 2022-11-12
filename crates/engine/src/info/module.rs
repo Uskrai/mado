@@ -77,20 +77,36 @@ pub struct ModuleInfo {
 }
 
 impl ModuleInfo {
-    pub fn new(module: LateBindingModule) -> Self {
-        let uuid = module.uuid();
-        Self {
-            uuid,
-            module: AsyncMutex::new(module),
-        }
-    }
-
     pub async fn lock(&self) -> AsyncMutexGuard<'_, LateBindingModule> {
         self.module.lock().await
     }
 
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
+    }
+}
+
+impl From<LateBindingModule> for ModuleInfo {
+    fn from(v: LateBindingModule) -> Self {
+        Self {
+            uuid: v.uuid(),
+            module: AsyncMutex::new(v),
+        }
+    }
+}
+
+impl From<ArcMadoModule> for ModuleInfo {
+    fn from(v: ArcMadoModule) -> Self {
+        Self {
+            uuid: v.uuid(),
+            module: AsyncMutex::new(v.into()),
+        }
+    }
+}
+
+impl<T: MadoModule> From<Arc<T>> for ModuleInfo {
+    fn from(v: Arc<T>) -> Self {
+        Self::from(v as ArcMadoModule)
     }
 }
 

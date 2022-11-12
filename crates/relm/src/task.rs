@@ -347,14 +347,15 @@ mod tests {
             "path".into(),
             DownloadStatus::Finished,
         ));
-        let info = Arc::new(DownloadInfo::new(
-            latebinding,
-            title.clone(),
-            vec![chapter.clone()],
-            "path".into(),
-            None,
-            DownloadStatus::Finished,
-        ));
+
+        let info = Arc::new(
+            DownloadInfo::builder()
+                .module(latebinding)
+                .manga_title(title.clone())
+                .chapters(vec![chapter.clone()])
+                .status(DownloadStatus::finished())
+                .build(),
+        );
 
         let view = DownloadView::from(info.as_ref());
         assert_eq!(view.title.text().to_string(), title);
