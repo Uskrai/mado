@@ -420,10 +420,10 @@ mod tests {
                 .await
                 .unwrap_err();
 
-            let future = watcher.wait_status(DownloadStatus::is_completed);
+            let future = watcher.wait_status(DownloadStatus::is_finished);
             info.resume(true);
             assert!(info.status().is_resumed());
-            assert!(!info.status().is_completed());
+            assert!(!info.status().is_finished());
             crate::timer::timeout(std::time::Duration::from_millis(10), future)
                 .await
                 .unwrap_err();
