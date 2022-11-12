@@ -12,9 +12,9 @@ use std::{
 use gtk::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ListIndex(usize);
+pub struct ListStoreIndex(usize);
 
-impl ListIndex {
+impl ListStoreIndex {
     pub fn as_usize(&self) -> usize {
         self.0
     }
@@ -23,7 +23,7 @@ impl ListIndex {
 #[derive(Debug)]
 struct Inner<T> {
     list: gtk::gio::ListStore,
-    map_index: RefCell<HashMap<ListIndex, u32>>,
+    map_index: RefCell<HashMap<ListStoreIndex, u32>>,
     container: RefCell<slab::Slab<T>>,
 }
 
@@ -83,7 +83,7 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 crate::gobject::struct_wrapper!(GUsize, Option<usize>, "MadoRelmUsize", usize_wrapper);
 use usize_wrapper::GUsize;
 
-fn to_object(value: &ListIndex) -> GUsize {
+fn to_object(value: &ListStoreIndex) -> GUsize {
     GUsize::to_gobject(Some(value.as_usize()))
 }
 
@@ -100,12 +100,12 @@ impl<T: 'static> ListStore<T> {
         &self.0.list
     }
 
-    fn map_index(&self) -> RefMut<HashMap<ListIndex, u32>> {
+    fn map_index(&self) -> RefMut<HashMap<ListStoreIndex, u32>> {
         self.0.map_index.borrow_mut()
     }
 
-    pub fn push(&self, value: T) -> ListIndex {
-        let index = ListIndex(self.container().insert(value));
+    pub fn push(&self, value: T) -> ListStoreIndex {
+        let index = ListStoreIndex(self.container().insert(value));
         let list_position = self.list().n_items();
         self.list().append(&to_object(&index));
         self.map_index().insert(index.clone(), list_position);
@@ -113,7 +113,7 @@ impl<T: 'static> ListStore<T> {
         index
     }
 
-    pub fn get(&self, &ListIndex(index): &ListIndex) -> Option<RefGuard<T>> {
+   pub fn get(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<RefGuard<T>> {
         let guard = self.0.container.borrow();
 
         guard
@@ -122,7 +122,7 @@ impl<T: 'static> ListStore<T> {
             .map(|_| RefGuard { guard, index })
     }
 
-    pub fn get_mut(&self, &ListIndex(index): &ListIndex) -> Option<MutexGuard<T>> {
+    pub fn get_mut(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<MutexGuard<T>> {
         let guard = self.container();
 
         guard
@@ -131,17 +131,17 @@ impl<T: 'static> ListStore<T> {
             .map(|_| MutexGuard { guard, index })
     }
 
-    pub fn get_gobject(&self, index: &ListIndex) -> Option<gtk::glib::Object> {
+    pub fn get_gobject(&self, index: &ListStoreIndex) -> Option<gtk::glib::Object> {
         let guard = self.list();
         let map_index = self.map_index();
 
         map_index.get(index).and_then(|it| guard.item(*it))
     }
 
-    pub fn remove(&self, index: ListIndex) -> Option<T> {
+    pub fn remove(&self, index: ListStoreIndex) -> Option<T> {
         let it = self.container().try_remove(index.as_usize())?;
 
-        let apply = |list_position: u32, slab_position: &ListIndex, gusize: GUsize| {
+        let apply = |list_position: u32, slab_position: &ListStoreIndex, gusize: GUsize| {
             if *gusize.borrow() == Some(slab_position.as_usize()) {
                 *gusize.borrow_mut() = None;
                 self.list().items_changed(list_position, 1, 1);
@@ -171,16 +171,16 @@ impl<T: 'static> ListStore<T> {
     pub fn get_by_object(&self, index: &gtk::glib::Object) -> Option<RefGuard<T>> {
         let index = *object_gusize(index)?.borrow();
 
-        index.and_then(|index| self.get(&ListIndex(index)))
+        index.and_then(|index| self.get(&ListStoreIndex(index)))
     }
 
     pub fn get_mut_by_object(&self, index: &gtk::glib::Object) -> Option<MutexGuard<T>> {
         let index = *object_gusize(index)?.borrow();
 
-        index.and_then(|index| self.get_mut(&ListIndex(index)))
+        index.and_then(|index| self.get_mut(&ListStoreIndex(index)))
     }
 
-    pub fn notify_changed(&self, index: &ListIndex) {
+    pub fn notify_changed(&self, index: &ListStoreIndex) {
         if let Some(it) = self.map_index().get(index) {
             self.list().items_changed(*it, 1, 1);
         }
@@ -222,7 +222,7 @@ where
         let index = object_gusize(object).and_then(|it| *it.borrow());
 
         if let Some(index) = index {
-            self.notify_changed(&ListIndex(index));
+            self.notify_changed(&ListStoreIndex(index));
         }
     }
 
