@@ -171,7 +171,7 @@ mod tests {
         let map = DefaultMadoModuleMap::new();
         let map = MutexMadoModuleMap::new(map);
         let map = Arc::new(map);
-        let state = MadoEngineState::new(map, vec![]);
+        let state = MadoEngineState::new(map, Default::default());
 
         let mado = MadoEngine::new(state);
         let app = AppModel::builder().launch(mado.state()).detach();
