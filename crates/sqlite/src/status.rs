@@ -34,10 +34,6 @@ impl DownloadStatus {
     pub fn error_parse<S: std::fmt::Display>(error: S) -> Self {
         Self::Error(format!("cannot parse status: {}", error))
     }
-
-    pub fn into_mado(self) -> mado_engine::DownloadStatus {
-        mado_engine::DownloadStatus::from(self)
-    }
 }
 
 impl From<&str> for DownloadStatus {

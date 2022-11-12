@@ -51,7 +51,7 @@ impl MadoEngineState {
     }
 
     pub fn download_request(&self, request: DownloadRequest) {
-        let info = Arc::new(DownloadInfo::from_request(request));
+        let info = Arc::new(DownloadInfo::from_request(0, request));
         self.tasks.write().push(info.clone());
         self.observers
             .emit(move |it| it(MadoEngineStateMsg::Download(&info)));

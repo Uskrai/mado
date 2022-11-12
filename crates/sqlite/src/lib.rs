@@ -50,6 +50,7 @@ mod tests {
 
         Arc::new(
             DownloadInfo::builder()
+                .order(0)
                 .module(state.module.clone())
                 .chapters(vec)
                 .status(mado_engine::DownloadStatus::paused())

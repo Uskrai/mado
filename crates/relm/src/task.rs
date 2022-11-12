@@ -219,6 +219,7 @@ impl DownloadViewController {
         let sender = this.sender.clone();
         let handle = info.connect(move |msg| match msg {
             DownloadInfoMsg::StatusChanged(_) => sender.send(DownloadMsg::StatusChanged).unwrap(),
+            DownloadInfoMsg::OrderChanged(_) => {}
         });
         handles.push(handle.send_handle_any());
 
@@ -350,6 +351,7 @@ mod tests {
 
         let info = Arc::new(
             DownloadInfo::builder()
+                .order(0)
                 .module(latebinding)
                 .manga_title(title.clone())
                 .chapters(vec![chapter.clone()])

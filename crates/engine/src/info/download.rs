@@ -5,7 +5,7 @@ use crate::{
     DownloadStatus, LateBindingModule, ModuleInfo, ObserverHandle, Observers,
 };
 use parking_lot::Mutex;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicUsize, Arc};
 use typed_builder::TypedBuilder;
 
 macro_rules! ImplObserver {
@@ -19,6 +19,8 @@ pub type BoxObserver = Box<dyn FnMut(DownloadInfoMsg) + Send + 'static>;
 
 #[derive(Debug, TypedBuilder)]
 pub struct DownloadInfo {
+    #[builder(setter(into))]
+    order: AtomicUsize,
     #[builder(setter(into))]
     module: ModuleInfo,
     #[builder(setter(into))]
@@ -38,11 +40,13 @@ pub struct DownloadInfo {
 
 pub enum DownloadInfoMsg<'a> {
     StatusChanged(&'a DownloadStatus),
+   OrderChanged(usize),
 }
 
 impl DownloadInfo {
     /// Create new Download info.
     pub fn new(
+        order: usize,
         module: LateBindingModule,
         title: String,
         chapters: Vec<Arc<DownloadChapterInfo>>,
@@ -51,6 +55,7 @@ impl DownloadInfo {
         status: DownloadStatus,
     ) -> Self {
         Self {
+            order: order.into(),
             module: module.into(),
             manga_title: title,
             chapters,
@@ -60,7 +65,8 @@ impl DownloadInfo {
             observers: Default::default(),
         }
     }
-    pub fn from_request(request: DownloadRequest) -> Self {
+
+    pub fn from_request(order: usize, request: DownloadRequest) -> Self {
         let DownloadRequest {
             module,
             manga,
@@ -87,6 +93,7 @@ impl DownloadInfo {
             .collect();
 
         Self::new(
+            order,
             LateBindingModule::Module(module),
             manga.title.clone(),
             chapters,
@@ -94,6 +101,10 @@ impl DownloadInfo {
             url,
             DownloadStatus::InProgress(status.into()),
         )
+    }
+
+    pub fn order(&self) -> usize {
+        self.order.load(atomic::Ordering::Relaxed)
     }
 
     /// Get download info's status.
@@ -134,6 +145,12 @@ impl DownloadInfo {
         &self.chapters
     }
 
+   pub fn set_order(&self, order: usize) {
+        self.order.store(order, atomic::Ordering::Relaxed);
+        self.observers
+            .emit(|it| it(DownloadInfoMsg::OrderChanged(order)));
+    }
+
     /// Change download's status, then emit [`DownloadInfoObserver::on_status_changed`]
     pub fn set_status(&self, status: DownloadStatus) {
         let mut lock = self.status.lock();
@@ -165,6 +182,7 @@ impl DownloadInfo {
     /// Connect and send current state.
     pub fn connect(&self, mut observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
         observer(DownloadInfoMsg::StatusChanged(&self.status()));
+        observer(DownloadInfoMsg::OrderChanged(self.order()));
 
         self.connect_only(observer)
     }
@@ -251,6 +269,7 @@ mod tests {
         pub Thing {
             fn on_status_changed(&self, status: &DownloadStatus);
             fn on_download(&self, info: &DownloadStatus);
+            fn on_order_changed(&self, index: usize);
         }
     }
 
@@ -258,6 +277,7 @@ mod tests {
         fn handle(&self, msg: DownloadInfoMsg<'_>) {
             match msg {
                 DownloadInfoMsg::StatusChanged(status) => self.on_status_changed(status),
+                DownloadInfoMsg::OrderChanged(index) => self.on_order_changed(index),
             }
         }
 
@@ -269,6 +289,7 @@ mod tests {
     #[test]
     fn download_observer() {
         let info = DownloadInfo::builder()
+            .order(0)
             .module(LateBindingModule::WaitModule(
                 Arc::new(DefaultMadoModuleMap::new()),
                 Default::default(),
@@ -282,6 +303,10 @@ mod tests {
                 .once()
                 .with(predicate::eq(DownloadStatus::paused()))
                 .returning(|_| ());
+            mock.expect_on_order_changed()
+                .once()
+                .with(predicate::eq(0))
+                .returning(|_| ());
 
             let _ = info.connect(mock.handler()).disconnect().unwrap();
         }
@@ -292,22 +317,34 @@ mod tests {
                 .once()
                 .with(predicate::eq(DownloadStatus::paused()))
                 .returning(|_| ());
+            mock.expect_on_order_changed()
+                .once()
+                .with(predicate::eq(0))
+                .returning(|_| ());
 
             mock.expect_on_status_changed()
                 .once()
                 .with(predicate::eq(DownloadStatus::waiting()))
                 .returning(|_| ());
 
+            mock.expect_on_order_changed()
+                .once()
+                .with(predicate::eq(1))
+                .returning(|_| ());
+
             let handle = info.connect(mock.handler());
 
             info.set_status(DownloadStatus::waiting());
+            info.set_order(1);
             let _ = handle.disconnect().unwrap();
             info.set_status(DownloadStatus::finished());
+            info.set_order(2);
         }
 
         {
             let mut mock = MockThing::new();
             mock.expect_on_status_changed().never();
+            mock.expect_on_order_changed().never();
             let _ = info.connect_only(mock.handler()).disconnect().unwrap();
         }
     }
@@ -319,14 +356,17 @@ mod tests {
         let url = Url::parse("https://localhost").unwrap();
         module.expect_domain().return_const(url.clone());
 
-        let download = DownloadInfo::from_request(DownloadRequest::new(
-            Arc::new(module),
-            Arc::new(MangaInfo::default()),
-            vec![Default::default()],
-            Default::default(),
-            Some(url.clone()),
-            DownloadRequestStatus::Resume,
-        ));
+        let download = DownloadInfo::from_request(
+            0,
+            DownloadRequest::new(
+                Arc::new(module),
+                Arc::new(MangaInfo::default()),
+                vec![Default::default()],
+                Default::default(),
+                Some(url.clone()),
+                DownloadRequestStatus::Resume,
+            ),
+        );
 
         assert_eq!(download.url(), Some(&url));
         assert_eq!(*download.module_uuid(), Uuid::from_u128(1));
@@ -335,6 +375,7 @@ mod tests {
     #[test]
     fn test_resume() {
         let info = DownloadInfo::builder()
+            .order(0)
             .module(LateBindingModule::WaitModule(
                 Arc::new(DefaultMadoModuleMap::new()),
                 Default::default(),

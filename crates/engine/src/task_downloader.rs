@@ -301,6 +301,7 @@ mod tests {
         ));
         let info = Arc::new(
             DownloadInfo::builder()
+                .order(0)
                 .module(module)
                 .manga_title("title")
                 .chapters(vec![chapter.clone()])
@@ -373,6 +374,7 @@ mod tests {
         ));
         let info = Arc::new(
             DownloadInfo::builder()
+                .order(0)
                 .module(module)
                 .chapters(vec![chapter.clone()])
                 .status(DownloadStatus::waiting())
@@ -403,6 +405,7 @@ mod tests {
 
         let module = LateBindingModule::WaitModule(Arc::new(map), Uuid::from_u128(1));
         let info = DownloadInfo::builder()
+            .order(0)
             .module(module)
             .chapters(vec![])
             .status(crate::DownloadStatus::error("Error"))

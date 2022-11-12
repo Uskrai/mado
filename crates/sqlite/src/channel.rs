@@ -193,6 +193,11 @@ impl Channel {
                 mado_engine::DownloadInfoMsg::StatusChanged(status) => tx
                     .send(DbMsg::DownloadStatusChanged(dl_pk, status.into()))
                     .ok(),
+                mado_engine::DownloadInfoMsg::OrderChanged(_) => {
+                    // tx.send(DbMsg::DownloadOrderChanged(dl_pk, status));
+
+                    Some(())
+                }
             };
         });
     }
