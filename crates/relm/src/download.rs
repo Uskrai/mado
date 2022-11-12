@@ -64,7 +64,7 @@ impl SimpleComponent for DownloadModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, _: ComponentSender<Self>) {
+    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             DownloadMsg::CreateDownloadView(info) => {
                 let object = DownloadItem { info };
@@ -135,6 +135,7 @@ mod tests {
         let create = || {
             Arc::new(
                 DownloadInfo::builder()
+                    .order(0)
                     .module(module.clone())
                     .chapters(vec![])
                     .status(mado::engine::DownloadStatus::paused())
