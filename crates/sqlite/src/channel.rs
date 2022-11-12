@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use mado_engine::{
     core::{ArcMadoModule, ArcMadoModuleMap, Uuid},
     DownloadChapterImageInfo, DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
-    MadoEngineState, MadoEngineStateMsg,
+    DownloadTaskList, MadoEngineState, MadoEngineStateMsg,
 };
 
 use crate::{
@@ -166,10 +166,10 @@ impl Channel {
     pub fn load_connect(
         &self,
         module_map: ArcMadoModuleMap,
-    ) -> Result<Vec<Arc<DownloadInfo>>, rusqlite::Error> {
+    ) -> Result<DownloadTaskList, rusqlite::Error> {
         let infos = self.db.load_download_info(module_map)?;
 
-        let mut vec = Vec::new();
+        let mut vec = DownloadTaskList::default();
         for it in infos {
             vec.push(it.info.clone());
             self.connect_info(it);
