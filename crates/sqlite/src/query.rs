@@ -164,7 +164,7 @@ pub fn load_download_info_join(
         let chapters: Vec<_> = chapters_join.iter().map(|it| it.chapter.clone()).collect();
 
         let info = Arc::new(DownloadInfo::new(
-            0,
+            download.order,
             module.clone(),
             download.title,
             chapters,

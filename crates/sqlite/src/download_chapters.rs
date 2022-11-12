@@ -127,6 +127,7 @@ mod tests {
         crate::downloads::insert(
             &db,
             InsertDownload {
+                order: 1,
                 title: "title",
                 module_id: &module_id,
                 path: "path",

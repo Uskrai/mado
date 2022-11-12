@@ -11,6 +11,7 @@ use crate::{
 };
 
 pub struct InsertDownload<'a> {
+    pub order: usize,
     pub title: &'a str,
     pub module_id: &'a i64,
     pub path: &'a str,
@@ -31,14 +32,16 @@ impl DownloadPK {
 
 pub fn insert(conn: &Connection, model: InsertDownload<'_>) -> Result<usize, Error> {
     conn.execute(
-        "INSERT INTO downloads (title, module_id, path, url, status)
-        VALUES (:title, :module, :path, :url, :status)",
+        "INSERT INTO downloads (title, module_id, path, url, status, `order`)
+        VALUES (:title, :module, :path, :url, :status, :order)",
         rusqlite::named_params! {
             ":title": model.title,
             ":module": model.module_id,
             ":path": model.path,
             ":url": model.url,
-            ":status": model.status
+            ":status": model.status,
+            ":order": model.order
+
         },
     )
 }
@@ -56,6 +59,7 @@ pub fn insert_info(
     let transaction = conn.transaction()?;
 
     let model = InsertDownload {
+        order: info.order(),
         title: info.manga(),
         module_id: &module.id,
         path: info.path().as_str(),
@@ -103,6 +107,7 @@ pub fn insert_info(
 #[derive(Debug)]
 pub struct Download {
     pub pk: DownloadPK,
+    pub order: usize,
     pub title: String,
     pub module_pk: ModulePK,
     pub path: Utf8PathBuf,
@@ -111,13 +116,16 @@ pub struct Download {
 }
 
 pub fn load(conn: &Connection) -> Result<Vec<Download>, Error> {
-    let mut stmt = conn.prepare("SELECT id, title, module_id, path, url, status FROM downloads")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, `order`, title, module_id, path, url, status FROM downloads ORDER BY `order`",
+    )?;
     let mut rows = stmt.query([])?;
 
     let mut downloads = Vec::new();
 
     while let Some(row) = rows.next()? {
         let download = Download {
+            order: row.get("order")?,
             pk: DownloadPK::new(row.get("id")?),
             title: row.get("title")?,
             module_pk: ModulePK {
@@ -162,11 +170,13 @@ mod tests {
                 uuid: &Default::default(),
                 name: "",
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         insert(
             &db,
             InsertDownload {
+                order: 10,
                 title: "title",
                 module_id: &module_id,
                 path: "path",
@@ -180,6 +190,7 @@ mod tests {
 
         assert_eq!(vec.len(), 1);
         let it = &vec[0];
+        assert_eq!(it.order, 10);
         assert_eq!(it.title, "title");
         assert_eq!(it.module_pk.id, module_id);
         assert_eq!(it.path, "path");
@@ -189,6 +200,7 @@ mod tests {
         insert(
             &db,
             InsertDownload {
+                order: 11,
                 title: "title",
                 module_id: &module_id,
                 path: "path",
@@ -201,6 +213,7 @@ mod tests {
         let vec = load(&db).unwrap();
         assert_eq!(vec.len(), 2);
         let it = &vec[1];
+        assert_eq!(it.order, 11);
         assert_eq!(it.title, "title");
         assert_eq!(it.module_pk.id, module_id);
         assert_eq!(it.path, "path");
@@ -237,5 +250,49 @@ mod tests {
         assert_eq!(get_status(1), DownloadStatus::paused());
         update_status(&db, insert.pk, DownloadStatus::resumed()).unwrap();
         assert_eq!(get_status(1), DownloadStatus::resumed())
+    }
+
+    #[test]
+    fn sorted_test() {
+        let db = connection();
+
+        let module_id = crate::module::insert(
+            &db,
+            crate::module::InsertModule {
+                uuid: &Default::default(),
+                name: "",
+            },
+        )
+        .unwrap();
+
+        let first = InsertDownload {
+            order: 2,
+            title: "first",
+            module_id: &module_id,
+            path: "path",
+            url: None,
+            status: "Finished".into(),
+        };
+
+        let second = InsertDownload {
+            order: 1,
+            title: "second",
+            module_id: &module_id,
+            path: "path",
+            url: None,
+            status: "Finished".into(),
+        };
+
+        insert(&db, first).unwrap();
+        insert(&db, second).unwrap();
+
+        let vec = load(&db).unwrap();
+
+        assert_eq!(vec.len(), 2);
+
+        assert_eq!(vec[0].order, 1);
+        assert_eq!(vec[0].title, "second");
+        assert_eq!(vec[1].order, 2);
+        assert_eq!(vec[1].title, "first");
     }
 }
