@@ -7,7 +7,17 @@ use mado::engine::{
 
 #[derive(Debug)]
 pub struct DownloadItem {
-    pub info: Arc<DownloadInfo>,
+    info: Arc<DownloadInfo>,
+}
+
+impl DownloadItem {
+    pub fn new(info: Arc<DownloadInfo>) -> Self {
+        Self { info }
+    }
+
+    pub fn info(&self) -> &Arc<DownloadInfo> {
+        &self.info
+    }
 }
 
 #[derive(Debug, Clone)]
