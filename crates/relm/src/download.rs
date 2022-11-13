@@ -13,6 +13,7 @@ use crate::task_list::TaskListModel;
 #[derive(Debug)]
 pub enum DownloadMsg {
     CreateDownloadView(Arc<DownloadInfo>),
+    OrderChanged(ListStoreIndex),
     PauseSelected,
     ResumeSelected,
 }
@@ -33,13 +34,14 @@ impl DownloadModel {
 
                 if selection.contains(index as u32) {
                     if let Some(it) = self.list.get_by_object(&it) {
-                        it.info.resume(resume);
+                        it.info().resume(resume);
                     }
                 }
             }
         }
     }
 }
+
 #[relm4::component(pub)]
 impl SimpleComponent for DownloadModel {
     type Widgets = DownloadWidgets;
@@ -74,8 +76,17 @@ impl SimpleComponent for DownloadModel {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             DownloadMsg::CreateDownloadView(info) => {
-                let object = DownloadItem { info };
-                self.list.push(object);
+                let index = self.list.push(DownloadItem::new(info.clone()));
+
+                info.connect_only(move |msg| match msg {
+                    mado::engine::DownloadInfoMsg::StatusChanged(_) => {}
+                    mado::engine::DownloadInfoMsg::OrderChanged(_) => {
+                        sender.input(DownloadMsg::OrderChanged(index.clone()));
+                    }
+                });
+            }
+            DownloadMsg::OrderChanged(index) => {
+                self.list.notify_changed(&index);
             }
             DownloadMsg::PauseSelected => {
                 self.resume(false);
