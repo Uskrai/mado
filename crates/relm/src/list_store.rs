@@ -92,7 +92,11 @@ pub fn object_gusize(object: &gtk::glib::Object) -> Option<GUsize> {
 }
 
 impl<T: 'static> ListStore<T> {
-    fn container(&self) -> RefMut<slab::Slab<T>> {
+    pub fn container(&self) -> Ref<slab::Slab<T>> {
+        self.0.container.borrow()
+    }
+
+    fn container_mut(&self) -> RefMut<slab::Slab<T>> {
         self.0.container.borrow_mut()
     }
 
@@ -100,21 +104,25 @@ impl<T: 'static> ListStore<T> {
         &self.0.list
     }
 
-    fn map_index(&self) -> RefMut<HashMap<ListStoreIndex, u32>> {
+    fn map_index(&self) -> Ref<HashMap<ListStoreIndex, u32>> {
+        self.0.map_index.borrow()
+    }
+
+    fn map_index_mut(&self) -> RefMut<HashMap<ListStoreIndex, u32>> {
         self.0.map_index.borrow_mut()
     }
 
     pub fn push(&self, value: T) -> ListStoreIndex {
-        let index = ListStoreIndex(self.container().insert(value));
+        let index = ListStoreIndex(self.container_mut().insert(value));
         let list_position = self.list().n_items();
         self.list().append(&to_object(&index));
-        self.map_index().insert(index.clone(), list_position);
+        self.map_index_mut().insert(index.clone(), list_position);
 
         index
     }
 
-   pub fn get(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<RefGuard<T>> {
-        let guard = self.0.container.borrow();
+    pub fn get(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<RefGuard<T>> {
+        let guard = self.container();
 
         guard
             .get(index)
@@ -123,7 +131,7 @@ impl<T: 'static> ListStore<T> {
     }
 
     pub fn get_mut(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<MutexGuard<T>> {
-        let guard = self.container();
+        let guard = self.container_mut();
 
         guard
             .get(index)
@@ -139,7 +147,7 @@ impl<T: 'static> ListStore<T> {
     }
 
     pub fn remove(&self, index: ListStoreIndex) -> Option<T> {
-        let it = self.container().try_remove(index.as_usize())?;
+        let it = self.container_mut().try_remove(index.as_usize())?;
 
         let apply = |list_position: u32, slab_position: &ListStoreIndex, gusize: GUsize| {
             if *gusize.borrow() == Some(slab_position.as_usize()) {
@@ -151,17 +159,20 @@ impl<T: 'static> ListStore<T> {
             }
         };
 
-        let mut map_index = self.map_index();
-        if let Some(list_position) = map_index.get(&index).cloned() {
-            let it = self
-                .list()
-                .item(list_position)
-                .as_ref()
-                .and_then(object_gusize);
+        {
+            let list_position = { self.map_index().get(&index).cloned() };
 
-            if let Some(it) = it {
-                apply(list_position, &index, it);
-                map_index.remove(&index);
+            if let Some(list_position) = list_position {
+                let it = self
+                    .list()
+                    .item(list_position)
+                    .as_ref()
+                    .and_then(object_gusize);
+
+                if let Some(it) = it {
+                    apply(list_position, &index, it);
+                    self.map_index_mut().remove(&index);
+                }
             }
         }
 
@@ -187,13 +198,13 @@ impl<T: 'static> ListStore<T> {
     }
 
     pub fn base(&self) -> ListModel<T> {
-        ListModel::new_with(self.clone())
+        ListModel::new(self.clone())
     }
 
     pub fn clear(&self) {
         self.list().remove_all();
-        self.container().clear();
-        self.map_index().clear();
+        self.container_mut().clear();
+        self.map_index_mut().clear();
     }
 
     pub fn len(&self) -> usize {
@@ -245,7 +256,7 @@ mod tests {
     #[gtk::test]
     pub fn list_test() {
         let store = ListStore::<usize>::default();
-        let base = ListModel::new_with(store.clone());
+        let base = ListModel::new(store.clone());
         let model = store.list_model();
         let count = || model.into_iter().count();
 
@@ -285,7 +296,7 @@ mod tests {
     #[gtk::test]
     pub fn guard_test() {
         let store = ListStore::<usize>::default();
-        let base = ListModel::new_with(store.clone());
+        let base = ListModel::new(store.clone());
         let model = base.list_model();
 
         let boolfilter = store.bool_filter(|it| *it <= 100);
