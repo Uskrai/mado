@@ -155,6 +155,13 @@ pub fn update_status(
     )
 }
 
+pub fn update_order(conn: &Connection, pk: DownloadPK, order: usize) -> Result<usize, Error> {
+    conn.execute(
+        "UPDATE downloads SET `order` = ? WHERE id = ?",
+        params![order, pk.id],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,6 +257,35 @@ mod tests {
         assert_eq!(get_status(1), DownloadStatus::paused());
         update_status(&db, insert.pk, DownloadStatus::resumed()).unwrap();
         assert_eq!(get_status(1), DownloadStatus::resumed())
+    }
+
+    #[test]
+    fn update_order_test() {
+        let mut db = connection();
+
+        let module = crate::module::insert_pk(
+            &mut db,
+            crate::module::InsertModule {
+                uuid: &Default::default(),
+                name: "Default",
+            },
+        )
+        .unwrap();
+
+        let info = setup_info(1);
+
+        let insert = crate::downloads::insert_info(&mut db, module, &info).unwrap();
+
+        let get_status = |id: i64| {
+            db.query_row::<usize, _, _>("SELECT `order` FROM downloads WHERE id = ?", [id], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        };
+
+        assert_eq!(get_status(1), 0);
+        update_order(&db, insert.pk, 10).unwrap();
+        assert_eq!(get_status(1), 10)
     }
 
     #[test]
