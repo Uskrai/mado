@@ -6,7 +6,8 @@ use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
 
-use crate::list_store::ListStore;
+use crate::list_model::{ListModel, ListModelBaseExt};
+use crate::list_store::{ListStore, ListStoreIndex};
 use crate::task::DownloadItem;
 use crate::task_list::TaskListModel;
 
@@ -16,6 +17,14 @@ pub enum DownloadMsg {
     OrderChanged(ListStoreIndex),
     PauseSelected,
     ResumeSelected,
+    MoveUp,
+    MoveDown,
+}
+
+#[derive(Copy, Clone)]
+pub enum DownloadMoveDirection {
+    Up,
+    Down,
 }
 
 pub struct DownloadModel {
@@ -39,6 +48,76 @@ impl DownloadModel {
                 }
             }
         }
+    }
+
+    pub fn move_selected(&mut self, direction: DownloadMoveDirection) {
+        let selection = &self.task_list.model().selection;
+
+        let bitset = selection.selection().copy();
+
+        let maximum: u64 = bitset.maximum().try_into().unwrap();
+        let minimum: u64 = bitset.minimum().try_into().unwrap();
+        let size = bitset.size();
+
+        let model = match selection.model() {
+            Some(model) => model,
+            None => return,
+        };
+
+        let mut count = 0;
+
+        use DownloadMoveDirection::*;
+
+        let move_by = 1;
+        let (minimum, maximum) = match direction {
+            Up => (minimum.checked_sub(move_by).unwrap_or(0), maximum),
+            Down => (minimum, maximum + move_by),
+        };
+
+        fn up_selection(bitset: &gtk::Bitset, index: u32) -> bool {
+            bitset.contains(index)
+        }
+
+        fn down_selection(bitset: &gtk::Bitset, index: u32) -> bool {
+            !bitset.contains(index)
+        }
+
+        let check_contains = match direction {
+            Up => up_selection,
+            Down => down_selection,
+        };
+
+        // check if 
+        let is_first = |index: u32| check_contains(&bitset, index);
+
+        for (index, it) in model.into_iter().enumerate() {
+            let index = index as u64;
+            let it = it.unwrap();
+
+            let it = match self.list.get_by_object(&it) {
+                Some(it) => it,
+                None => continue,
+            };
+
+            if index < minimum || index > maximum {
+                continue;
+            }
+
+            let index = index as u32;
+
+            if is_first(index as u32) {
+                let order = minimum + count;
+                it.info().set_order((order).try_into().unwrap());
+                count += 1;
+            } else {
+                let order = minimum + size + count;
+                it.info().set_order((order).try_into().unwrap());
+            }
+        }
+
+        let count: u32 = count.try_into().unwrap();
+        let minimum: u32 = minimum.try_into().unwrap();
+        selection.items_changed(minimum, count, count);
     }
 }
 
@@ -94,6 +173,12 @@ impl SimpleComponent for DownloadModel {
             DownloadMsg::ResumeSelected => {
                 self.resume(true);
             }
+            DownloadMsg::MoveUp => {
+                self.move_selected(DownloadMoveDirection::Up);
+            }
+            DownloadMsg::MoveDown => {
+                self.move_selected(DownloadMoveDirection::Down);
+            }
         }
     }
 
@@ -118,6 +203,22 @@ impl SimpleComponent for DownloadModel {
                         sender.input(DownloadMsg::PauseSelected);
                     }
                 },
+
+                #[name = "move_up_button"]
+                append = &gtk::Button {
+                    set_label: "Move Up",
+                    connect_clicked[sender] => move |_| {
+                        sender.input(DownloadMsg::MoveUp);
+                    }
+                },
+
+                #[name = "move_down_button"]
+                append = &gtk::Button {
+                    set_label: "Move Down",
+                    connect_clicked[sender] => move |_| {
+                        sender.input(DownloadMsg::MoveDown);
+                    }
+                }
             },
 
             append = &gtk::ScrolledWindow {
@@ -138,54 +239,177 @@ impl DownloadModel {
 #[cfg(test)]
 mod tests {
     use mado::engine::LateBindingModule;
-    use mado_core::DefaultMadoModuleMap;
+    use mado_core::{DefaultMadoModuleMap, Uuid};
 
     use super::*;
     use crate::tests::*;
+
+    pub struct State {
+        model: Controller<DownloadModel>,
+        modulemap: Arc<DefaultMadoModuleMap>,
+    }
+
+    impl State {
+        pub fn new(model: Controller<DownloadModel>) -> Self {
+            Self {
+                model,
+                modulemap: Arc::new(DefaultMadoModuleMap::new()),
+            }
+        }
+
+        pub fn emit_create(&self, info: Arc<DownloadInfo>) {
+            self.model.emit(DownloadMsg::CreateDownloadView(info));
+        }
+
+        pub fn create_info(&self, order: usize) -> Arc<DownloadInfo> {
+            let module = LateBindingModule::WaitModule(
+                self.modulemap.clone(),
+                Uuid::from_u128(order.try_into().unwrap()),
+            );
+
+            Arc::new(
+                DownloadInfo::builder()
+                    .order(order)
+                    .module(module)
+                    .chapters(vec![])
+                    .status(mado::engine::DownloadStatus::paused())
+                    .build(),
+            )
+        }
+
+        pub fn selection(&self) -> gtk::MultiSelection {
+            self.model.model().task_list.model().selection.clone()
+        }
+    }
 
     #[gtk::test]
     pub fn resume_test() {
         let model = DownloadModel::builder().launch(()).detach();
 
-        let modulemap = Arc::new(DefaultMadoModuleMap::new());
-        let module = LateBindingModule::WaitModule(modulemap, Default::default());
+        let state = State::new(model);
 
-        let create = || {
-            Arc::new(
-                DownloadInfo::builder()
-                    .order(0)
-                    .module(module.clone())
-                    .chapters(vec![])
-                    .status(mado::engine::DownloadStatus::paused())
-                    .build(),
-            )
-        };
+        let first = state.create_info(1);
+        let second = state.create_info(2);
 
-        let first = create();
-        let second = create();
-
-        model.emit(DownloadMsg::CreateDownloadView(first.clone()));
-        model.emit(DownloadMsg::CreateDownloadView(second.clone()));
+        state.emit_create(first.clone());
+        state.emit_create(second.clone());
         run_loop();
 
-        model
-            .model()
-            .task_list
-            .model()
-            .selection
-            .select_item(0, true);
+        state.selection().select_item(0, false);
 
-        model.widgets().resume_button.emit_clicked();
+        state.model.widgets().resume_button.emit_clicked();
         run_loop();
 
         assert!(first.status().is_resumed());
         assert!(second.status().is_paused());
 
-        model.widgets().pause_button.emit_clicked();
+        state.model.widgets().pause_button.emit_clicked();
         // model.emit(DownloadMsg::PauseSelected);
         run_loop();
 
         assert!(first.status().is_paused());
         assert!(second.status().is_paused());
+    }
+
+    #[gtk::test]
+    pub fn sort_test() {
+        let model = DownloadModel::builder().launch(()).detach();
+
+        let state = State::new(model);
+
+        let first = state.create_info(1);
+        let second = state.create_info(2);
+
+        state.emit_create(second);
+        state.emit_create(first);
+        run_loop();
+
+        // item at 0 should be from `first` because `first` has higher order
+        // even if second is added first
+        let gfirst = state.selection().item(0).unwrap();
+        let gsecond = state.selection().item(1).unwrap();
+
+        let gmodel = state.model.model();
+
+        let gfirst = gmodel.list.get_by_object(&gfirst).unwrap();
+        let gsecond = gmodel.list.get_by_object(&gsecond).unwrap();
+
+        assert_eq!(*gfirst.info().module_uuid(), Uuid::from_u128(1));
+        assert_eq!(*gsecond.info().module_uuid(), Uuid::from_u128(2));
+    }
+
+    #[gtk::test]
+    pub fn order_test() {
+        let model = DownloadModel::builder().launch(()).detach();
+        let state = State::new(model);
+
+        let vec = (0..8).map(|it| state.create_info(it)).collect::<Vec<_>>();
+
+        let collect = || {
+            let model = state.model.model();
+            let tmodel = model.task_list.model();
+
+            tmodel
+                .selection
+                .model()
+                .unwrap()
+                .into_iter()
+                .flat_map(|it| it.ok())
+                .flat_map(|it| model.list.get_by_object(&it))
+                .map(|it| (it.info().order(), it.info().module_uuid().clone()))
+                .collect::<Vec<_>>()
+        };
+
+        let map_vec_uuid = |vec: Vec<(usize, Uuid)>| vec.into_iter().map(|(_, it)| it.as_u128());
+
+        let collect_uuid = || map_vec_uuid(collect()).collect::<Vec<_>>();
+
+        let collect_selected = || {
+            let model = state.model.model();
+            let tmodel = model.task_list.model();
+
+            let bitset = tmodel.selection.selection();
+
+            tmodel
+                .selection
+                .model()
+                .unwrap()
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| bitset.contains(*i as u32))
+                .map(|(_, it)| it.unwrap())
+                .flat_map(|it| model.list.get_by_object(&it))
+                .map(|it| (it.info().order(), it.info().module_uuid().clone()))
+                .collect::<Vec<_>>()
+        };
+
+        let collect_selected_uuid = || map_vec_uuid(collect_selected()).collect::<Vec<_>>();
+
+        for it in &vec {
+            state.emit_create(it.clone());
+        }
+
+        run_loop();
+        state.selection().select_item(5, false);
+        state.selection().select_item(3, false);
+        run_loop();
+
+        assert_eq!(collect_uuid(), [0, 1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(collect_selected_uuid(), [3, 5]);
+        state.model.widgets().move_up_button.emit_clicked();
+        run_loop();
+        assert_eq!(collect_uuid(), [0, 1, 3, 5, 2, 4, 6, 7]);
+        assert_eq!(collect_selected_uuid(), [3, 5]);
+
+        state.model.widgets().move_down_button.emit_clicked();
+        run_loop();
+        assert_eq!(collect_uuid(), [0, 1, 2, 3, 5, 4, 6, 7]);
+
+        state.selection().unselect_item(3);
+        assert_eq!(collect_selected_uuid(), [5]);
+        run_loop();
+        state.model.widgets().move_down_button.emit_clicked();
+        run_loop();
+        assert_eq!(collect_uuid(), [0, 1, 2, 3, 4, 5, 6, 7]);
     }
 }
