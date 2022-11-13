@@ -55,8 +55,15 @@ impl SimpleComponent for DownloadModel {
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let list = ListStore::default();
-        let task_list = TaskListModel::builder().launch(list.base()).detach();
+        let list = ListStore::<DownloadItem>::default();
+        let model = ListModel::new_with_model(list.clone(), |model, gtkmodel| {
+            let sorter = model
+                .custom_sorter(|first, second| first.info().order().cmp(&second.info().order()));
+
+            gtk::SortListModel::new(Some(&gtkmodel), Some(&sorter)).into()
+        });
+
+        let task_list = TaskListModel::builder().launch(model).detach();
 
         let model = Self { list, task_list };
         let widgets = view_output!();

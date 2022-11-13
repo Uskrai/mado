@@ -222,11 +222,11 @@ where
 {
     fn get_by_object(&self, object: &gtk::glib::Object) -> Option<ListModelBorrow<'_, T>> {
         self.get_by_object(object)
-            .map(|it| ListModelBorrow::new_with(it))
+            .map(|it| ListModelBorrow::new(it))
     }
     fn get_mut_by_object(&self, object: &gtk::glib::Object) -> Option<ListModelMutBorrow<T>> {
         self.get_mut_by_object(object)
-            .map(|it| ListModelMutBorrow::new_with(it))
+            .map(|it| ListModelMutBorrow::new(it))
     }
 
     fn notify_changed(&self, object: &gtk::glib::Object) {
