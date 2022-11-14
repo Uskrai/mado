@@ -441,11 +441,11 @@ dependencies = [
 
 [[package]]
 name = "deno_console"
-version = "0.76.0"
+version = "0.77.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90099cf4c3ce07a855a7062b633adde90e8b258fe614e0f4d687a44d846422bd"
+checksum = "8ec37cba1e7fed8b5f372be900763209f4225fcbc31c1853308c6bb0ec7cca3f"
 dependencies = [
- "deno_core",
+ "deno_core 0.159.0",
 ]
 
 [[package]]
@@ -456,7 +456,7 @@ checksum = "3b8b8dc766c38608ffc3aed2c5ebd9ca0b07f062602e8e80eed59cda2a40e726"
 dependencies = [
  "anyhow",
  "bytes",
- "deno_ops",
+ "deno_ops 0.36.0",
  "futures",
  "indexmap",
  "libc",
@@ -466,10 +466,35 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_json",
- "serde_v8",
+ "serde_v8 0.69.0",
  "sourcemap",
  "url",
- "v8",
+ "v8 0.54.0",
+]
+
+[[package]]
+name = "deno_core"
+version = "0.159.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6bc348b3511b6366bde1091a78172ea3fcf21e19b657cfdba696b47a47a82d9"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "deno_ops 0.37.0",
+ "futures",
+ "indexmap",
+ "libc",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "pin-project",
+ "serde",
+ "serde_json",
+ "serde_v8 0.70.0",
+ "smallvec",
+ "sourcemap",
+ "url",
+ "v8 0.55.0",
 ]
 
 [[package]]
@@ -479,6 +504,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f669731e3bf2f2bf759af4912b2298284e3552061fbe4a01748776760d7d1203"
 dependencies = [
  "once_cell",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "deno_ops"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c165f670c2fd273ea8212b3d723ffa242b4a545548aa8ce61b71547807b845da"
+dependencies = [
+ "once_cell",
+ "pmutil",
  "proc-macro-crate",
  "proc-macro2",
  "quote",
@@ -1399,7 +1439,7 @@ dependencies = [
  "async-io",
  "async-trait",
  "deno_console",
- "deno_core",
+ "deno_core 0.158.0",
  "event-listener",
  "futures",
  "futures-core",
@@ -1423,7 +1463,7 @@ name = "mado-deno-coverage"
 version = "0.1.0"
 dependencies = [
  "atty",
- "deno_core",
+ "deno_core 0.158.0",
  "once_cell",
  "serde",
  "serde_json",
@@ -1837,6 +1877,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
 
 [[package]]
+name = "pmutil"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3894e5d549cccbe44afecf72922f277f603cd4bb0219c8342631ef18fffbe004"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "polling"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2215,7 +2266,21 @@ dependencies = [
  "serde",
  "serde_bytes",
  "smallvec",
- "v8",
+ "v8 0.54.0",
+]
+
+[[package]]
+name = "serde_v8"
+version = "0.70.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5003243369d7b70c9ede65a71d0060c34d11d4e5d23e2798a406cb3bc5036639"
+dependencies = [
+ "bytes",
+ "derive_more",
+ "serde",
+ "serde_bytes",
+ "smallvec",
+ "v8 0.55.0",
 ]
 
 [[package]]
@@ -2706,6 +2771,19 @@ name = "v8"
 version = "0.54.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b63103bd7caa4c3571e8baafe58f3e04818df70505304ed814737e655d1d8d6"
+dependencies = [
+ "bitflags",
+ "fslock",
+ "lazy_static",
+ "libc",
+ "which",
+]
+
+[[package]]
+name = "v8"
+version = "0.55.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46cd4f562bce7520fbb511850c5488366264caf346be221cf7e908f51ac33dbc"
 dependencies = [
  "bitflags",
  "fslock",
