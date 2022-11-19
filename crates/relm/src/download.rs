@@ -36,15 +36,18 @@ impl DownloadModel {
     pub fn resume(&mut self, resume: bool) {
         let selection = &self.task_list.model().selection;
 
-        if let Some(model) = selection.model() {
-            let selection = selection.selection();
-            for (index, it) in model.into_iter().enumerate() {
-                let it = it.unwrap();
+        let model = match selection.model() {
+            Some(model) => model,
+            None => return,
+        };
 
-                if selection.contains(index as u32) {
-                    if let Some(it) = self.list.get_by_object(&it) {
-                        it.info().resume(resume);
-                    }
+        let selection = selection.selection();
+        for (index, it) in model.into_iter().enumerate() {
+            let it = it.unwrap();
+
+            if selection.contains(index as u32) {
+                if let Some(it) = self.list.get_by_object(&it) {
+                    it.info().resume(resume);
                 }
             }
         }
