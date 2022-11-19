@@ -58,4 +58,34 @@ impl DownloadStatus {
     pub fn finished() -> Self {
         Self::Finished
     }
+
+    pub fn to_human_variant(&self) -> &'static str {
+        match self {
+            DownloadStatus::InProgress(status) => match status {
+                DownloadProgressStatus::Resumed(status) => match status {
+                    DownloadResumedStatus::Waiting => "Waiting",
+                    DownloadResumedStatus::Downloading => "Downloading",
+                },
+                DownloadProgressStatus::Paused => "Paused",
+                DownloadProgressStatus::Error(_) => "Error",
+            },
+            DownloadStatus::Finished => "Finished",
+        }
+    }
+
+    pub fn message(&self) -> Option<&str> {
+        match self {
+            DownloadStatus::InProgress(DownloadProgressStatus::Error(err)) => {
+                Some(err.as_str())
+            }
+            _ => None,
+        }
+    }
+
+    pub fn to_human_string(&self) -> String {
+        match self.message() {
+            Some(str) => format!("{}: {}", self.to_human_variant(), str),
+            None => self.to_human_variant().to_string()
+        }
+    }
 }
