@@ -73,7 +73,7 @@ impl DownloadModel {
 
         let move_by = 1;
         let (minimum, maximum) = match direction {
-            Up => (minimum.checked_sub(move_by).unwrap_or(0), maximum),
+            Up => (minimum.saturating_sub(move_by), maximum),
             Down => (minimum, maximum + move_by),
         };
 
@@ -108,7 +108,7 @@ impl DownloadModel {
 
             let index = index as u32;
 
-            if is_first(index as u32) {
+            if is_first(index) {
                 let order = minimum + count;
                 it.info().set_order((order).try_into().unwrap());
                 count += 1;
@@ -359,7 +359,7 @@ mod tests {
                 .into_iter()
                 .flat_map(|it| it.ok())
                 .flat_map(|it| model.list.get_by_object(&it))
-                .map(|it| (it.info().order(), it.info().module_uuid().clone()))
+                .map(|it| (it.info().order(), *it.info().module_uuid()))
                 .collect::<Vec<_>>()
         };
 
@@ -382,7 +382,7 @@ mod tests {
                 .filter(|(i, _)| bitset.contains(*i as u32))
                 .map(|(_, it)| it.unwrap())
                 .flat_map(|it| model.list.get_by_object(&it))
-                .map(|it| (it.info().order(), it.info().module_uuid().clone()))
+                .map(|it| (it.info().order(), *it.info().module_uuid()))
                 .collect::<Vec<_>>()
         };
 
