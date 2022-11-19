@@ -1,5 +1,7 @@
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Default)]
 pub enum DownloadResumedStatus {
+    #[default]
+    Queue,
     Waiting,
     Downloading,
 }
@@ -39,6 +41,10 @@ impl DownloadStatus {
         Self::InProgress(DownloadProgressStatus::Resumed(status))
     }
 
+    pub fn queued() -> Self {
+        Self::resumed(DownloadResumedStatus::Queue)
+    }
+
     pub fn waiting() -> Self {
         Self::resumed(DownloadResumedStatus::Waiting)
     }
@@ -63,6 +69,7 @@ impl DownloadStatus {
         match self {
             DownloadStatus::InProgress(status) => match status {
                 DownloadProgressStatus::Resumed(status) => match status {
+                    DownloadResumedStatus::Queue => "Queue",
                     DownloadResumedStatus::Waiting => "Waiting",
                     DownloadResumedStatus::Downloading => "Downloading",
                 },
