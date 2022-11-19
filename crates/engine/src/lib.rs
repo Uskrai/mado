@@ -1,6 +1,7 @@
 mod image_downloader;
 mod info;
 mod observer;
+pub mod semaphore;
 pub use info::*;
 pub use observer::*;
 mod engine;
