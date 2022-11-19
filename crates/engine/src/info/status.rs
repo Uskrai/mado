@@ -82,9 +82,7 @@ impl DownloadStatus {
 
     pub fn message(&self) -> Option<&str> {
         match self {
-            DownloadStatus::InProgress(DownloadProgressStatus::Error(err)) => {
-                Some(err.as_str())
-            }
+            DownloadStatus::InProgress(DownloadProgressStatus::Error(err)) => Some(err.as_str()),
             _ => None,
         }
     }
@@ -92,7 +90,60 @@ impl DownloadStatus {
     pub fn to_human_string(&self) -> String {
         match self.message() {
             Some(str) => format!("{}: {}", self.to_human_variant(), str),
-            None => self.to_human_variant().to_string()
+            None => self.to_human_variant().to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn message() {
+        macro_rules! assert {
+            ($name:ident  $(($nameparam:expr))?, $right: expr) => {
+                assert_eq!(DownloadStatus::$name( $($nameparam)? ).message(), $right);
+            };
+        }
+
+        assert!(waiting, None);
+        assert!(finished, None);
+        assert!(queued, None);
+        assert!(downloading, None);
+        assert!(paused, None);
+        assert!(error("Err"), Some("Err"));
+    }
+
+    #[test]
+    pub fn to_human_variant() {
+        macro_rules! assert {
+            ($name:ident  $(($nameparam:expr))?, $right: expr) => {
+                assert_eq!(DownloadStatus::$name( $($nameparam)? ).to_human_variant(), $right);
+            };
+        }
+
+        assert!(waiting, "Waiting");
+        assert!(finished, "Finished");
+        assert!(queued, "Queue");
+        assert!(downloading, "Downloading");
+        assert!(paused, "Paused");
+        assert!(error("Err"), "Error");
+    }
+
+    #[test]
+    pub fn to_human_string() {
+        macro_rules! assert {
+            ($name:ident  $(($nameparam:expr))?, $right: expr) => {
+                assert_eq!(DownloadStatus::$name( $($nameparam)? ).to_human_string(), $right);
+            };
+        }
+
+        assert!(waiting, "Waiting");
+        assert!(finished, "Finished");
+        assert!(queued, "Queue");
+        assert!(downloading, "Downloading");
+        assert!(paused, "Paused");
+        assert!(error("Err"), "Error: Err");
     }
 }
