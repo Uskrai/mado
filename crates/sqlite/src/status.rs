@@ -95,7 +95,7 @@ impl From<DownloadStatus> for mado_engine::DownloadStatus {
     fn from(v: DownloadStatus) -> Self {
         match v {
             DownloadStatus::Resumed => {
-                mado_engine::DownloadStatus::resumed(DownloadResumedStatus::Waiting)
+                mado_engine::DownloadStatus::resumed(DownloadResumedStatus::default())
             }
             DownloadStatus::Paused => mado_engine::DownloadStatus::paused(),
             DownloadStatus::Error(v) => mado_engine::DownloadStatus::error(v),
@@ -230,7 +230,7 @@ mod tests {
         );
 
         assert_eq!(
-            mado_engine::DownloadStatus::resumed(DownloadResumedStatus::Waiting),
+            mado_engine::DownloadStatus::resumed(Default::default()),
             DownloadStatus::Resumed.into(),
         );
         //
