@@ -29,7 +29,7 @@
     "@rollup/plugin-typescript": "^9.0.2",
     "@types/deep-equal": "^1.0.1",
     "@types/jsdom": "^20.0.1",
-    "@types/node": "^18.11.9",
+    "@types/node": "^18.11.10",
     "@types/object-inspect": "^1.8.1",
     "@types/xmldom": "^0.1.31",
     "chokidar": "^3.5.3",
