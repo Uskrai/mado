@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use gtk::prelude::*;
+use mado::engine::path::Utf8PathBuf;
 use mado::engine::DownloadInfo;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
@@ -19,6 +20,15 @@ pub enum DownloadMsg {
     ResumeSelected,
     MoveUp,
     MoveDown,
+    OpenMangaSelected,
+}
+
+#[derive(Debug)]
+pub enum DownloadOutputMsg {
+    OpenManga {
+        url: mado_core::Url,
+        path: Utf8PathBuf,
+    },
 }
 
 #[derive(Copy, Clone)]
@@ -90,7 +100,7 @@ impl DownloadModel {
             Down => down_selection,
         };
 
-        // check if 
+        // check if
         let is_first = |index: u32| check_contains(&bitset, index);
 
         for (index, it) in model.into_iter().enumerate() {
@@ -122,6 +132,47 @@ impl DownloadModel {
         let minimum: u32 = minimum.try_into().unwrap();
         selection.items_changed(minimum, count, count);
     }
+
+    pub fn open_manga_selected_static<F, O>(
+        selection: &gtk::MultiSelection,
+        list: &ListStore<DownloadItem>,
+        mut f: F,
+    ) -> Option<O>
+    where
+        F: FnMut(&DownloadItem) -> Option<O>,
+    {
+        let selected = selection.iter::<gtk::glib::Object>();
+
+        if let Ok(iter) = selected {
+            for it in iter {
+                let it = it.unwrap();
+
+                let it = match list.get_by_object(&it) {
+                    Some(it) => it,
+                    _ => continue,
+                };
+
+                if let Some(it) = f(&it) {
+                    return Some(it);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn open_manga_selected(&self) -> Option<DownloadOutputMsg> {
+        Self::open_manga_selected_static(&self.task_list.model().selection, &self.list, |it| {
+            let url = it.info().url().cloned()?;
+            let path = it.info().path().clone();
+
+            return Some(DownloadOutputMsg::OpenManga { url, path });
+        })
+    }
+
+    pub fn is_selected_only(&self, size: u64) -> bool {
+        self.task_list.model().selection.selection().size() == size
+    }
 }
 
 #[relm4::component(pub)]
@@ -132,7 +183,7 @@ impl SimpleComponent for DownloadModel {
     type Init = ();
 
     type Input = DownloadMsg;
-    type Output = ();
+    type Output = DownloadOutputMsg;
 
     fn init(
         _: Self::Init,
@@ -151,6 +202,23 @@ impl SimpleComponent for DownloadModel {
 
         let model = Self { list, task_list };
         let widgets = view_output!();
+
+        let open_manga = widgets.open_manga.clone();
+
+        let list = model.list.clone();
+        model
+            .task_list
+            .model()
+            .selection
+            .connect_selection_changed(move |selection, _, _| {
+                let is_sensitive = selection.selection().size() == 1
+                    && Self::open_manga_selected_static(selection, &list, |it| {
+                        Some(it.info().url().is_some())
+                    })
+                    .unwrap_or(false);
+
+                open_manga.set_sensitive(is_sensitive);
+            });
 
         ComponentParts { model, widgets }
     }
@@ -181,6 +249,11 @@ impl SimpleComponent for DownloadModel {
             }
             DownloadMsg::MoveDown => {
                 self.move_selected(DownloadMoveDirection::Down);
+            }
+            DownloadMsg::OpenMangaSelected => {
+                if let Some(msg) = self.open_manga_selected() {
+                    sender.output(msg);
+                }
             }
         }
     }
@@ -220,6 +293,16 @@ impl SimpleComponent for DownloadModel {
                     set_label: "Move Down",
                     connect_clicked[sender] => move |_| {
                         sender.input(DownloadMsg::MoveDown);
+                    }
+                },
+
+                #[name = "open_manga"]
+                append = &gtk::Button {
+                    set_label: "Open Manga",
+                    #[track(model.is_selected_only(1) == open_manga.is_sensitive())]
+                    set_sensitive: model.is_selected_only(1),
+                    connect_clicked[sender] => move |_| {
+                        sender.input(DownloadMsg::OpenMangaSelected);
                     }
                 }
             },

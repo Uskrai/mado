@@ -23,7 +23,16 @@ pub enum MangaInfoMsg {
     /// Get info from string
     /// string should be convertible to URL
     GetInfo(String),
-    Update(ArcMadoModule, Url, MangaAndChaptersInfo),
+    GetInfoWithPath {
+        url: String,
+        path: String,
+    },
+    Update {
+        module: ArcMadoModule,
+        url: Url,
+        path: Option<String>,
+        manga: MangaAndChaptersInfo,
+    },
     Clear,
 }
 
@@ -64,7 +73,12 @@ impl MangaInfoModel {
         }
     }
 
-    pub fn spawn_get_info(&mut self, sender: ComponentSender<Self>, url: String) {
+    pub fn spawn_get_info(
+        &mut self,
+        sender: ComponentSender<Self>,
+        url: String,
+        path: Option<String>,
+    ) {
         self.url = url.to_string();
 
         let url = url.trim();
@@ -90,7 +104,7 @@ impl MangaInfoModel {
 
         self.url = url.to_string();
 
-        let task = Self::get_info(module, url, sender);
+        let task = Self::get_info(module, url, path, sender);
 
         // reset current handle.
         // handle is automatically aborted when droped
@@ -129,12 +143,22 @@ impl MangaInfoModel {
         Some(request)
     }
 
-    pub async fn get_info(module: ArcMadoModule, url: Url, sender: relm4::ComponentSender<Self>) {
+    pub async fn get_info(
+        module: ArcMadoModule,
+        url: Url,
+        path: Option<String>,
+        sender: relm4::ComponentSender<Self>,
+    ) {
         let manga = module.get_info(url.clone()).await;
 
         match manga {
             Ok(manga) => {
-                sender.input(MangaInfoMsg::Update(module, url, manga));
+                sender.input(MangaInfoMsg::Update {
+                    module,
+                    url,
+                    path,
+                    manga,
+                });
             }
             Err(err) => {
                 sender.input(MangaInfoMsg::Error(err));
@@ -186,12 +210,23 @@ impl SimpleComponent for MangaInfoModel {
                 sender.output(MangaInfoOutput::DownloadRequest(request));
             }
             MangaInfoMsg::GetInfo(url) => {
-                self.spawn_get_info(sender, url);
+                self.spawn_get_info(sender, url, None);
             }
-            MangaInfoMsg::Update(module, url, manga) => {
+            MangaInfoMsg::GetInfoWithPath { url, path } => {
+                self.spawn_get_info(sender, url, Some(path));
+            }
+            MangaInfoMsg::Update {
+                module,
+                url,
+                path,
+                manga,
+            } => {
                 let manga = Arc::new(manga);
                 self.manga_info.replace((module, url, manga.clone()));
 
+                if let Some(path) = path {
+                    self.path = Utf8PathBuf::from(path);
+                }
                 for it in manga.chapters.iter() {
                     self.chapters.push(CheckChapterInfo::new(it.clone(), false));
                 }
