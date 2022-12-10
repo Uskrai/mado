@@ -9,6 +9,11 @@ export async function getInfo__Ok() {
   return await module.getInfo(url);
 }
 
+export async function getInfo__Ok__2() {
+  let url = "https://mangadex.org/title/99182618-ae92-4aec-a5df-518659b7b613/rebuild-world"
+  return await module.getInfo(url);
+}
+
 export async function getInfo__Err_MadoError_RequestError() {
   let url = "https://mangadex.org/title/5ebe4265-da26-4a3f-a2e4-56c4af489ce5";
 
