@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use deno_core::{op, Extension, ExtensionBuilder, OpState, serde_v8};
+use deno_core::{op, serde_v8, Extension, ExtensionBuilder, OpState};
 use thiserror::Error;
 
 use crate::{ResultJson, ToResultJson};
@@ -108,10 +108,10 @@ impl From<Error> for mado_core::Error {
             Error::UnexpectedError { url, message } => Self::RequestError { url, message },
             Error::RequestError { url, message } => Self::RequestError { url, message },
             Error::MadoError(err) => err,
-            Error::ExternalError(..)
-            | Error::ModuleLoadError(..)
-            | Error::ResourceError(..)
-            | Error::SerdeError(..) => Self::ExternalError(err.into()),
+            Error::ModuleLoadError(..) | Error::ResourceError(..) | Error::SerdeError(..) => {
+                Self::ExternalError(err.into())
+            }
+            Error::ExternalError(err) => Self::ExternalError(err),
         }
     }
 }

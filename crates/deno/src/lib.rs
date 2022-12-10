@@ -64,6 +64,7 @@ where
 {
     use anyhow::Context;
     use deno_core::serde_v8;
+    use tap::TapFallible;
     // using this give better information about path failing
     // #[cfg(debug_assertions)]
     let deserializer = serde_v8::from_v8::<serde_json::Value>(scope, value).unwrap();
@@ -75,7 +76,8 @@ where
 
     let deserializer = serde_path_to_error::Deserializer::new(deserializer, &mut track);
     T::deserialize(deserializer)
-        .with_context(|| anyhow::anyhow!("cannot deserialize at {:?}", track.path()))
+        .with_context(|| format!("cannot deserialize at {:?}", track.path()))
+        .tap_err(|e| tracing::error!("{:?}", e))
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
