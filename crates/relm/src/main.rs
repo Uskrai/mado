@@ -15,12 +15,14 @@ pub enum LoaderMsg {
         futures::channel::oneshot::Sender<Result<Vec<ArcMadoModule>, ModuleLoadError>>,
     ),
 }
-pub struct Loader(futures::channel::mpsc::Sender<LoaderMsg>);
+pub struct Loader {
+    root: Utf8PathBuf,
+    sender: futures::channel::mpsc::Sender<LoaderMsg>,
+}
 #[async_trait::async_trait]
 impl MadoModuleLoader for Loader {
     async fn get_paths(&self) -> Vec<Utf8PathBuf> {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../deno/dist/module");
-        let mut dir = tokio::fs::read_dir(dir).await.unwrap();
+        let mut dir = tokio::fs::read_dir(self.root.as_path()).await.unwrap();
 
         let mut paths = Vec::new();
         loop {
@@ -54,7 +56,7 @@ impl MadoModuleLoader for Loader {
     ) -> Result<Vec<mado::core::ArcMadoModule>, ModuleLoadError> {
         let (tx, rx) = futures::channel::oneshot::channel();
 
-        self.0
+        self.sender
             .clone()
             .send(LoaderMsg::Load(path, tx))
             .await
@@ -100,6 +102,10 @@ pub fn main() {
         .enable_all()
         .build()
         .unwrap();
+
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../deno/dist/module");
+    let dir = std::env::var("MADO_MODULE").unwrap_or_else(|_| dir.to_string());
+
     let _guard = runtime.enter();
 
     let db = mado_sqlite::Database::open("data.db").unwrap();
@@ -115,7 +121,10 @@ pub fn main() {
     let state = mado.state();
 
     let (loader_tx, mut loader_rx) = futures::channel::mpsc::channel(5);
-    let deno_loader = Loader(loader_tx);
+    let deno_loader = Loader {
+        root: Utf8PathBuf::from(dir),
+        sender: loader_tx,
+    };
 
     let handle = runtime.handle().clone();
 
