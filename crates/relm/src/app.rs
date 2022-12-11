@@ -1,6 +1,6 @@
 use crate::{
     download::{DownloadModel, DownloadMsg, DownloadOutputMsg},
-    manga_info::{MangaInfoModel, MangaInfoMsg, MangaInfoOutput},
+    manga_info::{MangaInfoModel, MangaInfoMsg, MangaInfoOutput, MangaInfoInit},
 };
 use gtk::prelude::*;
 use mado::engine::{DownloadRequest, MadoEngineState, MadoEngineStateMsg};
@@ -96,7 +96,10 @@ impl SimpleComponent for AppModel {
             .forward(sender.input_sender(), convert_downloads);
 
         let manga_info = MangaInfoModel::builder()
-            .launch(state.modules())
+            .launch(MangaInfoInit {
+                modules: state.modules(),
+                default_download_path: "downloads".into(),
+            })
             .forward(sender.input_sender(), convert_manga_list);
 
         let observer = RelmMadoEngineStateObserver::new(
@@ -202,7 +205,7 @@ mod tests {
     use super::*;
     use crate::tests::*;
 
-    fn state() -> MadoEngine{
+    fn state() -> MadoEngine {
         let map = DefaultMadoModuleMap::new();
         let map = MutexMadoModuleMap::new(map);
         let map = Arc::new(map);

@@ -7,10 +7,7 @@ use crate::list_model::ListModelBaseExt;
 use crate::list_store::ListStore;
 use crate::AbortOnDropHandle;
 use mado::core::{url::Url, ArcMadoModule, Error, MangaAndChaptersInfo};
-use mado::engine::{
-    path::{Utf8Path, Utf8PathBuf},
-    DownloadRequest, DownloadRequestStatus,
-};
+use mado::engine::{path::Utf8PathBuf, DownloadRequest, DownloadRequestStatus};
 
 use crate::chapter_list::{ChapterListModel, CheckChapterInfo};
 use relm4::{Component, ComponentController, ComponentParts, ComponentSender, SimpleComponent};
@@ -44,19 +41,38 @@ pub enum MangaInfoOutput {
 pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
     chapters: ListStore<CheckChapterInfo>,
+    download_path: relm4::Controller<DownloadPathModel>,
     chapter_list: relm4::Controller<ChapterListModel>,
     manga_info: Option<(ArcMadoModule, Url, Arc<MangaAndChaptersInfo>)>,
     url: String,
-    path: Utf8PathBuf,
+    default_download_path: Utf8PathBuf,
 
     current_handle: Option<AbortOnDropHandle<()>>,
 }
 
-impl MangaInfoModel {
-    pub fn path(&self) -> &Utf8Path {
-        &self.path
+#[derive(Clone, Debug)]
+pub enum DownloadPath {
+    FromGetInfo(String),
+    FromUser(String),
+}
+
+impl DownloadPath {
+    pub fn join(&self, v: &str) -> Utf8PathBuf {
+        match self {
+            DownloadPath::FromGetInfo(path) => Utf8PathBuf::from(path),
+            DownloadPath::FromUser(path) => Utf8PathBuf::from(path).join(v),
+        }
     }
 
+    pub fn as_str(&self) -> &str {
+        match self {
+            DownloadPath::FromGetInfo(v) => &v,
+            DownloadPath::FromUser(v) => &v,
+        }
+    }
+}
+
+impl MangaInfoModel {
     pub fn manga_and_chapters(&self) -> Option<&MangaAndChaptersInfo> {
         self.manga_info.as_ref().map(|it| it.2.as_ref())
     }
@@ -128,7 +144,11 @@ impl MangaInfoModel {
             return None;
         }
 
-        let path = self.path.join(&manga_info.manga.title);
+        let path = self
+            .download_path
+            .model()
+            .path
+            .join(&manga_info.manga.title);
 
         let request = DownloadRequest::new(
             module.clone(),
@@ -164,24 +184,54 @@ impl MangaInfoModel {
             }
         }
     }
+
+    pub fn set_download_path(&self, path: DownloadPath) {
+        self.download_path
+            .widgets()
+            .download_path
+            .set_text(path.as_str());
+        self.download_path
+            .sender()
+            .send(DownloadPathMsg::ChangeDownloadPath(path));
+    }
+
+    pub fn path(&self) -> DownloadPath {
+        self.download_path.model().path.clone()
+    }
+}
+
+pub struct MangaInfoInit {
+    pub modules: ArcMadoModuleMap,
+    pub default_download_path: Utf8PathBuf,
 }
 
 #[relm4::component(pub)]
-impl SimpleComponent for MangaInfoModel {
+impl Component for MangaInfoModel {
     type Widgets = MangaInfoWidgets;
-    type Init = ArcMadoModuleMap;
+    type Init = MangaInfoInit;
 
     type Output = MangaInfoOutput;
     type Input = MangaInfoMsg;
 
+    type CommandOutput = ();
+
     fn init(
-        modules: Self::Init,
+        init: Self::Init,
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let chapters = ListStore::default();
+        let Self::Init {
+            modules,
+            default_download_path,
+        } = init;
 
         let chapter_list = ChapterListModel::builder().launch(chapters.base()).detach();
+        let download_path = DownloadPathModel::builder()
+            .launch(default_download_path.to_string())
+            .forward(sender.input_sender(), |msg| match msg {
+                DownloadPathOutput::Download => MangaInfoMsg::Download,
+            });
 
         let model = Self {
             modules,
@@ -190,7 +240,8 @@ impl SimpleComponent for MangaInfoModel {
             current_handle: None,
             manga_info: None,
             url: "".to_string(),
-            path: Utf8PathBuf::from("downloads/"),
+            default_download_path,
+            download_path,
         };
 
         let widgets = view_output!();
@@ -221,14 +272,20 @@ impl SimpleComponent for MangaInfoModel {
                 self.manga_info.replace((module, url, manga.clone()));
 
                 if let Some(path) = path {
-                    self.path = Utf8PathBuf::from(path);
+                    let path = DownloadPath::FromGetInfo(path);
+                    self.set_download_path(path);
+                } else {
+                    if !matches!(self.download_path.model().path, DownloadPath::FromUser(..)) {
+                        let path = DownloadPath::FromUser(self.default_download_path.to_string());
+                        self.set_download_path(path);
+                    }
                 }
                 for it in manga.chapters.iter() {
                     self.chapters.push(CheckChapterInfo::new(it.clone(), false));
                 }
             }
             MangaInfoMsg::DownloadPathChanged(path) => {
-                self.path = path.into();
+                self.set_download_path(DownloadPath::FromUser(path));
             }
             MangaInfoMsg::Clear => {
                 self.chapters.clear();
@@ -263,7 +320,7 @@ impl SimpleComponent for MangaInfoModel {
                 append : enter_button = &gtk::Button {
                     set_label: "⏎",
                     connect_clicked[sender,url_entry] => move |_| {
-                        sender.input(MangaInfoMsg::GetInfo{ url: url_entry.text().to_string(), path: None })
+                        sender.input(MangaInfoMsg::GetInfo{ url: url_entry.text().to_string(), path: None });
                     }
                 }
             },
@@ -274,24 +331,75 @@ impl SimpleComponent for MangaInfoModel {
                 append: model.chapter_list.widget(),
             },
 
-            append = &gtk::Box {
-                set_orientation: gtk::Orientation::Horizontal,
+            append: model.download_path.widget(),
+        }
+    }
+}
 
-                append: download_path = &gtk::Entry {
-                    set_hexpand: true,
-                    set_placeholder_text: Some("Enter Download Path"),
-                    connect_changed[sender] => move |path| {
-                        sender.input(MangaInfoMsg::DownloadPathChanged(path.text().to_string()));
-                    }
-                },
+pub struct DownloadPathModel {
+    path: DownloadPath,
+}
 
-                append: download_button = &gtk::Button {
-                    set_label: "Download",
-                    connect_clicked[sender] => move |_| {
-                        sender.input(MangaInfoMsg::Download);
-                    }
+#[derive(Debug)]
+pub enum DownloadPathMsg {
+    ChangeDownloadPath(DownloadPath),
+}
+
+#[derive(Debug)]
+pub enum DownloadPathOutput {
+    Download,
+}
+
+#[relm4::component(pub)]
+impl SimpleComponent for DownloadPathModel {
+    type Widgets = DownloadPathWidget;
+    type Init = String;
+
+    type Output = DownloadPathOutput;
+    type Input = DownloadPathMsg;
+
+    fn init(
+        init: Self::Init,
+        root: &Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
+        let model = Self {
+            path: DownloadPath::FromUser(init),
+        };
+
+        let widgets = view_output!();
+
+        ComponentParts { model, widgets }
+    }
+
+    fn update(&mut self, message: Self::Input, _: ComponentSender<Self>) {
+        match message {
+            DownloadPathMsg::ChangeDownloadPath(string) => {
+                self.path = string;
+            }
+        }
+    }
+
+    view! {
+        #[root]
+        gtk::Box {
+            set_orientation: gtk::Orientation::Horizontal,
+
+            append: download_path = &gtk::Entry {
+                set_hexpand: true,
+                set_placeholder_text: Some("Enter Download Path"),
+                connect_changed[sender] => move |path| {
+                    let path = DownloadPath::FromUser(path.text().to_string());
+                    sender.input(DownloadPathMsg::ChangeDownloadPath(path));
                 }
             },
+
+            append: download_button = &gtk::Button {
+                set_label: "Download",
+                connect_clicked[sender] => move |_| {
+                    sender.output(DownloadPathOutput::Download);
+                }
+            }
         }
     }
 }
@@ -316,9 +424,14 @@ mod tests {
         let map = MutexMadoModuleMap::new(map);
         let map = Arc::new(map);
 
+        let default_download_path = Utf8PathBuf::from("downloads");
+
         let (tx, rx) = relm4::channel();
         let model = MangaInfoModel::builder()
-            .launch(map.clone())
+            .launch(MangaInfoInit {
+                modules: map.clone(),
+                default_download_path: default_download_path.clone(),
+            })
             .forward(&tx, |msg| msg);
 
         run_loop();
@@ -401,17 +514,18 @@ mod tests {
         let module: ArcMadoModule = Arc::new(module);
         map.push_mut(module.clone()).unwrap();
         {
-
             let path = Utf8PathBuf::from("download_path");
-            model.widgets().download_path.set_text(path.as_str());
+            model
+                .model()
+                .set_download_path(DownloadPath::FromUser(path.to_string()));
 
             run_loop();
-
-            assert_eq!(model.model().path(), path);
+            model.model().path();
+            assert_eq!(model.model().path().as_str(), path.as_str());
         }
 
+        // start of test Download
         {
-
             let path = Utf8PathBuf::from("set_path");
             model.emit(MangaInfoMsg::GetInfo {
                 url: get_info_link.to_string(),
@@ -430,7 +544,17 @@ mod tests {
 
             run_loop();
 
-            assert_eq!(model.model().path(), path);
+            assert_eq!(model.model().path().as_str(), path.as_str());
+            assert_eq!(
+                model
+                    .model()
+                    .download_path
+                    .widgets()
+                    .download_path
+                    .text()
+                    .as_str(),
+                model.model().path().as_str()
+            );
             assert!(Arc::ptr_eq(
                 &model.model().manga_and_chapters().unwrap().manga,
                 &info.manga
@@ -441,7 +565,12 @@ mod tests {
                 &info.chapters
             ));
 
-            model.widgets().download_button.emit_clicked();
+            model
+                .model()
+                .download_path
+                .widgets()
+                .download_button
+                .emit_clicked();
 
             run_loop();
 
@@ -449,7 +578,12 @@ mod tests {
                 info.set_active(true);
             });
 
-            model.widgets().download_button.emit_clicked();
+            model
+                .model()
+                .download_path
+                .widgets()
+                .download_button
+                .emit_clicked();
 
             run_loop();
 
@@ -458,13 +592,54 @@ mod tests {
                 _ => unreachable!(),
             };
 
-            assert_eq!(request.path(), path.join("test title"));
+            assert_eq!(request.path(), path);
             assert_eq!(request.url(), Some(&get_info_link));
             assert_eq!(request.chapters().len(), 1);
             assert_eq!(request.module().domain(), module.domain());
 
             run_loop();
+        }
+        // end of test Download
 
+        // test DownloadPath::FromUser join with title
+        {
+            model.emit(MangaInfoMsg::GetInfo {
+                url: get_info_link.to_string(),
+                path: None,
+            });
+            run_loop();
+
+            rt.block_on(rx_waiter_get_info.recv()).unwrap();
+
+            run_loop();
+
+            model.model().chapters.for_each(|info| {
+                info.set_active(true);
+            });
+
+            model
+                .model()
+                .download_path
+                .widgets()
+                .download_button
+                .emit_clicked();
+
+            run_loop();
+
+            let request = match rt.block_on(try_recv(&rx)).unwrap() {
+                MangaInfoOutput::DownloadRequest(request) => request,
+                _ => unreachable!(),
+            };
+
+            assert_eq!(request.path(), default_download_path.join("test title"));
+            assert_eq!(request.url(), Some(&get_info_link));
+            assert_eq!(request.chapters().len(), 1);
+            assert_eq!(request.module().domain(), module.domain());
+        }
+        // end of test DownloadPath::FromUser join with title
+
+        // start of test GetInfo Error
+        {
             model.emit(MangaInfoMsg::GetInfo {
                 url: get_info_error_link.to_string(),
                 path: None,
