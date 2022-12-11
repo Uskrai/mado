@@ -22,10 +22,9 @@ pub enum MangaInfoMsg {
     Error(mado::core::Error),
     /// Get info from string
     /// string should be convertible to URL
-    GetInfo(String),
-    GetInfoWithPath {
+    GetInfo {
         url: String,
-        path: String,
+        path: Option<String>,
     },
     Update {
         module: ArcMadoModule,
@@ -209,11 +208,8 @@ impl SimpleComponent for MangaInfoModel {
 
                 sender.output(MangaInfoOutput::DownloadRequest(request));
             }
-            MangaInfoMsg::GetInfo(url) => {
-                self.spawn_get_info(sender, url, None);
-            }
-            MangaInfoMsg::GetInfoWithPath { url, path } => {
-                self.spawn_get_info(sender, url, Some(path));
+            MangaInfoMsg::GetInfo { url, path } => {
+                self.spawn_get_info(sender, url, path);
             }
             MangaInfoMsg::Update {
                 module,
@@ -267,7 +263,7 @@ impl SimpleComponent for MangaInfoModel {
                 append : enter_button = &gtk::Button {
                     set_label: "⏎",
                     connect_clicked[sender,url_entry] => move |_| {
-                        sender.input(MangaInfoMsg::GetInfo(url_entry.text().to_string()))
+                        sender.input(MangaInfoMsg::GetInfo{ url: url_entry.text().to_string(), path: None })
                     }
                 }
             },
@@ -405,14 +401,22 @@ mod tests {
         let module: ArcMadoModule = Arc::new(module);
         map.push_mut(module.clone()).unwrap();
         {
+
             let path = Utf8PathBuf::from("download_path");
             model.widgets().download_path.set_text(path.as_str());
 
             run_loop();
 
             assert_eq!(model.model().path(), path);
+        }
 
-            model.emit(MangaInfoMsg::GetInfo(get_info_link.to_string()));
+        {
+
+            let path = Utf8PathBuf::from("set_path");
+            model.emit(MangaInfoMsg::GetInfo {
+                url: get_info_link.to_string(),
+                path: Some("set_path".to_string()),
+            });
 
             run_loop();
 
@@ -426,6 +430,7 @@ mod tests {
 
             run_loop();
 
+            assert_eq!(model.model().path(), path);
             assert!(Arc::ptr_eq(
                 &model.model().manga_and_chapters().unwrap().manga,
                 &info.manga
@@ -460,7 +465,10 @@ mod tests {
 
             run_loop();
 
-            model.emit(MangaInfoMsg::GetInfo(get_info_error_link.to_string()));
+            model.emit(MangaInfoMsg::GetInfo {
+                url: get_info_error_link.to_string(),
+                path: None,
+            });
 
             run_loop();
 

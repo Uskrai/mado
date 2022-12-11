@@ -325,7 +325,7 @@ impl DownloadModel {
 #[cfg(test)]
 mod tests {
     use mado::engine::LateBindingModule;
-    use mado_core::{DefaultMadoModuleMap, Uuid};
+    use mado_core::{DefaultMadoModuleMap, Url, Uuid};
 
     use super::*;
     use crate::tests::*;
@@ -497,5 +497,69 @@ mod tests {
         state.model.widgets().move_down_button.emit_clicked();
         run_loop();
         assert_eq!(collect_uuid(), [0, 1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[gtk::test]
+    pub fn open_manga_test() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+
+        let (tx, rx) = relm4::channel();
+        let model = DownloadModel::builder().launch(()).forward(&tx, |msg| msg);
+        let state = State::new(model);
+
+        state.create_info(5);
+        let module = LateBindingModule::WaitModule(
+            state.modulemap.clone(),
+            Uuid::from_u128(1.try_into().unwrap()),
+        );
+
+        let dl1 = Arc::new(
+            DownloadInfo::builder()
+                .url(Some(Url::parse("https://localhost/").unwrap()))
+                .path("path-1")
+                .order(1)
+                .module(module.clone())
+                .chapters(vec![])
+                .status(mado::engine::DownloadStatus::paused())
+                .build(),
+        );
+
+        let dl2 = Arc::new(
+            DownloadInfo::builder()
+                .url(Some(Url::parse("https://127.0.0.1").unwrap()))
+                .path("path-2")
+                .order(2)
+                .module(module)
+                .chapters(vec![])
+                .status(mado::engine::DownloadStatus::paused())
+                .build(),
+        );
+
+        state.model.emit(DownloadMsg::OpenMangaSelected);
+        run_loop();
+        rt.block_on(try_recv(&rx)).expect_err("should not exists");
+
+        state.emit_create(dl1.clone());
+        state.emit_create(dl2.clone());
+        run_loop();
+
+        state.selection().select_item(0, true);
+        run_loop();
+
+        state.model.emit(DownloadMsg::OpenMangaSelected);
+        run_loop();
+
+        let (url, path) = rt.block_on(async {
+            match try_recv(&rx).await.unwrap() {
+                DownloadOutputMsg::OpenManga { url, path } => (url, path),
+                // _ => unreachable!(),
+            }
+        });
+
+        assert_eq!(url.to_string(), "https://localhost/");
+        assert_eq!(path.to_string(), "path-1");
     }
 }

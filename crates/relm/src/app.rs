@@ -111,7 +111,7 @@ impl SimpleComponent for AppModel {
             manga_info,
 
             root: root.clone(),
-            visible_child: "Download".to_string()
+            visible_child: "Download".to_string(),
         };
         let widgets = view_output!();
 
@@ -132,9 +132,9 @@ impl SimpleComponent for AppModel {
                 self.state.download_request(info);
             }
             AppMsg::OpenManga { url, path } => {
-                self.manga_info.emit(MangaInfoMsg::GetInfoWithPath {
+                self.manga_info.emit(MangaInfoMsg::GetInfo {
                     url: url.to_string(),
-                    path: path.to_string(),
+                    path: Some(path.to_string()),
                 });
                 self.visible_child = "Manga Info".to_string();
             }
@@ -202,14 +202,18 @@ mod tests {
     use super::*;
     use crate::tests::*;
 
-    #[gtk::test]
-    fn test_app() {
+    fn state() -> MadoEngine{
         let map = DefaultMadoModuleMap::new();
         let map = MutexMadoModuleMap::new(map);
         let map = Arc::new(map);
         let state = MadoEngineState::new(map, Default::default());
 
-        let mado = MadoEngine::new(state);
+        MadoEngine::new(state)
+    }
+
+    #[gtk::test]
+    fn test_app() {
+        let mado = state();
         let app = AppModel::builder().launch(mado.state()).detach();
 
         let mut module = mado_core::MockMadoModule::new();
@@ -233,5 +237,18 @@ mod tests {
         run_loop();
 
         assert_eq!(app.model().downloads.model().task_len(), 1);
+    }
+
+    #[gtk::test]
+    fn test_open_manga() {
+        let mado = state();
+        let app = AppModel::builder().launch(mado.state()).detach();
+
+        let url = Url::parse("https://localhost").unwrap();
+        let path = Utf8PathBuf::from("path");
+        app.emit(AppMsg::OpenManga { url, path });
+        run_loop();
+
+        assert_eq!(app.model().visible_child, "Manga Info");
     }
 }
