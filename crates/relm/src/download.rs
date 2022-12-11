@@ -142,10 +142,15 @@ impl DownloadModel {
         F: FnMut(&DownloadItem) -> Option<O>,
     {
         let selected = selection.iter::<gtk::glib::Object>();
+        let bitset = selection.selection();
 
         if let Ok(iter) = selected {
-            for it in iter {
+            for (index, it) in iter.enumerate() {
                 let it = it.unwrap();
+
+                if !bitset.contains(index as u32) {
+                    continue;
+                }
 
                 let it = match list.get_by_object(&it) {
                     Some(it) => it,
@@ -546,7 +551,7 @@ mod tests {
         state.emit_create(dl2.clone());
         run_loop();
 
-        state.selection().select_item(0, true);
+        state.selection().select_item(1, true);
         run_loop();
 
         state.model.emit(DownloadMsg::OpenMangaSelected);
@@ -559,7 +564,7 @@ mod tests {
             }
         });
 
-        assert_eq!(url.to_string(), "https://localhost/");
-        assert_eq!(path.to_string(), "path-1");
+        assert_eq!(url.to_string(), "https://127.0.0.1/");
+        assert_eq!(path.to_string(), "path-2");
     }
 }
