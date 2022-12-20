@@ -116,20 +116,32 @@ impl ChapterInfo {
             ($fmt:literal, $name:ident) => {
                 if let Some(val) = &self.$name {
                     write!(f, $fmt, val)?;
+                    true
+                } else {
+                    false
                 }
             };
         }
 
         write_if!("Vol. {} ", volume);
-        write_if!("Chapter {} ", chapter);
-        if (self.volume.is_some() || self.chapter.is_some()) && self.title.is_some() {
-            write!(f, ": ")?;
+        write_if!("Chapter {}", chapter);
+
+        fn is_not_empty(string: &Option<String>) -> bool {
+            match string {
+                Some(it) => !it.is_empty(),
+                None => false
+            }
         }
-        write_if!("{} ", title);
+
+        if (is_not_empty(&self.volume) || is_not_empty(&self.chapter)) && is_not_empty(&self.title) {
+            write!(f, ":")?;
+        }
+        write_if!(" {}", title);
+
         if !self.scanlator.is_empty() {
-            write!(f, "[{}]", self.scanlator.join(","))?;
+            write!(f, " [{}]", self.scanlator.join(", "))?;
         }
-        write!(f, "[{}]", self.language)?;
+        write!(f, " [{}]", self.language)?;
 
         Ok(())
         //
