@@ -134,7 +134,7 @@ impl ChapterInfo {
         }
 
         if (is_not_empty(&self.volume) || is_not_empty(&self.chapter)) && is_not_empty(&self.title) {
-            write!(f, ":")?;
+            write!(f, " -")?;
         }
         write_if!(" {}", title);
 
