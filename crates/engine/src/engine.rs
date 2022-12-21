@@ -91,9 +91,10 @@ impl MadoEngine {
         &self,
         info: Arc<crate::DownloadInfo>,
     ) -> impl std::future::Future<Output = impl Send> + Send + 'static {
+        let state = self.state();
         async move {
             loop {
-                let task = crate::TaskDownloader::new(info.clone());
+                let task = crate::TaskDownloader::new(info.clone(), state.option());
                 let it = std::panic::AssertUnwindSafe(task.run())
                     .catch_unwind()
                     .await;

@@ -15,11 +15,12 @@ pub use super::*;
 
 pub struct TaskDownloader {
     info: Arc<crate::DownloadInfo>,
+    option: DownloadOption,
 }
 
 impl TaskDownloader {
-    pub fn new(info: Arc<crate::DownloadInfo>) -> Self {
-        Self { info }
+    pub fn new(info: Arc<crate::DownloadInfo>, option: DownloadOption) -> Self {
+        Self { info, option }
     }
 
     pub async fn run(self) {
@@ -93,6 +94,7 @@ impl TaskDownloader {
     ) -> impl futures::Stream<Item = Result<Arc<DownloadChapterImageInfo>, mado_core::Error>> + 'static
     {
         let module = self.info.wait_module().await;
+        let option = self.option.clone();
 
         let (image_tx, image_rx) = chapter_task_channel();
 
@@ -109,7 +111,7 @@ impl TaskDownloader {
         let mut stream = image_rx.enumerate().map(move |(i, image)| {
             let i = i + 1;
             let filename = format!("{:0>4}.{}", i, image.extension);
-            let path = it.path().join(filename);
+            let path = it.path().join(option.sanitize_filename(&filename));
 
             let image = DownloadChapterImageInfo::new(image, path, it.status().clone());
             Ok(Arc::new(image))
@@ -311,7 +313,7 @@ mod tests {
         );
 
         futures::executor::block_on(async {
-            let downloader = TaskDownloader::new(info.clone());
+            let downloader = TaskDownloader::new(info.clone(), Default::default());
 
             let status = DownloadInfoWatcher::connect(info.clone());
 
@@ -381,7 +383,7 @@ mod tests {
                 .build(),
         );
 
-        let downloader = TaskDownloader::new(info);
+        let downloader = TaskDownloader::new(info, Default::default());
 
         futures::executor::block_on(async {
             let mut it = downloader.get_chapter_images(chapter).await.enumerate();

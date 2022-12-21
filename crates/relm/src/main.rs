@@ -114,7 +114,7 @@ pub fn main() {
     let map = Arc::new(MutexMadoModuleMap::new(DefaultMadoModuleMap::new()));
     let downloads = channel.load_connect(map.clone()).unwrap();
 
-    let state = MadoEngineState::new(map, downloads);
+    let state = MadoEngineState::new(map, downloads, Default::default());
     channel.connect_only(&state);
 
     let mado = MadoEngine::new(state);

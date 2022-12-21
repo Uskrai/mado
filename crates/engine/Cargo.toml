@@ -19,6 +19,7 @@ parking_lot = "0.12"
 camino = "1.0"
 slab = "0.4.7"
 typed-builder = "0.11.0"
+sanitize-filename = "0.4"
 
 [dependencies.tokio]
 version = "1"

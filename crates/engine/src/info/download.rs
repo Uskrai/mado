@@ -2,7 +2,7 @@ use crate::{
     core::{ChapterInfo, MangaInfo, Url, Uuid},
     path::Utf8PathBuf,
     ArcMadoModule, DownloadChapterInfo, DownloadProgressStatus, DownloadResumedStatus,
-    DownloadStatus, LateBindingModule, ModuleInfo, ObserverHandle, Observers,
+    DownloadStatus, LateBindingModule, ModuleInfo, ObserverHandle, Observers, DownloadOption,
 };
 use parking_lot::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -66,7 +66,7 @@ impl DownloadInfo {
         }
     }
 
-    pub fn from_request(order: usize, request: DownloadRequest) -> Self {
+    pub fn from_request(order: usize, request: DownloadRequest, option: DownloadOption) -> Self {
         let DownloadRequest {
             module,
             manga,
@@ -80,7 +80,7 @@ impl DownloadInfo {
             .into_iter()
             .map(|it| {
                 let title = it.to_string();
-                let path = path.join(&title);
+                let path = path.join(&option.sanitize_filename(&title));
                 DownloadChapterInfo::new(
                     LateBindingModule::Module(module.clone()),
                     it.id.clone(),
@@ -366,6 +366,7 @@ mod tests {
                 Some(url.clone()),
                 DownloadRequestStatus::Resume,
             ),
+            Default::default()
         );
 
         assert_eq!(download.url(), Some(&url));

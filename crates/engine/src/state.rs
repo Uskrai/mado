@@ -5,7 +5,7 @@ use mado_core::{
 };
 use parking_lot::{RwLock, RwLockReadGuard};
 
-use crate::{DownloadInfo, DownloadRequest, Observers};
+use crate::{DownloadInfo, DownloadRequest, Observers, DownloadOption};
 
 #[derive(Default)]
 pub struct DownloadTaskList {
@@ -45,6 +45,7 @@ pub struct MadoEngineState {
     modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
     tasks: RwLock<DownloadTaskList>,
     observers: Observers<BoxObserver>,
+    option: DownloadOption,
 }
 
 macro_rules! ImplObserver {
@@ -64,6 +65,7 @@ impl MadoEngineState {
     pub fn new(
         modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
         tasks: DownloadTaskList,
+        option: DownloadOption,
     ) -> Self {
         let tasks = RwLock::new(tasks);
 
@@ -71,6 +73,7 @@ impl MadoEngineState {
             modules,
             tasks,
             observers: Default::default(),
+            option
         }
     }
     pub fn modules(&self) -> ArcMadoModuleMap {
@@ -83,9 +86,13 @@ impl MadoEngineState {
         Ok(())
     }
 
+    pub fn option(&self) -> DownloadOption {
+        self.option.clone()
+    }
+
     pub fn download_request(&self, request: DownloadRequest) {
         let mut tasks = self.tasks.write();
-        let info = Arc::new(DownloadInfo::from_request(tasks.max_order + 1, request));
+        let info = Arc::new(DownloadInfo::from_request(tasks.max_order + 1, request, self.option()));
         tasks.push(info.clone());
 
         self.observers
@@ -135,7 +142,7 @@ mod tests {
 
     #[test]
     fn connect_test() {
-        let state = MadoEngineState::new(Default::default(), Default::default());
+        let state = MadoEngineState::new(Default::default(), Default::default(), Default::default());
         assert!(state.tasks().is_empty());
 
         state

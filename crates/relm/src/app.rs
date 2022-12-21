@@ -98,6 +98,7 @@ impl SimpleComponent for AppModel {
         let manga_info = MangaInfoModel::builder()
             .launch(MangaInfoInit {
                 modules: state.modules(),
+                option: state.option(),
                 default_download_path: "downloads".into(),
             })
             .forward(sender.input_sender(), convert_manga_list);
@@ -209,7 +210,7 @@ mod tests {
         let map = DefaultMadoModuleMap::new();
         let map = MutexMadoModuleMap::new(map);
         let map = Arc::new(map);
-        let state = MadoEngineState::new(map, Default::default());
+        let state = MadoEngineState::new(map, Default::default(), Default::default());
 
         MadoEngine::new(state)
     }

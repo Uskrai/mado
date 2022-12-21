@@ -1,6 +1,7 @@
 use mado::core::ArcMadoModuleMap;
 
 use gtk::prelude::*;
+use mado::engine::DownloadOption;
 use std::sync::Arc;
 
 use crate::list_model::ListModelBaseExt;
@@ -40,6 +41,7 @@ pub enum MangaInfoOutput {
 
 pub struct MangaInfoModel {
     modules: ArcMadoModuleMap,
+    option: DownloadOption,
     chapters: ListStore<CheckChapterInfo>,
     download_path: relm4::Controller<DownloadPathModel>,
     chapter_list: relm4::Controller<ChapterListModel>,
@@ -57,10 +59,12 @@ pub enum DownloadPath {
 }
 
 impl DownloadPath {
-    pub fn join(&self, v: &str) -> Utf8PathBuf {
+    pub fn join(&self, v: &str, option: &DownloadOption) -> Utf8PathBuf {
         match self {
             DownloadPath::FromGetInfo(path) => Utf8PathBuf::from(path),
-            DownloadPath::FromUser(path) => Utf8PathBuf::from(path).join(v),
+            DownloadPath::FromUser(path) => {
+                Utf8PathBuf::from(path).join(option.sanitize_filename(v))
+            }
         }
     }
 
@@ -148,7 +152,7 @@ impl MangaInfoModel {
             .download_path
             .model()
             .path
-            .join(&manga_info.manga.title);
+            .join(&manga_info.manga.title, &self.option);
 
         let request = DownloadRequest::new(
             module.clone(),
@@ -203,6 +207,7 @@ impl MangaInfoModel {
 pub struct MangaInfoInit {
     pub modules: ArcMadoModuleMap,
     pub default_download_path: Utf8PathBuf,
+    pub option: DownloadOption,
 }
 
 #[relm4::component(pub)]
@@ -224,6 +229,7 @@ impl Component for MangaInfoModel {
         let Self::Init {
             modules,
             default_download_path,
+            option,
         } = init;
 
         let chapter_list = ChapterListModel::builder().launch(chapters.base()).detach();
@@ -235,6 +241,7 @@ impl Component for MangaInfoModel {
 
         let model = Self {
             modules,
+            option,
             chapters,
             chapter_list,
             current_handle: None,
@@ -431,6 +438,7 @@ mod tests {
             .launch(MangaInfoInit {
                 modules: map.clone(),
                 default_download_path: default_download_path.clone(),
+                option: Default::default(),
             })
             .forward(&tx, |msg| msg);
 
