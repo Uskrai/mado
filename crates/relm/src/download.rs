@@ -257,7 +257,7 @@ impl SimpleComponent for DownloadModel {
             }
             DownloadMsg::OpenMangaSelected => {
                 if let Some(msg) = self.open_manga_selected() {
-                    sender.output(msg);
+                    sender.output(msg).ok();
                 }
             }
         }

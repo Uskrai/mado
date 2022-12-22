@@ -1,6 +1,6 @@
 use crate::{
     download::{DownloadModel, DownloadMsg, DownloadOutputMsg},
-    manga_info::{MangaInfoModel, MangaInfoMsg, MangaInfoOutput, MangaInfoInit},
+    manga_info::{MangaInfoInit, MangaInfoModel, MangaInfoMsg, MangaInfoOutput},
 };
 use gtk::prelude::*;
 use mado::engine::{DownloadRequest, MadoEngineState, MadoEngineStateMsg};
@@ -49,11 +49,13 @@ impl RelmMadoEngineStateObserver {
     pub fn connect(self, state: &Arc<MadoEngineState>) {
         state.connect(move |msg| {
             match msg {
-                MadoEngineStateMsg::Download(info) => self
-                    .download_sender
-                    .send(DownloadMsg::CreateDownloadView(info.clone())),
+                MadoEngineStateMsg::Download(info) => {
+                    self.download_sender
+                        .send(DownloadMsg::CreateDownloadView(info.clone()))
+                        .ok();
+                }
                 MadoEngineStateMsg::PushModule(module) => {
-                    self.sender.send(AppMsg::PushModule(module.clone()))
+                    self.sender.send(AppMsg::PushModule(module.clone())).ok();
                 }
             };
         });

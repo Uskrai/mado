@@ -196,7 +196,8 @@ impl MangaInfoModel {
             .set_text(path.as_str());
         self.download_path
             .sender()
-            .send(DownloadPathMsg::ChangeDownloadPath(path));
+            .send(DownloadPathMsg::ChangeDownloadPath(path))
+            .ok();
     }
 
     pub fn path(&self) -> DownloadPath {
@@ -256,7 +257,7 @@ impl Component for MangaInfoModel {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _: &Self::Root) {
         match msg {
             MangaInfoMsg::Download => {
                 let request = match self.create_download_request() {
@@ -264,7 +265,9 @@ impl Component for MangaInfoModel {
                     None => return,
                 };
 
-                sender.output(MangaInfoOutput::DownloadRequest(request));
+                sender
+                    .output(MangaInfoOutput::DownloadRequest(request))
+                    .ok();
             }
             MangaInfoMsg::GetInfo { url, path } => {
                 self.spawn_get_info(sender, url, path);
@@ -300,7 +303,7 @@ impl Component for MangaInfoModel {
             }
 
             MangaInfoMsg::Error(error) => {
-                sender.output(MangaInfoOutput::Error(error));
+                sender.output(MangaInfoOutput::Error(error)).ok();
             }
         }
     }
@@ -404,7 +407,7 @@ impl SimpleComponent for DownloadPathModel {
             append: download_button = &gtk::Button {
                 set_label: "Download",
                 connect_clicked[sender] => move |_| {
-                    sender.output(DownloadPathOutput::Download);
+                    sender.output(DownloadPathOutput::Download).ok();
                 }
             }
         }
