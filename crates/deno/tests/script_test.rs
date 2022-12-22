@@ -1,4 +1,10 @@
-use std::{any::type_name, cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+use std::{
+    any::type_name,
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    rc::Rc,
+};
 
 use deno_core::{
     serde_v8,
@@ -7,6 +13,7 @@ use deno_core::{
 use mado_deno::Runtime;
 use serde::de::DeserializeOwned;
 use tokio::task::LocalSet;
+use tracing_subscriber::{util::SubscriberInitExt, EnvFilter};
 
 #[test]
 pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,6 +21,11 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         .enable_all()
         .build()
         .unwrap();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .finish()
+        .init();
 
     let local_set = LocalSet::new();
     let _local_set_guard = local_set.enter();
@@ -67,6 +79,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| panic!("{}", format!("{} is not valid pattern", pattern)));
 
     let errors = Rc::new(RefCell::new(vec![]));
+    let notfinished = Rc::new(RefCell::new(HashSet::<Name>::new()));
 
     for (index, path) in module_to_path.iter() {
         let namespace = runtime
@@ -108,6 +121,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
                 let name = split_to_name();
 
                 if pattern.is_match(&name.to_string()) {
+                    notfinished.borrow_mut().insert(name.clone());
                     let value = Local::<v8::Function>::try_from(
                         namespace.get(scope, name_v8.into()).unwrap(),
                     );
@@ -126,12 +140,25 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
                     let spawning = || {
                         let runtime = runtime.clone();
                         let errors = errors.clone();
+                        let notfinished = notfinished.clone();
                         async move {
-                            let result = test_function(runtime.clone(), name, value).await;
+                            tracing::debug!("running {name}");
+                            let result = tokio::time::timeout(
+                                std::time::Duration::from_secs(10),
+                                test_function(runtime.clone(), name.clone(), value),
+                            )
+                            .await
+                            .map_err(|it| anyhow::anyhow!(it))
+                            .and_then(|it| it);
+
+                            tracing::debug!("finished {name}");
 
                             if let Err(err) = result {
+                                tracing::trace!("error {name}: {}", err);
                                 errors.borrow_mut().push(err);
                             }
+
+                            notfinished.borrow_mut().remove(&name);
                         }
                     };
 
@@ -145,14 +172,33 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    local_set.block_on(&tokio, test_set);
-    local_set.block_on(&tokio, last_set);
-    local_set.block_on(
-        &tokio,
+    macro_rules! block {
+        ($name:ident) => {{
+            tracing::debug!("running {}", stringify!($name));
+            let result = local_set.block_on(&tokio, async move {
+                tokio::time::timeout(std::time::Duration::from_secs(10), $name).await
+            });
+
+            if let Err(err) = &result {
+                tracing::error!("{}", err);
+                tracing::error!("{:?}", notfinished);
+            }
+
+            result
+        }};
+    }
+
+    let _ = block!(test_set);
+    let _ = block!(last_set);
+
+    let stop_collecting = async {
         runtime
             .clone()
-            .with_event_loop(coverage_collector.stop_collecting()),
-    )?;
+            .with_event_loop(coverage_collector.stop_collecting())
+            .await
+    };
+
+    block!(stop_collecting)??;
 
     if errors.borrow().is_empty() {
         return Ok(());
@@ -189,7 +235,7 @@ impl std::fmt::Debug for ErrorWrapper {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Name {
     filename: String,
     testname: String,
@@ -239,6 +285,7 @@ async fn test_function(
         }
     };
 
+    tracing::debug!("resolving value {name}");
     let value = runtime.resolve_value(promise).await;
 
     let value = match value {
@@ -299,6 +346,7 @@ async fn test_function(
         };
     }
 
+    tracing::debug!("matching value {name}");
     match_first1! {
         it,
         "getInfo" = mado_core::MangaAndChaptersInfo

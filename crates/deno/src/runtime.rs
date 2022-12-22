@@ -176,6 +176,7 @@ impl Runtime {
         let mut options = deno_core::RuntimeOptions {
             module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
             extensions: crate::extensions(),
+            extensions_with_js: crate::extensions(),
             ..Default::default()
         };
 
@@ -471,11 +472,12 @@ fn build_function<'s>(
 }
 
 fn fn_catch_callback(
-    _: &mut v8::HandleScope,
+    scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
     mut rv: v8::ReturnValue,
 ) {
     let errors = args.get(0);
+    tracing::error!("{}", errors.to_rust_string_lossy(scope));
     rv.set(errors);
 }
 

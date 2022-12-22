@@ -1,6 +1,6 @@
 import { catchAndReturn} from "./error";
 import { HttpClient, HttpRequest } from "./http";
-import { ChapterTask, MangaAndChapters} from "./manga";
+import { ChapterImageInfo, ChapterTask, MangaAndChapters} from "./manga";
 import { RustChapterTask } from './rust_chapter_task';
 
 export interface Module {
@@ -40,8 +40,8 @@ export class ResultModule {
     return await this.getChapterImage(id, new RustChapterTask(task_rid));
   }
 
-  async downloadImage(info: object) {
-    return await catchAndReturn(() => this.module.downloadImage(info));
+  async downloadImage(image: ChapterImageInfo) {
+    return await catchAndReturn(() => this.module.downloadImage(image));
   }
 
   async close() {

@@ -16,14 +16,14 @@ serde = "1.0"
 serde_json = "1.0"
 serde_path_to_error = "0.1"
 
-deno_core = "0.158"
-deno_console = "0.76"
+deno_core = "0.164"
+deno_console = "0.82"
 
 event-listener = "2.5"
 
 waker-fn = "1.1"
 
-uuid = { version = "1.2", features = ["serde"] }
+uuid = { version = "1.0", features = ["serde"] }
 
 # don't forget to update rune-macros dependencies.
 # rune = "0.10"
@@ -35,12 +35,12 @@ thiserror = "1.0"
 
 url = "2.2"
 
-tokio = {version = "1.23", features = ["macros", "rt-multi-thread", "time", "sync"] }
+tokio = {version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
 futures = { version = "0.3"  }
 tracing = "0.1"
 tap = "1.0.1"
 
-regex = "1.7"
+regex = "1.6"
 
 [dependencies.mado-core]
 path = "../core"
@@ -48,7 +48,7 @@ features = ["mockall"]
 
 [dev-dependencies]
 mado-deno-coverage = { path = "../deno_coverage" }
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # [[test]]
 # name = "script"

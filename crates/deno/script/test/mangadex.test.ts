@@ -1,3 +1,4 @@
+import { Ok } from "../deps/error";
 import { RustChapterTask, RustModule } from "../deps/index";
 import { assertOk } from "../deps/test";
 import { initMadoModule } from "../module/mangadex";
@@ -53,4 +54,6 @@ export async function close() {
   for (let it of allmodule) {
     await it.close();
   }
+
+  return Ok({});
 }

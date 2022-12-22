@@ -49,7 +49,6 @@ pub fn extensions() -> Vec<deno_core::Extension> {
                 prefix "bootstrap",
                 "../script/bootstrap/00_bootstrap.js",
                 "../script/bootstrap/01_console.js",
-
             ))
             .build(),
     ]

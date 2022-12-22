@@ -1,6 +1,5 @@
 import { RustChapterTask, RustModule } from "../deps/index";
 import { assertEq, assertOk } from "../deps/test";
-import '../deps/index';
 import { initMadoModule } from "../module/manganato";
 import { Ok } from "../deps/error";
 
@@ -55,4 +54,5 @@ export async function close() {
   for (const it of allmodule) {
     await it.close();
   }
+  return Ok({});
 }
