@@ -48,17 +48,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-broadcast"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d26004fe83b2d1cd3a97609b21e39f9a31535822210fe83205d2ce48866ea61"
-dependencies = [
- "event-listener",
- "futures-core",
- "parking_lot",
-]
-
-[[package]]
 name = "async-channel"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1979,11 +1968,11 @@ checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 
 [[package]]
 name = "relm4"
-version = "0.5.0-beta.4"
+version = "0.5.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "691f7e54e0e008aed42522887fa634d5699cfaa11873d2090420717a76173613"
+checksum = "775146054bd0dd0e719b882efadeb5d7372e7fdeb69779b2e137937fc679d62c"
 dependencies = [
- "async-broadcast",
+ "async-trait",
  "flume",
  "fragile",
  "futures",
@@ -2008,9 +1997,9 @@ dependencies = [
 
 [[package]]
 name = "relm4-macros"
-version = "0.5.0-beta.4"
+version = "0.5.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c710756302235fd02a26b45ddb4db2ec5b4d6e10c3d687911b465ececf979d1f"
+checksum = "61467ebc57ae11ec196fc851e7f976d17b5ec29ed293db5cbc8a3781fb2b1f06"
 dependencies = [
  "proc-macro2",
  "quote",
