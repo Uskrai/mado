@@ -1,6 +1,8 @@
 mod image_downloader;
 mod info;
 mod observer;
+mod scheduler;
+mod watcher;
 pub use info::*;
 pub use observer::*;
 mod engine;
@@ -12,7 +14,8 @@ pub use image_downloader::{ImageDownloader, ImageDownloaderConfig};
 pub use task_downloader::TaskDownloader;
 
 mod state;
-pub use state::{MadoEngineState, MadoEngineStateMsg, DownloadTaskList};
+pub use scheduler::{TaskRunner, TaskScheduler, TaskSchedulerOption};
+pub use state::{DownloadTaskList, MadoEngineState, MadoEngineStateMsg};
 
 /// Error happen when Loading Module.
 #[derive(Debug, thiserror::Error)]

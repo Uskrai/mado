@@ -6,12 +6,48 @@ pub enum DownloadResumedStatus {
     Downloading,
 }
 
+impl DownloadResumedStatus {
+    /// Returns `true` if the download resumed status is [`Queue`].
+    ///
+    /// [`Queue`]: DownloadResumedStatus::Queue
+    #[must_use]
+    pub fn is_queue(&self) -> bool {
+        matches!(self, Self::Queue)
+    }
+
+    /// Returns `true` if the download resumed status is [`Waiting`].
+    ///
+    /// [`Waiting`]: DownloadResumedStatus::Waiting
+    #[must_use]
+    pub fn is_waiting(&self) -> bool {
+        matches!(self, Self::Waiting)
+    }
+
+    /// Returns `true` if the download resumed status is [`Downloading`].
+    ///
+    /// [`Downloading`]: DownloadResumedStatus::Downloading
+    #[must_use]
+    pub fn is_downloading(&self) -> bool {
+        matches!(self, Self::Downloading)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum DownloadProgressStatus {
     Resumed(DownloadResumedStatus),
     Paused,
     // we don't need StdError here because this is only used to shows to user
     Error(String),
+}
+
+impl DownloadProgressStatus {
+    pub fn as_resumed(&self) -> Option<&DownloadResumedStatus> {
+        if let Self::Resumed(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -23,6 +59,16 @@ pub enum DownloadStatus {
 impl DownloadStatus {
     pub fn is_resumed(&self) -> bool {
         matches!(self, Self::InProgress(DownloadProgressStatus::Resumed(..)))
+    }
+
+    pub fn is_downloading(&self) -> bool {
+        self.as_resumed()
+            .map(|it| it.is_downloading())
+            .unwrap_or(false)
+    }
+
+    pub fn is_queue(&self) -> bool {
+        self.as_resumed().map(|it| it.is_queue()).unwrap_or(false)
     }
 
     pub fn is_paused(&self) -> bool {
@@ -91,6 +137,18 @@ impl DownloadStatus {
         match self.message() {
             Some(str) => format!("{}: {}", self.to_human_variant(), str),
             None => self.to_human_variant().to_string(),
+        }
+    }
+
+    pub fn as_resumed(&self) -> Option<&DownloadResumedStatus> {
+        self.as_in_progress().and_then(|it| it.as_resumed())
+    }
+
+    pub fn as_in_progress(&self) -> Option<&DownloadProgressStatus> {
+        if let Self::InProgress(v) = self {
+            Some(v)
+        } else {
+            None
         }
     }
 }
