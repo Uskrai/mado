@@ -23,6 +23,7 @@ impl Default for Inner {
 struct SanitizeOptions {
     windows: bool,
     truncate: bool,
+    convert_to_unicode: bool,
     replacement: String,
 }
 
@@ -31,6 +32,7 @@ impl Default for SanitizeOptions {
         Self {
             windows: true,
             truncate: false,
+            convert_to_unicode: true,
             replacement: "_".to_string(),
         }
     }
@@ -39,11 +41,46 @@ impl Default for SanitizeOptions {
 #[derive(Debug, Default, Clone)]
 pub struct DownloadOption(Arc<Inner>);
 
+pub struct PatternReplace<'a>(&'a str, &'a str);
+
+fn replace_all(haystack: &str, p: &[PatternReplace]) -> String {
+    let pattern = p.iter().map(|it| it.0);
+
+    let ac = aho_corasick::AhoCorasick::new(pattern);
+
+    let mut result = String::new();
+
+    ac.replace_all_with(haystack, &mut result, |mat, _, dst| {
+        let replace = &p[mat.pattern()];
+        dst.push_str(replace.1);
+        true
+    });
+
+    result
+}
+
 impl DownloadOption {
     pub fn sanitize_filename(&self, name: &str) -> String {
-        let this = self.0.lock();
+        let option = &self.0.sanitize_option.lock();
 
-        let option = &this.sanitize_option;
+        let name = if option.convert_to_unicode {
+            replace_all(
+                name,
+                [
+                    PatternReplace("?", "？"),
+                    PatternReplace("/", "∕"),
+                    PatternReplace("\\", "⧵"),
+                    PatternReplace("<", "＜"),
+                    PatternReplace(">", "＞"),
+                    PatternReplace(":", "꞉"),
+                    PatternReplace("*", "⁎"),
+                ]
+                .as_slice(),
+            )
+        } else {
+            name.to_string()
+        };
+
         let option = sanitize_filename::Options {
             truncate: option.truncate,
             windows: option.windows,
