@@ -1,8 +1,9 @@
 use crate::{
     core::{ChapterInfo, MangaInfo, Url, Uuid},
     path::Utf8PathBuf,
-    ArcMadoModule, DownloadChapterInfo, DownloadProgressStatus, DownloadResumedStatus,
-    DownloadStatus, LateBindingModule, ModuleInfo, ObserverHandle, Observers, DownloadOption,
+    ArcMadoModule, DownloadChapterInfo, DownloadOption, DownloadProgressStatus,
+    DownloadResumedStatus, DownloadStatus, LateBindingModule, ModuleInfo, ObserverHandle,
+    Observers,
 };
 use parking_lot::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -40,7 +41,7 @@ pub struct DownloadInfo {
 
 pub enum DownloadInfoMsg<'a> {
     StatusChanged(&'a DownloadStatus),
-   OrderChanged(usize),
+    OrderChanged(usize),
 }
 
 impl DownloadInfo {
@@ -145,14 +146,16 @@ impl DownloadInfo {
         &self.chapters
     }
 
-   pub fn set_order(&self, order: usize) {
+    pub fn set_order(&self, order: usize) {
         self.order.store(order, atomic::Ordering::Relaxed);
         self.observers
             .emit(|it| it(DownloadInfoMsg::OrderChanged(order)));
     }
 
     /// Change download's status, then emit [`DownloadInfoObserver::on_status_changed`]
+    #[tracing::instrument]
     pub fn set_status(&self, status: DownloadStatus) {
+        tracing::trace!("setting status to {:?}", status);
         let mut lock = self.status.lock();
         *lock = status;
         self.observers
@@ -366,7 +369,7 @@ mod tests {
                 Some(url.clone()),
                 DownloadRequestStatus::Resume,
             ),
-            Default::default()
+            Default::default(),
         );
 
         assert_eq!(download.url(), Some(&url));

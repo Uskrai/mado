@@ -1,6 +1,6 @@
 use parking_lot::Mutex;
 
-use crate::{core::ChapterImageInfo, path::Utf8PathBuf, DownloadStatus, Observers, ObserverHandle};
+use crate::{core::ChapterImageInfo, path::Utf8PathBuf, DownloadStatus, ObserverHandle, Observers};
 #[derive(Debug)]
 pub struct DownloadChapterImageInfo {
     image: ChapterImageInfo,
@@ -67,7 +67,7 @@ impl DownloadChapterImageInfo {
 mod tests {
     use mockall::predicate;
 
-    use crate::{DownloadStatus, DownloadChapterImageInfo};
+    use crate::{DownloadChapterImageInfo, DownloadStatus};
 
     use super::DownloadChapterImageInfoMsg;
 
@@ -81,7 +81,9 @@ mod tests {
     impl MockThing {
         fn handle(&self, msg: DownloadChapterImageInfoMsg<'_>) {
             match msg {
-                DownloadChapterImageInfoMsg::StatusChanged(status) => self.on_status_changed(status),
+                DownloadChapterImageInfoMsg::StatusChanged(status) => {
+                    self.on_status_changed(status)
+                }
             }
         }
 

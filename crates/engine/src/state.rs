@@ -73,7 +73,7 @@ impl MadoEngineState {
             modules,
             tasks,
             observers: Default::default(),
-            option
+            option,
         }
     }
     pub fn modules(&self) -> ArcMadoModuleMap {
@@ -92,7 +92,11 @@ impl MadoEngineState {
 
     pub fn download_request(&self, request: DownloadRequest) {
         let mut tasks = self.tasks.write();
-        let info = Arc::new(DownloadInfo::from_request(tasks.max_order + 1, request, self.option()));
+        let info = Arc::new(DownloadInfo::from_request(
+            tasks.max_order + 1,
+            request,
+            self.option(),
+        ));
         tasks.push(info.clone());
 
         self.observers
@@ -142,7 +146,7 @@ mod tests {
 
     #[test]
     fn connect_test() {
-        let state = MadoEngineState::new(Default::default(), Default::default(), Default::default());
+        let state = MadoEngineState::default();
         assert!(state.tasks().is_empty());
 
         state
