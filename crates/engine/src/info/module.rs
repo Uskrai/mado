@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use futures::lock::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard};
 
@@ -10,7 +10,7 @@ pub enum LateBindingModule {
     WaitModule(ArcMadoModuleMap, Uuid),
 }
 
-const SLEEP_TIME_MILLIS: u64 = 100;
+pub const LATE_BINDING_MODULE_SLEEP_TIME: Duration = Duration::from_millis(100);
 
 impl std::fmt::Debug for LateBindingModule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -53,7 +53,7 @@ impl LateBindingModule {
                         break module;
                     }
 
-                    crate::timer::sleep(std::time::Duration::from_millis(SLEEP_TIME_MILLIS)).await;
+                    crate::timer::sleep(LATE_BINDING_MODULE_SLEEP_TIME).await;
                 };
 
                 *self = Self::Module(module.clone());
@@ -163,7 +163,11 @@ mod tests {
 
         futures::executor::block_on(async {
             crate::timer::timeout(
-                std::time::Duration::from_millis(SLEEP_TIME_MILLIS * 2),
+                std::time::Duration::from_millis(
+                    (LATE_BINDING_MODULE_SLEEP_TIME.as_millis() * 2)
+                        .try_into()
+                        .unwrap(),
+                ),
                 async {
                     wait_module.wait().await;
                     unreachable!();
