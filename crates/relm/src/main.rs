@@ -94,7 +94,11 @@ async fn handle_loader_msg(loader: &mut mado_deno::ModuleLoader, msg: LoaderMsg)
 
 pub fn main() {
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(
+            EnvFilter::from_default_env()
+                .add_directive("polling=error".parse().unwrap())
+                .add_directive("async_io=error".parse().unwrap()),
+        )
         .finish()
         .init();
 
