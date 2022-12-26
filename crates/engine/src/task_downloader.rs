@@ -37,20 +37,31 @@ impl TaskDownloader {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip_all,
+        fields(
+            chapter = %it.chapter_id()
+        )
+    )]
     async fn download_chapter(&self, it: Arc<DownloadChapterInfo>) -> Result<(), mado_core::Error> {
         if it.status().is_finished() {
             return Ok(());
         }
+        tracing::trace!("start downloading chapter");
 
         let (image_tx, mut image_rx) = mpsc::unbounded();
         let mut images = vec![];
         let get_images = self
             .get_chapter_images(it.clone())
             .await
-            .inspect(|image| {
-                if let Ok(image) = image {
+            .inspect(|image| match image {
+                Ok(image) => {
+                    tracing::trace!("pushing {:?}", image);
                     images.push(image.clone());
                     it.set_images(images.clone());
+                }
+                Err(err) => {
+                    tracing::error!("error downloading chapter: {:?}", err);
                 }
             })
             .forward(image_tx.sink_map_err(|err| mado_core::Error::ExternalError(err.into())));
@@ -108,6 +119,13 @@ impl TaskDownloader {
         })
     }
 
+    #[tracing::instrument(
+        skip_all
+        fields(
+            image = %download.image().id,
+            path = %download.path(),
+        )
+    )]
     pub async fn download_image(
         &self,
         download: Arc<DownloadChapterImageInfo>,
@@ -128,17 +146,17 @@ impl TaskDownloader {
         if !exists {
             let task = ImageDownloader::new(module.clone(), image.clone(), Config(retry, timeout));
 
-            tracing::trace!("Start downloading {} {:?}", path, image);
+            tracing::trace!("Start downloading {}", path);
 
             let buffer = task.download().await?;
 
-            tracing::trace!("Finished downloading {} {:?}", path, image);
+            tracing::trace!("Finished downloading {}", path);
 
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
 
-            let mut file = std::fs::File::create(path).unwrap();
+            let mut file = std::fs::File::create(path)?;
 
             file.write_all(&buffer)?;
             tracing::trace!("Finished writing to {}", path);

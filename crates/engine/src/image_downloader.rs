@@ -164,14 +164,6 @@ where
         }
     }
 
-    #[tracing::instrument(
-        level = "error",
-        skip_all,
-        fields(
-            self.image = %self.image.id,
-            self.module = %self.module.uuid()
-        )
-    )]
     pub async fn download(self) -> Result<C::Buffer, mado_core::Error> {
         do_while_err_or(
             || async {

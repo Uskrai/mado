@@ -5,9 +5,9 @@ use mado_core::{
 };
 use parking_lot::{RwLock, RwLockReadGuard};
 
-use crate::{DownloadInfo, DownloadRequest, Observers, DownloadOption};
+use crate::{DownloadInfo, DownloadOption, DownloadRequest, Observers};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DownloadTaskList {
     tasks: Vec<Arc<DownloadInfo>>,
     max_order: usize,
@@ -40,7 +40,7 @@ impl Index<usize> for DownloadTaskList {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MadoEngineState {
     modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
     tasks: RwLock<DownloadTaskList>,
