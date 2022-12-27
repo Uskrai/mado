@@ -92,6 +92,13 @@ async fn handle_loader_msg(loader: &mut mado_deno::ModuleLoader, msg: LoaderMsg)
     }
 }
 
+pub struct DisplayInstant(std::time::Instant);
+impl std::fmt::Debug for DisplayInstant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.elapsed().fmt(f)
+    }
+}
+
 pub fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -101,30 +108,35 @@ pub fn main() {
         )
         .finish()
         .init();
+    let time = DisplayInstant(std::time::Instant::now());
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../deno/dist/module");
-    let dir = std::env::var("MADO_MODULE").unwrap_or_else(|_| dir.to_string());
-
     let _guard = runtime.enter();
+    tracing::trace!("tokio runtime {time:?}");
 
     let db = mado_sqlite::Database::open("data.db").unwrap();
     let channel = mado_sqlite::channel(db);
+    tracing::trace!("sqlite {time:?}");
 
     let map = Arc::new(MutexMadoModuleMap::new(DefaultMadoModuleMap::new()));
     let downloads = channel.load_connect(map.clone()).unwrap();
+    tracing::trace!("downloads {time:?}");
 
     let state = MadoEngineState::new(map, downloads, Default::default());
     channel.connect_only(&state);
 
     let mado = MadoEngine::new(state);
     let state = mado.state();
+    tracing::trace!("state {time:?}");
 
     let (loader_tx, mut loader_rx) = futures::channel::mpsc::channel(5);
+
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../deno/dist/module");
+    let dir = std::env::var("MADO_MODULE").unwrap_or_else(|_| dir.to_string());
     let deno_loader = Loader {
         root: Utf8PathBuf::from(dir),
         sender: loader_tx,
@@ -152,6 +164,7 @@ pub fn main() {
 
     tokio::spawn(mado.load_module(deno_loader));
     tokio::spawn(mado.run());
+    tracing::trace!("engine run {time:?}");
 
     let _guard = scopeguard::guard(channel.sender(), |sender| {
         sender.send(mado_sqlite::DbMsg::Close).unwrap();
@@ -161,5 +174,6 @@ pub fn main() {
         channel.run().unwrap();
     });
 
+    tracing::trace!("running relm {time:?}");
     RelmApp::new("").run::<AppModel>(state);
 }
