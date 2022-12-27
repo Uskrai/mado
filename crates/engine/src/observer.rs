@@ -1,7 +1,7 @@
 use parking_lot::Mutex;
 use std::{
     fmt::Debug,
-    sync::{Arc, Weak},
+    sync::{atomic::AtomicBool, Arc, Weak},
 };
 
 type ObserverMap<T> = Mutex<slab::Slab<T>>;
@@ -36,7 +36,7 @@ impl<T> Observers<T> {
 
         ObserverHandle {
             observers: Arc::downgrade(&self.observers),
-            id: Arc::new(Mutex::new(Some(id))),
+            id: Arc::new(OptionAtomicUsize::new(id)),
         }
     }
 
@@ -48,8 +48,48 @@ impl<T> Observers<T> {
 }
 
 #[derive(Debug)]
+pub struct OptionAtomicUsize {
+    exists: AtomicBool,
+    id: usize,
+}
+
+impl OptionAtomicUsize {
+    pub fn new(id: usize) -> OptionAtomicUsize {
+        Self {
+            exists: AtomicBool::new(true),
+            id,
+        }
+    }
+
+    pub fn as_option(&self) -> Option<usize> {
+        if self.is_some() {
+            Some(self.id)
+        } else {
+            None
+        }
+    }
+
+    pub fn take(&self) -> Option<usize> {
+        if let Some(it) = self.as_option() {
+            self.exists.store(false, atomic::Ordering::Relaxed);
+            Some(it)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.exists.load(atomic::Ordering::Relaxed)
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
+}
+
+#[derive(Debug)]
 pub struct ObserverHandle<T> {
-    id: Arc<Mutex<Option<usize>>>,
+    id: Arc<OptionAtomicUsize>,
     observers: Weak<ObserverMap<T>>,
 }
 
@@ -64,14 +104,11 @@ impl<T> Clone for ObserverHandle<T> {
 
 impl<T> ObserverHandle<T> {
     pub fn disconnect(self) -> Option<T> {
-        self.id
-            .lock()
-            .take()
-            .and_then(|it| self.observers.disconnect(it))
+        self.id.take().and_then(|it| self.observers.disconnect(it))
     }
 
     pub fn is_disconnected(&self) -> bool {
-        self.id.lock().is_none()
+        self.id.as_option().is_none()
     }
 }
 
@@ -118,7 +155,7 @@ impl<T> TypedObserverMapTrait for Weak<ObserverMap<T>> {
 #[derive(Clone)]
 pub struct AnyObserverHandleSend {
     map: Arc<dyn ObserverMapTrait + Send + Sync>,
-    id: Arc<Mutex<Option<usize>>>,
+    id: Arc<OptionAtomicUsize>,
 }
 
 impl std::fmt::Debug for AnyObserverHandleSend {
@@ -131,12 +168,11 @@ impl std::fmt::Debug for AnyObserverHandleSend {
 
 impl AnyObserverHandleSend {
     pub fn is_disconnected(&self) -> bool {
-        self.id.lock().is_none()
+        self.id.is_none()
     }
 
     pub fn disconnect(self) -> bool {
         self.id
-            .lock()
             .take()
             .map(|it| self.map.disconnect_any(it))
             .unwrap_or(false)
@@ -193,5 +229,9 @@ mod tests {
     fn observer_debug() {
         let observer = Observers::<()>::new();
         assert_eq!(format!("{:?}", observer), "Observers");
+        assert_eq!(
+            format!("{:?}", observer.connect(()).send_handle_any()),
+            "AnyObserverHandleSend { id: OptionAtomicUsize { exists: true, id: 0 }, .. }"
+        );
     }
 }
