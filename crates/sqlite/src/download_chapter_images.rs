@@ -167,11 +167,13 @@ mod tests {
                 uuid: &Default::default(),
                 name: "Test Module",
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         crate::downloads::insert(
             &db,
             InsertDownload {
+                order: 0,
                 title: "title",
                 module_id: &module_id,
                 path: "path",

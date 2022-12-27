@@ -26,7 +26,7 @@ const NAME_REGEX = rx`
 `;
 
 class MangaNato implements HttpModule {
-  constructor(public uuid: string, public name: string, public domain: string, public client: HttpClient) {
+  constructor(public uuid: string, public name: string, public domain: string, public client: HttpClient, public reverseChapter: boolean) {
   }
 
   async getInfo(url: string): Promise<MangaAndChapters> {
@@ -46,6 +46,10 @@ class MangaNato implements HttpModule {
         '//ul[@class="row-content-chapter"]/li/a[contains(@class, "chapter-name")]'
       )
       .map((it) => this.parse_chapter(it));
+
+    if (this.reverseChapter) {
+      chapters.reverse();
+    }
 
     return {
       manga,
@@ -157,7 +161,7 @@ class MangaNato implements HttpModule {
   }
 
   async close() {
-    this.client.close();
+    await this.client.close();
   }
 }
 
@@ -167,6 +171,7 @@ export function initModule() {
     "Manganato",
     "https://chapmanganato.com",
     new RustHttpClient(),
+    true
   );
 
   let manganato = new ModuleWrapper(
@@ -184,18 +189,21 @@ export function initModule() {
       "MangaKakalot",
       "https://mangakakalot.com",
       new RustHttpClient(),
+      true,
     ),
     new MangaNato(
       "ed4175a390e74aedbe4b4f622f3767c6",
       "MangaKakalots",
       "https://mangakakalots.com",
       new RustHttpClient(),
+      true,
     ),
     new MangaNato(
       "2234588abb544fc6a279c7811f2a9733",
       "MangaBat",
       "https://m.mangabat.com",
       new RustHttpClient(),
+      true
     ),
   ];
 }

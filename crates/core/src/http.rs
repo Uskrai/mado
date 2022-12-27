@@ -86,6 +86,13 @@ impl Response {
         &self.url
     }
 
+    pub fn header_str(&self, name: &str) -> Option<&str> {
+        self.response
+            .headers()
+            .get(name)
+            .and_then(|it| it.to_str().ok())
+    }
+
     pub async fn text(mut self) -> Result<String, Error> {
         self.response.text().await.map_err(Into::into)
     }

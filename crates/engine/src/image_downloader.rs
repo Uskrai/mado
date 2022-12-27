@@ -118,6 +118,10 @@ where
     let mut total = 0;
 
     let response = request.send().await?;
+    let length = response
+        .header_str("Content-Length")
+        .map(|it| it.to_string());
+
     let mut stream = response.stream();
 
     loop {
@@ -132,9 +136,10 @@ where
 
         total += size;
         tracing::trace!(
-            "Writing {} bytes to buffer, total: {} bytes",
+            "Writing {} bytes to buffer, total: {}/{:?}",
             buf.len(),
-            total
+            total,
+            length
         );
 
         buffer.write_all(buf).await?;
@@ -159,14 +164,6 @@ where
         }
     }
 
-    #[tracing::instrument(
-        level = "error",
-        skip_all,
-        fields(
-            self.image = %self.image.id,
-            self.module = %self.module.uuid()
-        )
-    )]
     pub async fn download(self) -> Result<C::Buffer, mado_core::Error> {
         do_while_err_or(
             || async {

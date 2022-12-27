@@ -18,6 +18,11 @@ atomic = "0.5"
 parking_lot = "0.12"
 camino = "1.0"
 slab = "0.4.7"
+typed-builder = "0.11.0"
+by_address = "1.1.0"
+
+sanitize-filename = "0.4"
+aho-corasick = "0.7"
 
 [dependencies.tokio]
 version = "1"

@@ -46,7 +46,7 @@ impl SimpleComponent for TaskListModel {
         match msg {
             TaskListMsg::Setup(item) => {
                 if let Some(data) = self.tasks.get_by_object(&item.item().unwrap()) {
-                    let info = &data.info;
+                    let info = data.info().clone();
                     let view = DownloadView::from(info.as_ref());
                     let _ = DownloadViewController::connect(view.clone(), info.clone());
                     item.set_child(Some(&view.widget));

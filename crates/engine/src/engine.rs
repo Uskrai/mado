@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use futures::{channel::mpsc, FutureExt, StreamExt};
 
-use crate::{DownloadStatus, MadoEngineState, MadoEngineStateMsg, MadoModuleLoader};
+use crate::{
+    DownloadStatus, MadoEngineState, MadoEngineStateMsg, MadoModuleLoader,
+    {TaskRunner, TaskScheduler},
+};
 
 pub struct MadoEngine {
     state: Arc<MadoEngineState>,
@@ -33,16 +36,26 @@ impl MadoEngine {
     }
 
     pub async fn run(self) {
-        let rx = self.connect_state();
+        let mut rx = self.connect_state();
 
-        rx.for_each(|msg| async {
-            match msg {
-                MadoEngineMsg::Download(info) => {
-                    tokio::spawn(self.download(info));
+        let option = self.state().option().scheduler();
+        let (scheduler, runner) = TaskScheduler::connect(self.state.clone(), option);
+
+        let runner = Arc::new(runner);
+
+        let scheduler = scheduler.run();
+
+        let rx = async move {
+            while let Some(msg) = rx.next().await {
+                match msg {
+                    MadoEngineMsg::Download(info) => {
+                        tokio::spawn(self.download(runner.clone(), info));
+                    }
                 }
             }
-        })
-        .await;
+        };
+
+        let _ = futures::future::join(rx, scheduler).await;
     }
 
     pub fn connect_state(&self) -> mpsc::UnboundedReceiver<MadoEngineMsg> {
@@ -89,14 +102,18 @@ impl MadoEngine {
 
     fn download(
         &self,
+        scheduler: Arc<TaskRunner>,
         info: Arc<crate::DownloadInfo>,
     ) -> impl std::future::Future<Output = impl Send> + Send + 'static {
+        let state = self.state();
         async move {
             loop {
-                let task = crate::TaskDownloader::new(info.clone());
-                let it = std::panic::AssertUnwindSafe(task.run())
-                    .catch_unwind()
-                    .await;
+                let option = state.option();
+                let it = std::panic::AssertUnwindSafe(scheduler.run(info.clone(), |info| {
+                    crate::TaskDownloader::new(info.clone(), option.clone())
+                }))
+                .catch_unwind()
+                .await;
 
                 if let Err(e) = it {
                     if let Some(e) = e.downcast_ref::<&str>() {

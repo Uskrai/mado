@@ -100,7 +100,9 @@ impl DownloadChapterInfo {
 
     pub fn connect(&self, mut observer: ImplObserver!()) -> ObserverHandle<BoxObserver> {
         observer(DownloadChapterInfoMsg::StatusChanged(&self.status()));
-        observer(DownloadChapterInfoMsg::DownloadImagesChanged(&self.images()));
+        observer(DownloadChapterInfoMsg::DownloadImagesChanged(
+            &self.images(),
+        ));
 
         self.connect_only(observer)
     }

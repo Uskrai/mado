@@ -48,14 +48,14 @@ mod tests {
             vec.push(ch);
         }
 
-        Arc::new(DownloadInfo::new(
-            state.module.clone(),
-            "".to_string(),
-            vec,
-            Default::default(),
-            None,
-            mado_engine::DownloadStatus::paused(),
-        ))
+        Arc::new(
+            DownloadInfo::builder()
+                .order(0)
+                .module(state.module.clone())
+                .chapters(vec)
+                .status(mado_engine::DownloadStatus::paused())
+                .build(),
+        )
     }
 
     pub struct State {

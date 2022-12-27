@@ -1,10 +1,10 @@
 use crate::{
-    download::{DownloadModel, DownloadMsg},
-    manga_info::{MangaInfoModel, MangaInfoOutput},
+    download::{DownloadModel, DownloadMsg, DownloadOutputMsg},
+    manga_info::{MangaInfoInit, MangaInfoModel, MangaInfoMsg, MangaInfoOutput},
 };
 use gtk::prelude::*;
-use mado::core::ArcMadoModule;
 use mado::engine::{DownloadRequest, MadoEngineState, MadoEngineStateMsg};
+use mado::{core::ArcMadoModule, engine::path::Utf8PathBuf};
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent,
 };
@@ -14,6 +14,11 @@ use std::sync::Arc;
 pub enum AppMsg {
     PushModule(ArcMadoModule),
     DownloadRequest(DownloadRequest),
+    OpenManga {
+        url: mado_core::Url,
+        path: Utf8PathBuf,
+    },
+    ChangeVisibleChild(String),
     Error(mado::core::Error),
 }
 
@@ -24,6 +29,7 @@ pub struct AppModel {
     downloads: Controller<DownloadModel>,
     manga_info: Controller<MangaInfoModel>,
 
+    visible_child: String,
     root: gtk::ApplicationWindow,
 }
 
@@ -43,11 +49,13 @@ impl RelmMadoEngineStateObserver {
     pub fn connect(self, state: &Arc<MadoEngineState>) {
         state.connect(move |msg| {
             match msg {
-                MadoEngineStateMsg::Download(info) => self
-                    .download_sender
-                    .send(DownloadMsg::CreateDownloadView(info.clone())),
+                MadoEngineStateMsg::Download(info) => {
+                    self.download_sender
+                        .send(DownloadMsg::CreateDownloadView(info.clone()))
+                        .ok();
+                }
                 MadoEngineStateMsg::PushModule(module) => {
-                    self.sender.send(AppMsg::PushModule(module.clone()))
+                    self.sender.send(AppMsg::PushModule(module.clone())).ok();
                 }
             };
         });
@@ -63,6 +71,14 @@ pub fn convert_manga_list(msg: MangaInfoOutput) -> AppMsg {
     }
 }
 
+pub fn convert_downloads(msg: DownloadOutputMsg) -> AppMsg {
+    match msg {
+        DownloadOutputMsg::OpenManga { url, path } => AppMsg::OpenManga { url, path },
+    }
+}
+
+// pub fn convert_downloads(msg: )
+
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {
     type Widgets = AppWidgets;
@@ -77,10 +93,16 @@ impl SimpleComponent for AppModel {
         root: &Self::Root,
         sender: ComponentSender<Self>,
     ) -> relm4::ComponentParts<Self> {
-        let downloads = DownloadModel::builder().launch(()).detach();
+        let downloads = DownloadModel::builder()
+            .launch(())
+            .forward(sender.input_sender(), convert_downloads);
 
         let manga_info = MangaInfoModel::builder()
-            .launch(state.modules())
+            .launch(MangaInfoInit {
+                modules: state.modules(),
+                option: state.option(),
+                default_download_path: "downloads".into(),
+            })
             .forward(sender.input_sender(), convert_manga_list);
 
         let observer = RelmMadoEngineStateObserver::new(
@@ -95,6 +117,7 @@ impl SimpleComponent for AppModel {
             manga_info,
 
             root: root.clone(),
+            visible_child: "Download".to_string(),
         };
         let widgets = view_output!();
 
@@ -114,9 +137,20 @@ impl SimpleComponent for AppModel {
             AppMsg::DownloadRequest(info) => {
                 self.state.download_request(info);
             }
+            AppMsg::OpenManga { url, path } => {
+                self.manga_info.emit(MangaInfoMsg::GetInfo {
+                    url: url.to_string(),
+                    path: Some(path.to_string()),
+                });
+                self.visible_child = "Manga Info".to_string();
+            }
+            AppMsg::ChangeVisibleChild(string) => {
+                self.visible_child = string;
+            }
             AppMsg::Error(error) => {
+                let error = format!("{:#}", error);
                 gtk::MessageDialog::builder()
-                    .text(error.to_string().as_str())
+                    .text(&error)
                     .transient_for(&self.root)
                     .build()
                     .show();
@@ -150,7 +184,15 @@ impl SimpleComponent for AppModel {
                         set_orientation: gtk::Orientation::Vertical,
                         append: model.manga_info.widget()
                     },
-                    set_visible_child_name: "Download",
+
+                    #[track(Some(model.visible_child.as_str()) != stack.visible_child_name().as_ref().map(|it| it.as_str()))]
+                    set_visible_child_name: &model.visible_child,
+
+                    connect_visible_child_name_notify[sender] => move |stack| {
+                        if let Some(it) = stack.visible_child_name() {
+                            sender.input(AppMsg::ChangeVisibleChild(it.to_string()))
+                        }
+                    }
                 },
 
             }
@@ -161,24 +203,30 @@ impl SimpleComponent for AppModel {
 #[cfg(test)]
 mod tests {
     use mado::engine::MadoEngine;
-    use mado_core::{DefaultMadoModuleMap, MangaInfo, MutexMadoModuleMap, Uuid, Url};
+    use mado_core::{DefaultMadoModuleMap, MangaInfo, MutexMadoModuleMap, Url, Uuid};
 
     use super::*;
     use crate::tests::*;
 
-    #[gtk::test]
-    fn test_app() {
+    fn state() -> MadoEngine {
         let map = DefaultMadoModuleMap::new();
         let map = MutexMadoModuleMap::new(map);
         let map = Arc::new(map);
-        let state = MadoEngineState::new(map, vec![]);
+        let state = MadoEngineState::new(map, Default::default(), Default::default());
 
-        let mado = MadoEngine::new(state);
+        MadoEngine::new(state)
+    }
+
+    #[gtk::test]
+    fn test_app() {
+        let mado = state();
         let app = AppModel::builder().launch(mado.state()).detach();
 
         let mut module = mado_core::MockMadoModule::new();
         module.expect_uuid().return_const(Uuid::from_u128(1));
-        module.expect_domain().return_const(Url::parse("https://localhost").unwrap());
+        module
+            .expect_domain()
+            .return_const(Url::parse("https://localhost").unwrap());
 
         let module = Arc::new(module);
 
@@ -195,5 +243,18 @@ mod tests {
         run_loop();
 
         assert_eq!(app.model().downloads.model().task_len(), 1);
+    }
+
+    #[gtk::test]
+    fn test_open_manga() {
+        let mado = state();
+        let app = AppModel::builder().launch(mado.state()).detach();
+
+        let url = Url::parse("https://localhost").unwrap();
+        let path = Utf8PathBuf::from("path");
+        app.emit(AppMsg::OpenManga { url, path });
+        run_loop();
+
+        assert_eq!(app.model().visible_child, "Manga Info");
     }
 }

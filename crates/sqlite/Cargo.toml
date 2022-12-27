@@ -20,6 +20,6 @@ features = [
 
 [dev-dependencies]
 mado-core = { path = "../core", features = ["mockall"] }
-uuid = { version = "1.2", features = ["v4"]}
+uuid = { version = "1.0", features = ["v4"]}
 async-trait = "0.1"
 ntest = "0.9"

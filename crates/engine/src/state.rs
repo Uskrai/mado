@@ -1,17 +1,51 @@
-use std::sync::Arc;
+use std::{ops::Index, sync::Arc};
 
 use mado_core::{
     ArcMadoModule, ArcMadoModuleMap, DefaultMadoModuleMap, MutMadoModuleMap, MutexMadoModuleMap,
 };
 use parking_lot::{RwLock, RwLockReadGuard};
 
-use crate::{DownloadInfo, DownloadRequest, Observers};
+use crate::{DownloadInfo, DownloadOption, DownloadRequest, Observers};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
+pub struct DownloadTaskList {
+    tasks: Vec<Arc<DownloadInfo>>,
+    max_order: usize,
+}
+
+impl DownloadTaskList {
+    pub fn push(&mut self, value: Arc<DownloadInfo>) {
+        self.max_order = value.order().max(self.max_order);
+        self.tasks.push(value);
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<Arc<DownloadInfo>> {
+        self.tasks.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.tasks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tasks.is_empty()
+    }
+}
+
+impl Index<usize> for DownloadTaskList {
+    type Output = Arc<DownloadInfo>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.tasks.index(index)
+    }
+}
+
+#[derive(Default, Debug)]
 pub struct MadoEngineState {
     modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
-    tasks: RwLock<Vec<Arc<DownloadInfo>>>,
+    tasks: RwLock<DownloadTaskList>,
     observers: Observers<BoxObserver>,
+    option: DownloadOption,
 }
 
 macro_rules! ImplObserver {
@@ -30,7 +64,8 @@ pub enum MadoEngineStateMsg<'a> {
 impl MadoEngineState {
     pub fn new(
         modules: Arc<MutexMadoModuleMap<DefaultMadoModuleMap>>,
-        tasks: Vec<Arc<DownloadInfo>>,
+        tasks: DownloadTaskList,
+        option: DownloadOption,
     ) -> Self {
         let tasks = RwLock::new(tasks);
 
@@ -38,6 +73,7 @@ impl MadoEngineState {
             modules,
             tasks,
             observers: Default::default(),
+            option,
         }
     }
     pub fn modules(&self) -> ArcMadoModuleMap {
@@ -50,9 +86,19 @@ impl MadoEngineState {
         Ok(())
     }
 
+    pub fn option(&self) -> DownloadOption {
+        self.option.clone()
+    }
+
     pub fn download_request(&self, request: DownloadRequest) {
-        let info = Arc::new(DownloadInfo::from_request(request));
-        self.tasks.write().push(info.clone());
+        let mut tasks = self.tasks.write();
+        let info = Arc::new(DownloadInfo::from_request(
+            tasks.max_order + 1,
+            request,
+            self.option(),
+        ));
+        tasks.push(info.clone());
+
         self.observers
             .emit(move |it| it(MadoEngineStateMsg::Download(&info)));
     }
@@ -77,7 +123,7 @@ impl MadoEngineState {
         self.observers.connect(Box::new(observer))
     }
 
-    pub fn tasks(&self) -> RwLockReadGuard<'_, Vec<Arc<DownloadInfo>>> {
+    pub fn tasks(&self) -> RwLockReadGuard<'_, DownloadTaskList> {
         self.tasks.read()
     }
 }
@@ -100,7 +146,8 @@ mod tests {
 
     #[test]
     fn connect_test() {
-        let state = MadoEngineState::new(Default::default(), Vec::new());
+        let state = MadoEngineState::default();
+        assert!(state.tasks().is_empty());
 
         state
             .connect(|_| {

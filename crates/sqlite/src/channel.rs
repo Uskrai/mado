@@ -5,7 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use mado_engine::{
     core::{ArcMadoModule, ArcMadoModuleMap, Uuid},
     DownloadChapterImageInfo, DownloadChapterInfo, DownloadChapterInfoMsg, DownloadInfo,
-    MadoEngineState, MadoEngineStateMsg,
+    DownloadTaskList, MadoEngineState, MadoEngineStateMsg,
 };
 
 use crate::{
@@ -23,6 +23,7 @@ pub enum DbMsg {
     NewDownload(Arc<DownloadInfo>),
     PushModule(ArcMadoModule),
     DownloadStatusChanged(DownloadPK, DownloadStatus),
+    DownloadOrderChanged(DownloadPK, usize),
     DownloadChapterStatusChanged(DownloadChapterPK, DownloadStatus),
     DownloadChapterImagesChanged(DownloadChapterPK, Vec<Arc<DownloadChapterImageInfo>>),
     DownloadChapterImageStatusChanged(DownloadChapterImagePK, DownloadStatus),
@@ -119,6 +120,9 @@ impl Channel {
             DbMsg::DownloadStatusChanged(id, status) => {
                 self.db.update_download_status(id, status)?;
             }
+            DbMsg::DownloadOrderChanged(id, order) => {
+                self.db.update_download_order(id, order)?;
+            }
             DbMsg::DownloadChapterStatusChanged(pk, status) => {
                 self.db.update_download_chapter_status(pk, status)?;
             }
@@ -166,10 +170,10 @@ impl Channel {
     pub fn load_connect(
         &self,
         module_map: ArcMadoModuleMap,
-    ) -> Result<Vec<Arc<DownloadInfo>>, rusqlite::Error> {
+    ) -> Result<DownloadTaskList, rusqlite::Error> {
         let infos = self.db.load_download_info(module_map)?;
 
-        let mut vec = Vec::new();
+        let mut vec = DownloadTaskList::default();
         for it in infos {
             vec.push(it.info.clone());
             self.connect_info(it);
@@ -193,6 +197,9 @@ impl Channel {
                 mado_engine::DownloadInfoMsg::StatusChanged(status) => tx
                     .send(DbMsg::DownloadStatusChanged(dl_pk, status.into()))
                     .ok(),
+                mado_engine::DownloadInfoMsg::OrderChanged(order) => {
+                    tx.send(DbMsg::DownloadOrderChanged(dl_pk, order)).ok()
+                }
             };
         });
     }
@@ -362,6 +369,17 @@ mod tests {
 
             let status = it[0].download.status.clone();
             assert_eq!(status, DownloadStatus::Finished);
+        }
+
+        info.set_order(2);
+        rx.try_all().unwrap();
+
+        {
+            let it = rx.db.load_download().unwrap();
+            assert_eq!(it.len(), 1);
+
+            let order = it[0].download.order;
+            assert_eq!(order, 2);
         }
 
         info.chapters()[0].set_status(mado_engine::DownloadStatus::Finished);

@@ -12,9 +12,9 @@ use std::{
 use gtk::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ListIndex(usize);
+pub struct ListStoreIndex(usize);
 
-impl ListIndex {
+impl ListStoreIndex {
     pub fn as_usize(&self) -> usize {
         self.0
     }
@@ -23,7 +23,7 @@ impl ListIndex {
 #[derive(Debug)]
 struct Inner<T> {
     list: gtk::gio::ListStore,
-    map_index: RefCell<HashMap<ListIndex, u32>>,
+    map_index: RefCell<HashMap<ListStoreIndex, u32>>,
     container: RefCell<slab::Slab<T>>,
 }
 
@@ -83,7 +83,7 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 crate::gobject::struct_wrapper!(GUsize, Option<usize>, "MadoRelmUsize", usize_wrapper);
 use usize_wrapper::GUsize;
 
-fn to_object(value: &ListIndex) -> GUsize {
+fn to_object(value: &ListStoreIndex) -> GUsize {
     GUsize::to_gobject(Some(value.as_usize()))
 }
 
@@ -92,7 +92,11 @@ pub fn object_gusize(object: &gtk::glib::Object) -> Option<GUsize> {
 }
 
 impl<T: 'static> ListStore<T> {
-    fn container(&self) -> RefMut<slab::Slab<T>> {
+    pub fn container(&self) -> Ref<slab::Slab<T>> {
+        self.0.container.borrow()
+    }
+
+    fn container_mut(&self) -> RefMut<slab::Slab<T>> {
         self.0.container.borrow_mut()
     }
 
@@ -100,21 +104,25 @@ impl<T: 'static> ListStore<T> {
         &self.0.list
     }
 
-    fn map_index(&self) -> RefMut<HashMap<ListIndex, u32>> {
+    fn map_index(&self) -> Ref<HashMap<ListStoreIndex, u32>> {
+        self.0.map_index.borrow()
+    }
+
+    fn map_index_mut(&self) -> RefMut<HashMap<ListStoreIndex, u32>> {
         self.0.map_index.borrow_mut()
     }
 
-    pub fn push(&self, value: T) -> ListIndex {
-        let index = ListIndex(self.container().insert(value));
+    pub fn push(&self, value: T) -> ListStoreIndex {
+        let index = ListStoreIndex(self.container_mut().insert(value));
         let list_position = self.list().n_items();
         self.list().append(&to_object(&index));
-        self.map_index().insert(index.clone(), list_position);
+        self.map_index_mut().insert(index.clone(), list_position);
 
         index
     }
 
-    pub fn get(&self, &ListIndex(index): &ListIndex) -> Option<RefGuard<T>> {
-        let guard = self.0.container.borrow();
+    pub fn get(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<RefGuard<T>> {
+        let guard = self.container();
 
         guard
             .get(index)
@@ -122,8 +130,8 @@ impl<T: 'static> ListStore<T> {
             .map(|_| RefGuard { guard, index })
     }
 
-    pub fn get_mut(&self, &ListIndex(index): &ListIndex) -> Option<MutexGuard<T>> {
-        let guard = self.container();
+    pub fn get_mut(&self, &ListStoreIndex(index): &ListStoreIndex) -> Option<MutexGuard<T>> {
+        let guard = self.container_mut();
 
         guard
             .get(index)
@@ -131,17 +139,17 @@ impl<T: 'static> ListStore<T> {
             .map(|_| MutexGuard { guard, index })
     }
 
-    pub fn get_gobject(&self, index: &ListIndex) -> Option<gtk::glib::Object> {
+    pub fn get_gobject(&self, index: &ListStoreIndex) -> Option<gtk::glib::Object> {
         let guard = self.list();
         let map_index = self.map_index();
 
         map_index.get(index).and_then(|it| guard.item(*it))
     }
 
-    pub fn remove(&self, index: ListIndex) -> Option<T> {
-        let it = self.container().try_remove(index.as_usize())?;
+    pub fn remove(&self, index: ListStoreIndex) -> Option<T> {
+        let it = self.container_mut().try_remove(index.as_usize())?;
 
-        let apply = |list_position: u32, slab_position: &ListIndex, gusize: GUsize| {
+        let apply = |list_position: u32, slab_position: &ListStoreIndex, gusize: GUsize| {
             if *gusize.borrow() == Some(slab_position.as_usize()) {
                 *gusize.borrow_mut() = None;
                 self.list().items_changed(list_position, 1, 1);
@@ -151,17 +159,20 @@ impl<T: 'static> ListStore<T> {
             }
         };
 
-        let mut map_index = self.map_index();
-        if let Some(list_position) = map_index.get(&index).cloned() {
-            let it = self
-                .list()
-                .item(list_position)
-                .as_ref()
-                .and_then(object_gusize);
+        {
+            let list_position = { self.map_index().get(&index).cloned() };
 
-            if let Some(it) = it {
-                apply(list_position, &index, it);
-                map_index.remove(&index);
+            if let Some(list_position) = list_position {
+                let it = self
+                    .list()
+                    .item(list_position)
+                    .as_ref()
+                    .and_then(object_gusize);
+
+                if let Some(it) = it {
+                    apply(list_position, &index, it);
+                    self.map_index_mut().remove(&index);
+                }
             }
         }
 
@@ -171,29 +182,29 @@ impl<T: 'static> ListStore<T> {
     pub fn get_by_object(&self, index: &gtk::glib::Object) -> Option<RefGuard<T>> {
         let index = *object_gusize(index)?.borrow();
 
-        index.and_then(|index| self.get(&ListIndex(index)))
+        index.and_then(|index| self.get(&ListStoreIndex(index)))
     }
 
     pub fn get_mut_by_object(&self, index: &gtk::glib::Object) -> Option<MutexGuard<T>> {
         let index = *object_gusize(index)?.borrow();
 
-        index.and_then(|index| self.get_mut(&ListIndex(index)))
+        index.and_then(|index| self.get_mut(&ListStoreIndex(index)))
     }
 
-    pub fn notify_changed(&self, index: &ListIndex) {
+    pub fn notify_changed(&self, index: &ListStoreIndex) {
         if let Some(it) = self.map_index().get(index) {
             self.list().items_changed(*it, 1, 1);
         }
     }
 
     pub fn base(&self) -> ListModel<T> {
-        ListModel::new_with(self.clone())
+        ListModel::new(self.clone())
     }
 
     pub fn clear(&self) {
         self.list().remove_all();
-        self.container().clear();
-        self.map_index().clear();
+        self.container_mut().clear();
+        self.map_index_mut().clear();
     }
 
     pub fn len(&self) -> usize {
@@ -211,18 +222,18 @@ where
 {
     fn get_by_object(&self, object: &gtk::glib::Object) -> Option<ListModelBorrow<'_, T>> {
         self.get_by_object(object)
-            .map(|it| ListModelBorrow::new_with(it))
+            .map(|it| ListModelBorrow::new(it))
     }
     fn get_mut_by_object(&self, object: &gtk::glib::Object) -> Option<ListModelMutBorrow<T>> {
         self.get_mut_by_object(object)
-            .map(|it| ListModelMutBorrow::new_with(it))
+            .map(|it| ListModelMutBorrow::new(it))
     }
 
     fn notify_changed(&self, object: &gtk::glib::Object) {
         let index = object_gusize(object).and_then(|it| *it.borrow());
 
         if let Some(index) = index {
-            self.notify_changed(&ListIndex(index));
+            self.notify_changed(&ListStoreIndex(index));
         }
     }
 
@@ -245,7 +256,7 @@ mod tests {
     #[gtk::test]
     pub fn list_test() {
         let store = ListStore::<usize>::default();
-        let base = ListModel::new_with(store.clone());
+        let base = ListModel::new(store.clone());
         let model = store.list_model();
         let count = || model.into_iter().count();
 
@@ -285,7 +296,7 @@ mod tests {
     #[gtk::test]
     pub fn guard_test() {
         let store = ListStore::<usize>::default();
-        let base = ListModel::new_with(store.clone());
+        let base = ListModel::new(store.clone());
         let model = base.list_model();
 
         let boolfilter = store.bool_filter(|it| *it <= 100);

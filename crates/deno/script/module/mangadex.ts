@@ -166,7 +166,7 @@ export class MangaDex implements HttpModule {
     info.scanlator = CommonFunction.query(
       json,
       "$.relationships[?(@.type=='scanlation_group')]..name"
-    );
+    ) ?? [];
 
     return info;
   }
@@ -201,7 +201,7 @@ export class MangaDex implements HttpModule {
   }
 
   async close() {
-    this.client.close();
+    await this.client.close();
   }
 }
 

@@ -2,12 +2,22 @@ use std::sync::Arc;
 
 use gtk::prelude::*;
 use mado::engine::{
-    DownloadInfo, DownloadInfoMsg, DownloadProgressStatus, DownloadResumedStatus, DownloadStatus,
+    DownloadInfo, DownloadInfoMsg, DownloadProgressStatus, DownloadStatus,
 };
 
 #[derive(Debug)]
 pub struct DownloadItem {
-    pub info: Arc<DownloadInfo>,
+    info: Arc<DownloadInfo>,
+}
+
+impl DownloadItem {
+    pub fn new(info: Arc<DownloadInfo>) -> Self {
+        Self { info }
+    }
+
+    pub fn info(&self) -> &Arc<DownloadInfo> {
+        &self.info
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -50,7 +60,7 @@ impl From<&DownloadInfo> for DownloadView {
                     #[name = "status"]
                     append = &gtk::Label {
                         set_halign: gtk::Align::Start,
-                        set_text: &status_to_string(&info.status()),
+                        set_text: &info.status().to_human_string(),
                     },
 
                     #[name = "chapter_title"]
@@ -101,20 +111,6 @@ impl From<&DownloadInfo> for DownloadView {
     }
 }
 
-pub fn status_to_string(status: &DownloadStatus) -> String {
-    match status {
-        DownloadStatus::Finished => "Finished".to_string(),
-        DownloadStatus::InProgress(progress) => match progress {
-            DownloadProgressStatus::Resumed(v) => match v {
-                DownloadResumedStatus::Waiting => "Waiting".to_string(),
-                DownloadResumedStatus::Downloading => "Downloading".to_string(),
-            },
-            DownloadProgressStatus::Paused => "Paused".to_string(),
-            DownloadProgressStatus::Error(err) => format!("Error: {}", err),
-        },
-    }
-}
-
 pub fn status_to_class(status: &DownloadStatus) -> &'static str {
     match status {
         DownloadStatus::Finished => DOWNLOAD_RESUMED_CSS,
@@ -161,7 +157,7 @@ impl DownloadView {
         remove_css(DOWNLOAD_ERROR_CSS);
 
         add_css(status_to_class(status));
-        set_text(&status_to_string(status));
+        set_text(&status.to_human_string());
     }
 
     pub fn update_info(&self, info: &DownloadInfo) {
@@ -219,6 +215,7 @@ impl DownloadViewController {
         let sender = this.sender.clone();
         let handle = info.connect(move |msg| match msg {
             DownloadInfoMsg::StatusChanged(_) => sender.send(DownloadMsg::StatusChanged).unwrap(),
+            DownloadInfoMsg::OrderChanged(_) => {}
         });
         handles.push(handle.send_handle_any());
 
@@ -315,7 +312,7 @@ mod tests {
             ($status:expr, $class:expr, $title:expr) => {{
                 let item = $status;
                 assert_eq!(status_to_class(&item), $class);
-                assert_eq!(status_to_string(&item), $title);
+                assert_eq!(&item.to_human_string(), $title);
             }};
         }
 
@@ -347,14 +344,16 @@ mod tests {
             "path".into(),
             DownloadStatus::Finished,
         ));
-        let info = Arc::new(DownloadInfo::new(
-            latebinding,
-            title.clone(),
-            vec![chapter.clone()],
-            "path".into(),
-            None,
-            DownloadStatus::Finished,
-        ));
+
+        let info = Arc::new(
+            DownloadInfo::builder()
+                .order(0)
+                .module(latebinding)
+                .manga_title(title.clone())
+                .chapters(vec![chapter.clone()])
+                .status(DownloadStatus::finished())
+                .build(),
+        );
 
         let view = DownloadView::from(info.as_ref());
         assert_eq!(view.title.text().to_string(), title);
@@ -372,7 +371,7 @@ mod tests {
 
             run_loop();
 
-            assert_eq!(view.status.text().as_str(), status_to_string(&i));
+            assert_eq!(view.status.text().as_str(), &i.to_human_string());
         }
 
         info.set_status(DownloadStatus::downloading());

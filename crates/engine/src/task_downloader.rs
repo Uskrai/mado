@@ -6,45 +6,28 @@ use std::{
     },
 };
 
-use event_listener::Event;
 use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
 
 use crate::{DownloadChapterImageInfo, DownloadChapterInfo, DownloadStatus};
 
 pub use super::*;
 
+#[derive(Debug)]
 pub struct TaskDownloader {
     info: Arc<crate::DownloadInfo>,
+    option: DownloadOption,
 }
 
 impl TaskDownloader {
-    pub fn new(info: Arc<crate::DownloadInfo>) -> Self {
-        Self { info }
+    pub fn new(info: Arc<crate::DownloadInfo>, option: DownloadOption) -> Self {
+        Self { info, option }
     }
 
-    pub async fn run(self) {
-        let status = DownloadInfoWatcher::connect(self.info.clone());
-        loop {
-            status.wait_status(DownloadStatus::is_resumed).await;
-
-            let paused = status
-                .wait_status(DownloadStatus::is_paused)
-                .map(|_| Ok::<(), mado_core::Error>(()));
-
-            let dl = self.download();
-
-            futures::pin_mut!(dl, paused);
-
-            let (result, _) = futures::future::select(dl, paused).await.factor_first();
-
-            if let Err(err) = result {
-                tracing::error!("{}", err);
-                self.info.set_status(DownloadStatus::error(err));
-            }
-        }
+    pub async fn run(self) -> Result<(), core::Error> {
+        self.download().await
     }
 
-    async fn download(&self) -> Result<(), mado_core::Error> {
+    pub async fn download(&self) -> Result<(), mado_core::Error> {
         let _ = self.info.wait_module().await;
         self.info.set_status(DownloadStatus::downloading());
         for it in self.info.chapters() {
@@ -54,20 +37,31 @@ impl TaskDownloader {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip_all,
+        fields(
+            chapter = %it.chapter_id()
+        )
+    )]
     async fn download_chapter(&self, it: Arc<DownloadChapterInfo>) -> Result<(), mado_core::Error> {
         if it.status().is_finished() {
             return Ok(());
         }
+        tracing::trace!("start downloading chapter");
 
         let (image_tx, mut image_rx) = mpsc::unbounded();
         let mut images = vec![];
         let get_images = self
             .get_chapter_images(it.clone())
             .await
-            .inspect(|image| {
-                if let Ok(image) = image {
+            .inspect(|image| match image {
+                Ok(image) => {
+                    tracing::trace!("pushing {:?}", image);
                     images.push(image.clone());
                     it.set_images(images.clone());
+                }
+                Err(err) => {
+                    tracing::error!("error downloading chapter: {:?}", err);
                 }
             })
             .forward(image_tx.sink_map_err(|err| mado_core::Error::ExternalError(err.into())));
@@ -93,6 +87,7 @@ impl TaskDownloader {
     ) -> impl futures::Stream<Item = Result<Arc<DownloadChapterImageInfo>, mado_core::Error>> + 'static
     {
         let module = self.info.wait_module().await;
+        let option = self.option.clone();
 
         let (image_tx, image_rx) = chapter_task_channel();
 
@@ -109,7 +104,7 @@ impl TaskDownloader {
         let mut stream = image_rx.enumerate().map(move |(i, image)| {
             let i = i + 1;
             let filename = format!("{:0>4}.{}", i, image.extension);
-            let path = it.path().join(filename);
+            let path = it.path().join(option.sanitize_filename(&filename));
 
             let image = DownloadChapterImageInfo::new(image, path, it.status().clone());
             Ok(Arc::new(image))
@@ -124,6 +119,13 @@ impl TaskDownloader {
         })
     }
 
+    #[tracing::instrument(
+        skip_all
+        fields(
+            image = %download.image().id,
+            path = %download.path(),
+        )
+    )]
     pub async fn download_image(
         &self,
         download: Arc<DownloadChapterImageInfo>,
@@ -144,17 +146,17 @@ impl TaskDownloader {
         if !exists {
             let task = ImageDownloader::new(module.clone(), image.clone(), Config(retry, timeout));
 
-            tracing::trace!("Start downloading {} {:?}", path, image);
+            tracing::trace!("Start downloading {}", path);
 
             let buffer = task.download().await?;
 
-            tracing::trace!("Finished downloading {} {:?}", path, image);
+            tracing::trace!("Finished downloading {}", path);
 
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
 
-            let mut file = std::fs::File::create(path).unwrap();
+            let mut file = std::fs::File::create(path)?;
 
             file.write_all(&buffer)?;
             tracing::trace!("Finished writing to {}", path);
@@ -180,38 +182,6 @@ impl crate::ImageDownloaderConfig for Config {
 
     fn buffer(&self) -> Self::Buffer {
         Vec::new()
-    }
-}
-
-#[derive(Debug)]
-struct DownloadInfoWatcher {
-    info: Arc<crate::DownloadInfo>,
-    event: Arc<Event>,
-}
-
-impl DownloadInfoWatcher {
-    pub fn connect(info: Arc<crate::DownloadInfo>) -> Self {
-        let event = Arc::new(Event::new());
-
-        info.connect({
-            let event = event.clone();
-
-            move |_| {
-                event.notify(usize::MAX);
-            }
-        });
-
-        Self { info, event }
-    }
-
-    pub async fn wait_status(&self, fun: impl Fn(&DownloadStatus) -> bool) {
-        loop {
-            if fun(&self.info.status()) {
-                return;
-            }
-
-            self.event.listen().await;
-        }
     }
 }
 
@@ -242,15 +212,12 @@ mod tests {
     use camino::Utf8PathBuf;
     use futures::StreamExt;
     use httpmock::Method::GET;
-    use mado_core::{ChapterImageInfo, DefaultMadoModuleMap, MockMadoModule, Uuid};
+    use mado_core::{ChapterImageInfo, MockMadoModule, Uuid};
     use mockall::predicate::{always, eq};
 
     use crate::{
-        tests::server_url, DownloadChapterInfo, DownloadInfo, DownloadStatus, LateBindingModule,
-        TaskDownloader,
+        tests::server_url, DownloadChapterInfo, DownloadInfo, DownloadStatus, TaskDownloader,
     };
-
-    use super::DownloadInfoWatcher;
 
     // TODO: improve this test to not use fs
     #[test]
@@ -299,27 +266,23 @@ mod tests {
             path.join("1"),
             DownloadStatus::waiting(),
         ));
-        let info = Arc::new(DownloadInfo::new(
-            module.into(),
-            "title".to_string(),
-            vec![chapter.clone()],
-            path.clone(),
-            None,
-            DownloadStatus::waiting(),
-        ));
+        let info = Arc::new(
+            DownloadInfo::builder()
+                .order(0)
+                .module(module)
+                .manga_title("title")
+                .chapters(vec![chapter.clone()])
+                .path(path.clone())
+                .status(DownloadStatus::waiting())
+                .build(),
+        );
 
         futures::executor::block_on(async {
-            let downloader = TaskDownloader::new(info.clone());
-
-            let status = DownloadInfoWatcher::connect(info.clone());
-
-            let fut = status.wait_status(|s| !s.is_resumed());
-
-            let runner = downloader.run();
-
-            futures::pin_mut!(fut);
-            futures::pin_mut!(runner);
-            let _ = futures::future::select(fut, runner).await;
+            let downloader = TaskDownloader::new(info.clone(), Default::default());
+            let _ = downloader
+                .download()
+                .await
+                .expect("download should not error");
         });
 
         assert_eq!(
@@ -370,16 +333,16 @@ mod tests {
             Default::default(),
             DownloadStatus::waiting(),
         ));
-        let info = Arc::new(DownloadInfo::new(
-            module.into(),
-            "title".to_string(),
-            vec![chapter.clone()],
-            Default::default(),
-            None,
-            DownloadStatus::waiting(),
-        ));
+        let info = Arc::new(
+            DownloadInfo::builder()
+                .order(0)
+                .module(module)
+                .chapters(vec![chapter.clone()])
+                .status(DownloadStatus::waiting())
+                .build(),
+        );
 
-        let downloader = TaskDownloader::new(info);
+        let downloader = TaskDownloader::new(info, Default::default());
 
         futures::executor::block_on(async {
             let mut it = downloader.get_chapter_images(chapter).await.enumerate();
@@ -394,44 +357,6 @@ mod tests {
                     _ => unreachable!(),
                 }
             }
-        });
-    }
-
-    #[test]
-    fn watcher_test() {
-        let map = DefaultMadoModuleMap::default();
-
-        let module = LateBindingModule::WaitModule(Arc::new(map), Uuid::from_u128(1));
-        let info = DownloadInfo::new(
-            module,
-            "title".to_string(),
-            vec![],
-            Default::default(),
-            None,
-            crate::DownloadStatus::error("Error"),
-        );
-
-        let info = Arc::new(info);
-        let watcher = DownloadInfoWatcher::connect(info.clone());
-
-        futures::executor::block_on(async {
-            let future = watcher.wait_status(DownloadStatus::is_paused);
-            crate::timer::timeout(std::time::Duration::from_millis(10), future)
-                .await
-                .unwrap_err();
-
-            let future = watcher.wait_status(DownloadStatus::is_completed);
-            info.resume(true);
-            assert!(info.status().is_resumed());
-            assert!(!info.status().is_completed());
-            crate::timer::timeout(std::time::Duration::from_millis(10), future)
-                .await
-                .unwrap_err();
-
-            let future = watcher.wait_status(DownloadStatus::is_resumed);
-            crate::timer::timeout(std::time::Duration::from_millis(10), future)
-                .await
-                .unwrap();
         });
     }
 }

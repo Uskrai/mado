@@ -3,26 +3,31 @@ use std::{
     sync::Arc,
 };
 
-pub struct ListModel<T>(Arc<dyn ListModelBase<T>>);
+pub struct ListModel<T>(
+    Arc<dyn ListModelBase<T>>,
+    Option<Arc<dyn Fn(&ListModel<T>, gtk::gio::ListModel) -> gtk::gio::ListModel + Send>>,
+);
 
 impl<T> Clone for ListModel<T> {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self(self.0.clone(), self.1.clone())
     }
 }
 
-// impl<T> std::fmt::Debug for ListModel<T> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.debug_tuple("ListModel").finish()
-//     }
-// }
-
 impl<T> ListModel<T> {
-    pub fn new_with<R>(val: R) -> ListModel<T>
+    pub fn new<R>(val: R) -> ListModel<T>
     where
         R: ListModelBase<T> + 'static,
     {
-        ListModel(Arc::new(val))
+        ListModel(Arc::new(val), None)
+    }
+
+    pub fn new_with_model<R, F>(val: R, fun: F) -> ListModel<T>
+    where
+        R: ListModelBase<T> + 'static,
+        F: Fn(&ListModel<T>, gtk::gio::ListModel) -> gtk::gio::ListModel + Send + 'static,
+    {
+        ListModel(Arc::new(val), Some(Arc::new(fun)))
     }
 }
 
@@ -30,7 +35,7 @@ pub trait ListModelBorrowBase<T>: Deref<Target = T> {}
 pub struct ListModelBorrow<'a, T>(Box<dyn ListModelBorrowBase<T> + 'a>);
 
 impl<'borrow, T> ListModelBorrow<'borrow, T> {
-    pub fn new_with<R>(val: R) -> Self
+    pub fn new<R>(val: R) -> Self
     where
         R: ListModelBorrowBase<T> + 'borrow,
     {
@@ -49,7 +54,7 @@ pub trait ListModelMutBorrowBase<T>: DerefMut<Target = T> {}
 pub struct ListModelMutBorrow<'a, T>(Box<dyn ListModelMutBorrowBase<T> + 'a>);
 
 impl<'borrow, T> ListModelMutBorrow<'borrow, T> {
-    pub fn new_with<R>(val: R) -> Self
+    pub fn new<R>(val: R) -> Self
     where
         R: ListModelMutBorrowBase<T> + 'borrow,
     {
@@ -96,7 +101,12 @@ impl<T> ListModelBase<T> for ListModel<T> {
     }
 
     fn list_model(&self) -> gtk::gio::ListModel {
-        self.0.list_model()
+        let model = self.0.list_model();
+        if let Some(it) = &self.1 {
+            it(self, model)
+        } else {
+            model
+        }
     }
 }
 

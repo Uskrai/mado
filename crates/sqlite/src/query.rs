@@ -164,6 +164,7 @@ pub fn load_download_info_join(
         let chapters: Vec<_> = chapters_join.iter().map(|it| it.chapter.clone()).collect();
 
         let info = Arc::new(DownloadInfo::new(
+            download.order,
             module.clone(),
             download.title,
             chapters,
@@ -236,56 +237,5 @@ mod tests {
         let downloads = load_download_join(&db).unwrap();
         assert_eq!(downloads.len(), 1);
         assert_eq!(downloads[0].chapters.len(), CHAPTER_LENGTH as usize);
-    }
-
-    #[test]
-    fn delete_test() {
-        let db = connection();
-
-        // crate::downloads::Entity::insert(crate::downloads::default_model())
-        //     .exec(&db.conn)
-        //     .await
-        //     .unwrap();
-
-        // crate::download_chapters::Entity::insert(crate::download_chapters::default_model(1, 1))
-        //     .exec(&db.conn)
-        //     .await
-        //     .unwrap();
-        //
-        // db.delete_download(1).await.unwrap();
-    }
-
-    #[test]
-    fn load_test() {
-        // let db = connection().await;
-        // let state = State::default();
-        //
-        // const CHAPTER_LENGTH: usize = u8::MAX as usize;
-        //
-        // let mut vec = Vec::new();
-        // for _ in 0..CHAPTER_LENGTH {
-        //     vec.push(state.new_chapter());
-        // }
-        //
-        // let info = DownloadInfo::new(
-        //     state.module.clone(),
-        //     "title".to_string(),
-        //     vec,
-        //     Default::default(),
-        //     None,
-        //     mado_engine::DownloadStatus::Finished,
-        // );
-        //
-        // db.insert_download(&info).await.unwrap();
-        // db.insert_download(&info).await.unwrap();
-        // db.insert_download(&info).await.unwrap();
-        //
-        // let item = db.load_download().await.unwrap();
-        //
-        // assert_eq!(item.len(), 3);
-        //
-        // for (_, ch) in item {
-        //     assert_eq!(ch.len(), CHAPTER_LENGTH);
-        // }
     }
 }
