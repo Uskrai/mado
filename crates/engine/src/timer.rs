@@ -195,6 +195,16 @@ mod tests {
     }
 
     #[test]
+    fn test_debounce_size_hint() {
+        futures::executor::block_on(async {
+            let (_sender, receiver) = futures::channel::mpsc::channel::<()>(1024);
+            let hint = receiver.size_hint();
+            let debounced = debounce(receiver, Duration::from_secs(1));
+            assert_eq!(debounced.size_hint(), hint);
+        })
+    }
+
+    #[test]
     fn test_debounce_order() {
         #[derive(Debug, PartialEq, Eq)]
         pub enum Message {
