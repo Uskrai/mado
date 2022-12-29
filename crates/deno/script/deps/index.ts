@@ -42,3 +42,7 @@ export class CommonFunction {
     return JSONPath({ path, json, wrap: false });
   }
 }
+
+export async function sleep(millis: number) {
+  await Deno.core.ops.op_tokio_sleep(millis)
+}
