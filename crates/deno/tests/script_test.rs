@@ -148,7 +148,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
                         async move {
                             tracing::debug!("running {name}");
                             let result = tokio::time::timeout(
-                                std::time::Duration::from_secs(10),
+                                std::time::Duration::from_secs(60),
                                 test_function(runtime.clone(), name.clone(), value),
                             )
                             .await
@@ -180,7 +180,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         ($name:ident) => {{
             tracing::debug!("running {}", stringify!($name));
             let result = local_set.block_on(&tokio, async move {
-                tokio::time::timeout(std::time::Duration::from_secs(10), $name).await
+                tokio::time::timeout(std::time::Duration::from_secs(180), $name).await
             });
 
             if let Err(err) = &result {
