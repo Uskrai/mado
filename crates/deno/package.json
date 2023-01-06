@@ -14,7 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@xmldom/xmldom": "^0.8.6",
-    "deep-equal": "^2.1.0",
+    "deep-equal": "^2.2.0",
     "esbuild": "^0.16.12",
     "fast-glob": "^3.2.12",
     "jsonpath-plus": "^7.2.0",
