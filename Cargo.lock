@@ -431,11 +431,11 @@ dependencies = [
 
 [[package]]
 name = "deno_console"
-version = "0.82.0"
+version = "0.84.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d812b29850c1a8b0bba0069faa9841cebc258333a0bba4ec2566b1d7c761bc9"
+checksum = "b1fcedec1b382f40fd1ab38d18edb5715d5cd5f65bd949c83387c43152fd34a8"
 dependencies = [
- "deno_core",
+ "deno_core 0.166.0",
 ]
 
 [[package]]
@@ -446,7 +446,7 @@ checksum = "b7e27ca2ef58fdba235d90f8c98ab8bc498f956bb7297ce64b992d80d5bfa56c"
 dependencies = [
  "anyhow",
  "bytes",
- "deno_ops",
+ "deno_ops 0.42.0",
  "futures",
  "indexmap",
  "libc",
@@ -456,7 +456,32 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_json",
- "serde_v8",
+ "serde_v8 0.75.0",
+ "smallvec",
+ "sourcemap",
+ "url",
+ "v8",
+]
+
+[[package]]
+name = "deno_core"
+version = "0.166.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5db7d38c223a683b23b7ff4967572ec863f40397fa1bb792383273629e1e39f"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "deno_ops 0.44.0",
+ "futures",
+ "indexmap",
+ "libc",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "pin-project",
+ "serde",
+ "serde_json",
+ "serde_v8 0.77.0",
  "smallvec",
  "sourcemap",
  "url",
@@ -468,6 +493,21 @@ name = "deno_ops"
 version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aeeef7a7865ae587ad6b17b03e13a5b34b44299f51ad12b04316d647d5f5ceee"
+dependencies = [
+ "once_cell",
+ "pmutil",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "deno_ops"
+version = "0.44.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27e85062a5f1a79194e7dd1bb8c664f0979bf5c869a8f2208192cbcb6e18e6e7"
 dependencies = [
  "once_cell",
  "pmutil",
@@ -1400,7 +1440,7 @@ dependencies = [
  "async-io",
  "async-trait",
  "deno_console",
- "deno_core",
+ "deno_core 0.164.0",
  "event-listener",
  "futures",
  "futures-core",
@@ -1425,7 +1465,7 @@ name = "mado-deno-coverage"
 version = "0.1.0"
 dependencies = [
  "atty",
- "deno_core",
+ "deno_core 0.164.0",
  "once_cell",
  "serde",
  "serde_json",
@@ -2228,6 +2268,20 @@ name = "serde_v8"
 version = "0.75.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81957fca74f7a393a726341b70a797b28e2ef09890958c94d87c9cd7a8ffe4a7"
+dependencies = [
+ "bytes",
+ "derive_more",
+ "serde",
+ "serde_bytes",
+ "smallvec",
+ "v8",
+]
+
+[[package]]
+name = "serde_v8"
+version = "0.77.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36203a818a80f973b4b487bfc32d173b2bf78821869513af2f6e8c93938fa0e3"
 dependencies = [
  "bytes",
  "derive_more",
