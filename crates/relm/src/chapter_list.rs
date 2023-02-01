@@ -55,6 +55,9 @@ pub enum ChapterListMsg {
 const CHECK_BUTTON_ROW: i32 = 0;
 const CHECK_BUTTON_COLUMN: i32 = 0;
 
+const LABEL_COLUMN: i32 = 2;
+const LABEL_ROW: i32 = 0;
+
 impl ChapterListModel {
     /// Create gtk::Grid from ChapterInfo
     pub fn create_chapter_info(chapter: CheckChapterInfo) -> gtk::Grid {
@@ -68,7 +71,7 @@ impl ChapterListModel {
             .build();
 
         grid.attach(&check, CHECK_BUTTON_COLUMN, CHECK_BUTTON_ROW, 1, 1);
-        grid.attach(&label, 2, 0, 1, 1);
+        grid.attach(&label, LABEL_COLUMN, LABEL_ROW, 1, 1);
         grid.set_column_spacing(5);
 
         check.connect_toggled(move |it| {
@@ -76,6 +79,12 @@ impl ChapterListModel {
         });
 
         grid
+    }
+
+    fn get_label(grid: &gtk::Grid) -> Option<gtk::Label> {
+        grid.child_at(LABEL_COLUMN, LABEL_ROW)?
+            .downcast::<gtk::Label>()
+            .ok()
     }
 
     fn get_check(grid: &gtk::Grid) -> Option<gtk::CheckButton> {
@@ -130,11 +139,22 @@ impl SimpleComponent for ChapterListModel {
 
             // Sync children with data
             ChapterListMsg::Change(item) => {
-                let child = item.child().unwrap().downcast::<gtk::Grid>().unwrap();
-                let child = Self::get_check(&child).unwrap();
+                let child = item.child().and_then(|it| it.downcast::<gtk::Grid>().ok());
+                let child = match child {
+                    Some(child) => child,
+                    _ => return
+                };
+                let check = Self::get_check(&child).unwrap();
+                let label = Self::get_label(&child).unwrap();
 
                 if let Some(data) = item.item().and_then(|it| self.chapters.get_by_object(&it)) {
-                    child.set_active(data.active());
+                    check.set_active(data.active());
+
+                    let strlabel = format!("{}", data.info());
+                    if label.label() != strlabel.as_str() {
+                        label.set_label(&strlabel);
+                    }
+
                 }
             }
             ChapterListMsg::Activate => {
