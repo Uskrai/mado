@@ -17,7 +17,7 @@ serde_json = "1.0"
 serde_path_to_error = "0.1"
 
 deno_core = "0.164"
-deno_console = "0.82"
+deno_console = "0.90"
 
 event-listener = "2.5"
 
