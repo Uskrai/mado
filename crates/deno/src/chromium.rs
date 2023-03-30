@@ -55,21 +55,29 @@ impl Chromium {
         self.browser
             .get_or_try_init(async {
                 spawn_blocking(|| {
-                    tracing::trace!("launching browser");
-                    Browser::new(
-                        headless_chrome::LaunchOptions::default_builder()
-                            .path(Some(
-                                default_executable().map_err(|err| anyhow::anyhow!(err))?,
-                            ))
-                            .args(
-                                ["--no-zygote", "--no-sandbox"]
-                                    .map(|it| std::ffi::OsStr::new(it))
-                                    .to_vec(),
-                            )
-                            .idle_browser_timeout(std::time::Duration::from_secs(u64::MAX))
-                            .build()?,
-                    )
-                    .map_err(|err| anyhow::anyhow!(err))
+                    let ws_url = std::env::var("CHROMIUM_WS_URL").ok();
+                    if let Some(ws_url) = ws_url {
+                        tracing::trace!("connecting to {ws_url}");
+
+                        Browser::connect(ws_url).map_err(|err| anyhow::anyhow!(err))
+                    } else {
+                        tracing::trace!("launching browser");
+                        Browser::new(
+                            headless_chrome::LaunchOptions::default_builder()
+                                .path(Some(
+                                    default_executable().map_err(|err| anyhow::anyhow!(err))?,
+                                ))
+                                .args(
+                                    ["--no-zygote", "--no-sandbox"]
+                                        .map(|it| std::ffi::OsStr::new(it))
+                                        .to_vec(),
+                                )
+                                .idle_browser_timeout(std::time::Duration::from_secs(u64::MAX))
+                                .build()?,
+                        )
+                        .tap_ok(|_| tracing::info!("launching browser success"))
+                        .map_err(|err| anyhow::anyhow!(err))
+                    }
                 })
                 .await
                 .map_err(|err| anyhow::anyhow!(err))
