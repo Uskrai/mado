@@ -62,7 +62,7 @@ impl Chromium {
                                 default_executable().map_err(|err| anyhow::anyhow!(err))?,
                             ))
                             .args(
-                                ["--single-process", "--no-zygote", "--no-sandbox"]
+                                ["--no-zygote", "--no-sandbox"]
                                     .map(|it| std::ffi::OsStr::new(it))
                                     .to_vec(),
                             )
