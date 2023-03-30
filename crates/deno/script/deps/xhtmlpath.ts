@@ -49,6 +49,10 @@ export class XHTMLPath {
     });
   }
 
+  selectTextContent(expression: string) {
+    return this.select(expression).map((it) => it.textContent);
+  }
+
   selectText(expression: string, name: string) {
     return this.select(expression).map((it) => {
       return it[name];

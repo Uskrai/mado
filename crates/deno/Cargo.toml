@@ -25,6 +25,10 @@ waker-fn = "1.1"
 
 uuid = { version = "1.0", features = ["serde"] }
 
+async-once-cell = "0.4.2"
+headless_chrome = { git = "https://github.com/uskrai/rust-headless-chrome" }
+# chromiumoxide = { path = "../../../chromiumoxide", features = ["tokio-runtime"], default-features = false}
+
 # don't forget to update rune-macros dependencies.
 # rune = "0.10"
 # rune-modules = "0.10"

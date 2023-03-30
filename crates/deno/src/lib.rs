@@ -2,6 +2,7 @@ pub mod error;
 pub mod http;
 mod module;
 mod runtime;
+mod chromium;
 pub mod task;
 
 pub use error::{Error, ErrorJson};
@@ -51,6 +52,7 @@ pub fn extensions() -> Vec<deno_core::Extension> {
                 "../script/bootstrap/01_console.js",
             ))
             .build(),
+        crate::chromium::init(),
     ]
 }
 
