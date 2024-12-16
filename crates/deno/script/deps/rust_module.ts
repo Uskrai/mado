@@ -16,33 +16,31 @@ export class RustModule {
 
   async getInfo(id: string): Promise<Result<MangaAndChapters>> {
     return ResultFromJson(
-      await Deno.core.opAsync("op_mado_module_get_info", this.rid, id)
+      await Deno.core.ops.op_mado_module_get_info(this.rid, id),
     );
   }
 
   async getChapterImage(
     id: string,
-    task: RustChapterTask
+    task: RustChapterTask,
   ): Promise<Result<ChapterTask>> {
-    return ResultFromJson(
-      await Deno.core.opAsync(
-        "op_mado_module_get_chapter_images",
-        this.rid,
-        id,
-        task.rid
-      )
+    const a = await Deno.core.ops.op_mado_module_get_chapter_images(
+      this.rid,
+      id,
+      task.rid,
     );
+    return ResultFromJson(a);
   }
 
   async downloadImage(info: object): Promise<Result<HttpRequest>> {
     return ResultFromJson(
-      await Deno.core.opAsync("op_mado_module_download_image", this.rid, info)
+      await Deno.core.ops.op_mado_module_download_image(this.rid, info),
     );
   }
 
   async close() {
     let it = ResultFromJson(
-      await Deno.core.opAsync("op_mado_module_close", this.rid)
+      await Deno.core.ops.op_mado_module_close(this.rid),
     );
     return it;
   }

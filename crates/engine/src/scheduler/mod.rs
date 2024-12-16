@@ -42,7 +42,7 @@ const _: () = {
 impl Default for TaskSchedulerOption {
     fn default() -> Self {
         Self {
-            download_limit: AtomicUsize::new(usize::MAX),
+            download_limit: AtomicUsize::new(1),
         }
     }
 }
@@ -70,6 +70,11 @@ impl TaskScheduler {
         (Self { state, option }, runner)
     }
 
+    #[tracing::instrument(
+        skip(
+            self
+        )
+    )]
     pub async fn run(self) {
         let vec = Mutex::new(Vec::<QueueItem>::new());
 
@@ -100,6 +105,7 @@ impl TaskScheduler {
                     .count();
 
                 let limit = self.option.download_limit();
+                tracing::debug!("currently downloading {downloading}/{limit}");
 
                 // set queued item to downloading until downloading is not less than limit
                 for it in vec.iter() {

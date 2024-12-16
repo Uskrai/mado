@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use deno_core::{op, serde_v8, Extension, ExtensionBuilder, OpState};
+use deno_core::{op2, serde_v8, Extension, OpState, Resource};
 use thiserror::Error;
 
 use crate::{ResultJson, ToResultJson};
@@ -175,43 +175,64 @@ impl ErrorJson {
             rid: state.resource_table.add(error),
         }
     }
+
+    pub fn custom(error: impl std::fmt::Display) -> ErrorJson {
+        ErrorJson::Custom {
+            message: error.to_string(),
+        }
+    }
 }
 
 pub fn error_to_deno(state: &mut OpState, error: Error) -> ErrorJson {
     ErrorJson::from_error(state, error)
 }
 
-#[op]
-pub fn op_error_invalid_url(state: &mut OpState, url: String) -> ErrorJson {
+#[op2]
+#[serde]
+pub fn op_error_invalid_url(state: &mut OpState, #[string] url: String) -> ErrorJson {
     ErrorJson::from_error(state, Error::InvalidUrl { url })
 }
 
-#[op]
-pub fn op_error_to_string(state: &mut OpState, error: ErrorJson) -> String {
+#[op2]
+#[string]
+pub fn op_error_to_string(state: &mut OpState, #[serde] error: ErrorJson) -> String {
     error.to_string(state)
 }
 
-#[op]
-pub fn op_error_to_debug(state: &mut OpState, error: ErrorJson) -> String {
+#[op2]
+#[string]
+pub fn op_error_to_debug(state: &mut OpState, #[serde] error: ErrorJson) -> String {
     error.to_debug(state)
 }
 
-#[op]
-pub fn op_error_request_error(state: &mut OpState, url: String, message: String) -> ErrorJson {
+#[op2]
+#[serde]
+pub fn op_error_request_error(
+    state: &mut OpState,
+    #[string] url: String,
+    #[string] message: String,
+) -> ErrorJson {
     ErrorJson::from_error(state, Error::RequestError { url, message })
 }
 
-#[op]
-pub fn op_error_unexpected_error(state: &mut OpState, url: String, message: String) -> ErrorJson {
+#[op2]
+#[serde]
+pub fn op_error_unexpected_error(
+    state: &mut OpState,
+    #[string] url: String,
+    #[string] message: String,
+) -> ErrorJson {
     ErrorJson::from_error(state, Error::UnexpectedError { url, message })
 }
 
-#[op]
-pub fn op_error_close(state: &mut OpState, error: ErrorJson) -> ResultJson<()> {
+#[op2]
+#[serde]
+pub fn op_error_close(state: &mut OpState, #[serde] error: ErrorJson) -> ResultJson<()> {
     if let ErrorJson::Resource { rid, .. } = error {
         state
             .resource_table
-            .close(rid)
+            .take_any(rid)
+            .map(|it| it.close())
             .map_err(|_| Error::resource_error(rid, "Error already closed"))
             .to_result_json(state)
     } else {
@@ -219,15 +240,18 @@ pub fn op_error_close(state: &mut OpState, error: ErrorJson) -> ResultJson<()> {
     }
 }
 
+deno_core::extension!(
+    extension,
+    ops = [
+        op_error_invalid_url,
+        op_error_request_error,
+        op_error_close,
+        op_error_unexpected_error,
+        op_error_to_string,
+        op_error_to_debug,
+    ]
+);
+
 pub fn init() -> Extension {
-    ExtensionBuilder::default()
-        .ops(vec![
-            op_error_invalid_url::decl(),
-            op_error_request_error::decl(),
-            op_error_close::decl(),
-            op_error_unexpected_error::decl(),
-            op_error_to_string::decl(),
-            op_error_to_debug::decl(),
-        ])
-        .build()
+    extension::init_ops_and_esm()
 }

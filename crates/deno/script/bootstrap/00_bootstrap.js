@@ -1,2 +1,2 @@
 globalThis.window = globalThis;
-Deno.core.initializeAsyncOps()
+// Deno.core.initializeAsyncOps()

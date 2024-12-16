@@ -78,13 +78,13 @@ export async function error__Ok__Throw() {
   return Ok({});
 }
 
-export async function error__Ok__IsError() {
+export function error__Ok__IsError() {
   assertThrow(() => Ok({}).error);
 
   return Ok({});
 }
 
-export async function error__Ok__ToString() {
+export function error__Ok__ToString() {
   let error = Errors.invalid_url("https://google.com");
 
   assertEq(error.intoString(), "https://google.com is invalid");

@@ -2,12 +2,13 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use anyhow::Context;
 use async_once_cell::OnceCell;
-use deno_core::{op, Extension, OpState, Resource};
+use deno_core::{op2, Extension, OpState, Resource};
 use headless_chrome::{
     browser::default_executable,
     protocol::cdp::DOM::{Node, NodeId},
     Browser, Element, Tab as ChromeTab,
 };
+use tap::TapFallible;
 
 pub fn spawn_blocking<F, R>(f: F) -> tokio::task::JoinHandle<R>
 where
@@ -30,7 +31,8 @@ pub struct Chromium {
 
 impl Drop for Chromium {
     fn drop(&mut self) {
-        tracing::trace!("dropping chromium");
+        tracing::info!("dropping chromium");
+        if let Some(it) = self.browser.get() {}
     }
 }
 
@@ -41,7 +43,7 @@ pub struct Tab {
 
 impl Drop for Tab {
     fn drop(&mut self) {
-        tracing::trace!("dropping tab");
+        tracing::info!("dropping tab");
     }
 }
 
@@ -67,6 +69,7 @@ impl Chromium {
                                 .path(Some(
                                     default_executable().map_err(|err| anyhow::anyhow!(err))?,
                                 ))
+                                .headless(false)
                                 .args(
                                     ["--no-zygote", "--no-sandbox"]
                                         .map(|it| std::ffi::OsStr::new(it))
@@ -106,7 +109,8 @@ fn get_chromium(state: Rc<RefCell<OpState>>) -> Result<Chromium, Error> {
 }
 
 #[tracing::instrument(skip_all)]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_new_tab(state: Rc<RefCell<OpState>>) -> ResultJson<u32> {
     // let tab = chromium.
     let inner = || async {
@@ -136,11 +140,12 @@ pub async fn op_mado_chromium_new_tab(state: Rc<RefCell<OpState>>) -> ResultJson
 }
 
 #[tracing::instrument(skip_all, fields(tab = rid))]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_goto(
     state: Rc<RefCell<OpState>>,
     rid: u32,
-    url: String,
+    #[string] url: String,
 ) -> ResultJson<()> {
     with_tab_async(state.clone(), rid, move |tab| {
         tracing::trace!("goto {}", url);
@@ -152,7 +157,8 @@ pub async fn op_mado_chromium_tab_goto(
 }
 
 #[tracing::instrument(skip_all, fields(tab = rid))]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_wait_for_navigation(
     state: Rc<RefCell<OpState>>,
     rid: u32,
@@ -166,7 +172,8 @@ pub async fn op_mado_chromium_tab_wait_for_navigation(
     .to_result_json_borrow(state)
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_content(
     state: Rc<RefCell<OpState>>,
     rid: u32,
@@ -234,20 +241,23 @@ where
     inner().await
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_url(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<String> {
     with_tab(state.clone(), rid, |tab| Ok(tab.get_url())).to_result_json_borrow(state)
 }
 
-#[op]
+#[tracing::instrument(skip_all, fields(tab = rid, script))]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_evaluate(
     state: Rc<RefCell<OpState>>,
     rid: u32,
-    script: String,
+    #[string] script: String,
 ) -> ResultJson<()> {
     with_tab_async(state.clone(), rid, move |tab| {
         let it = tab.evaluate(&script, true)?;
-        println!("{:?}", it);
+        tracing::trace!("{:?}", it);
         Ok(())
     })
     .await
@@ -258,11 +268,12 @@ pub async fn op_mado_chromium_tab_evaluate(
     skip_all,
     fields(tab = rid)
 )]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_wait_for_element(
     state: Rc<RefCell<OpState>>,
     rid: u32,
-    selector: String,
+    #[string] selector: String,
 ) -> ResultJson<u32> {
     to_tab_element(state, rid, selector, |tab, selector| {
         tracing::trace!("wait for element {}", selector);
@@ -272,11 +283,12 @@ pub async fn op_mado_chromium_tab_wait_for_element(
 }
 
 #[tracing::instrument(skip_all, fields(tab = rid))]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_wait_for_element_by_xpath(
     state: Rc<RefCell<OpState>>,
     rid: u32,
-    selector: String,
+    #[string] selector: String,
 ) -> ResultJson<u32> {
     to_tab_element(state, rid, selector, |tab, selector| {
         tracing::trace!("wait for element by xpath {}", selector);
@@ -314,11 +326,12 @@ where
     skip_all,
     fields(tab = rid)
 )]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_click(
     state: Rc<RefCell<OpState>>,
     rid: u32,
-    selector: String,
+    #[string] selector: String,
 ) -> ResultJson<()> {
     with_tab_async(state.clone(), rid, move |tab| {
         tracing::trace!("click: {}", selector);
@@ -336,7 +349,8 @@ pub async fn op_mado_chromium_tab_click(
         tab = rid
     )
 )]
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_close(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<()> {
     let it = with_tab_async(state.clone(), rid, move |tab| {
         tracing::trace!("close tab");
@@ -347,7 +361,7 @@ pub async fn op_mado_chromium_tab_close(state: Rc<RefCell<OpState>>, rid: u32) -
     .await
     .to_result_json_borrow(state.clone());
 
-    state.borrow_mut().resource_table.close(rid).ok();
+    state.borrow_mut().resource_table.take_any(rid).map(|it| it.close()).ok();
 
     it
 }
@@ -369,12 +383,14 @@ pub async fn reload_tab(state: Rc<RefCell<OpState>>, rid: u32, force: bool) -> R
     .to_result_json_borrow(state)
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_reload(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<()> {
     reload_tab(state, rid, false).await
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_tab_reload_force(
     state: Rc<RefCell<OpState>>,
     rid: u32,
@@ -382,7 +398,8 @@ pub async fn op_mado_chromium_tab_reload_force(
     reload_tab(state, rid, true).await
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_element_click(
     state: Rc<RefCell<OpState>>,
     rid: u32,
@@ -395,7 +412,8 @@ pub async fn op_mado_chromium_element_click(
     .to_result_json_borrow(state)
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_mado_chromium_element_node(
     state: Rc<RefCell<OpState>>,
     rid: u32,
@@ -409,26 +427,26 @@ pub async fn op_mado_chromium_element_node(
     .to_result_json_borrow(state)
 }
 
+deno_core::extension!(
+    chromium,
+    ops = [
+        op_mado_chromium_new_tab,
+        op_mado_chromium_tab_content,
+        op_mado_chromium_tab_goto,
+        op_mado_chromium_tab_wait_for_navigation,
+        op_mado_chromium_tab_url,
+        op_mado_chromium_tab_reload,
+        op_mado_chromium_tab_reload_force,
+        op_mado_chromium_tab_wait_for_element,
+        op_mado_chromium_tab_wait_for_element_by_xpath,
+        op_mado_chromium_tab_click,
+        op_mado_chromium_tab_evaluate,
+        op_mado_chromium_tab_close,
+        op_mado_chromium_element_click,
+        op_mado_chromium_element_node,
+    ]
+);
+
 pub fn init() -> Extension {
-    Extension::builder()
-        .ops(vec![
-            op_mado_chromium_new_tab::decl(),
-            op_mado_chromium_tab_content::decl(),
-            op_mado_chromium_tab_goto::decl(),
-            op_mado_chromium_tab_wait_for_navigation::decl(),
-            op_mado_chromium_tab_url::decl(),
-            op_mado_chromium_tab_reload::decl(),
-            op_mado_chromium_tab_reload_force::decl(),
-            op_mado_chromium_tab_wait_for_element::decl(),
-            op_mado_chromium_tab_wait_for_element_by_xpath::decl(),
-            op_mado_chromium_tab_click::decl(),
-            op_mado_chromium_tab_evaluate::decl(),
-            op_mado_chromium_tab_close::decl(),
-            op_mado_chromium_element_click::decl(),
-            op_mado_chromium_element_node::decl(),
-            // op_mado_chapter_task_new::decl(),
-            // op_mado_chapter_task_add::decl(),
-            // op_mado_chapter_task_to_array::decl(),
-        ])
-        .build()
+    return chromium::init_ops_and_esm();
 }

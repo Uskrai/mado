@@ -1,5 +1,5 @@
 use futures_lite::io::AsyncReadExt;
-use isahc::AsyncReadResponseExt;
+use isahc::{prelude::Configurable, AsyncReadResponseExt};
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone)]
@@ -10,7 +10,10 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         Self {
-            client: isahc::HttpClientBuilder::new().build().unwrap(),
+            client: isahc::HttpClientBuilder::new()
+                .redirect_policy(isahc::config::RedirectPolicy::Limit(20))
+                .build()
+                .unwrap(),
         }
     }
 }

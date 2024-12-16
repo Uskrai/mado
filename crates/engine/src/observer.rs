@@ -171,11 +171,15 @@ impl AnyObserverHandleSend {
         self.id.is_none()
     }
 
-    pub fn disconnect(self) -> bool {
+    pub fn disconnect_ref(&self) -> bool {
         self.id
             .take()
             .map(|it| self.map.disconnect_any(it))
             .unwrap_or(false)
+    }
+
+    pub fn disconnect(self) -> bool {
+        self.disconnect_ref()
     }
 }
 

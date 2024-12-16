@@ -1,5 +1,6 @@
 import esbuild from "esbuild";
 import fastglob from "fast-glob";
+import htmlPlugin from '@chialab/esbuild-plugin-html';
 
 esbuild.build({
   entryPoints: [...await fastglob("script/deps/*.ts"), ... await fastglob("script/module/*.ts"), ...await fastglob("script/test/*.ts")],
@@ -19,6 +20,9 @@ esbuild.build({
   },
   tsconfig: "tsconfig.json",
   chunkNames: "chunk/[name]-[hash]",
+  loader: {
+    '.html': 'text'
+  },
   plugins: [
     // nodePolyfills(),
   ]

@@ -511,6 +511,7 @@ mod tests {
             .build()
             .unwrap();
 
+
         let (tx, rx) = relm4::channel();
         let model = DownloadModel::builder().launch(()).forward(&tx, |msg| msg);
         let state = State::new(model);

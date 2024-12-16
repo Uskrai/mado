@@ -10,6 +10,7 @@ use deno_core::{
     serde_v8,
     v8::{self, Local},
 };
+use futures::FutureExt;
 use mado_deno::Runtime;
 use serde::de::DeserializeOwned;
 use tokio::task::LocalSet;
@@ -21,6 +22,7 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         .enable_all()
         .build()
         .unwrap();
+    let _tokio_guard = tokio.enter();
 
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -32,10 +34,8 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let local_set = LocalSet::new();
-    let _local_set_guard = local_set.enter();
 
-    let test_set = LocalSet::new();
-    let last_set = LocalSet::new();
+    let _local_set_guard = local_set.enter();
 
     let runtime = Runtime::new_with_option(|option| option.inspector = true);
     let inspector = runtime
@@ -85,6 +85,19 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
     let errors = Rc::new(RefCell::new(vec![]));
     let notfinished = Rc::new(RefCell::new(HashSet::<Name>::new()));
 
+    pub struct SpawnIn {
+        set: LocalSet,
+        notfinished: Rc<RefCell<HashSet<Name>>>,
+    }
+
+    let test_set = SpawnIn {
+        set: LocalSet::new(),
+        notfinished: Default::default(),
+    };
+    let last_set = SpawnIn {
+        set: LocalSet::new(),
+        notfinished: Default::default(),
+    };
     for (index, path) in module_to_path.iter() {
         let namespace = runtime
             .js()
@@ -99,93 +112,114 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap();
             let length = names.length();
 
-            for j in 0..length {
-                let name_v8 =
-                    Local::<v8::String>::try_from(names.get_index(scope, j).unwrap()).unwrap();
-                let name_str = name_v8.to_rust_string_lossy(scope);
+            pub struct NameV8<'a> {
+                name_v8: Local<'a, v8::String>,
+                name: Name,
+            }
 
-                let filename = path.file_stem().unwrap().to_string_lossy().to_string();
+            let vec = (0..length)
+                .into_iter()
+                .map(|j| {
+                    let name_v8 =
+                        Local::<v8::String>::try_from(names.get_index(scope, j).unwrap()).unwrap();
+                    let name_str = name_v8.to_rust_string_lossy(scope);
 
-                let split_to_name = || {
-                    let mut name_str = name_str.splitn(3, "__").map(|it| it.to_string());
+                    let filename = path.file_stem().unwrap().to_string_lossy().to_string();
 
-                    let filename = filename.to_string();
-                    let testname = name_str.next().unwrap();
-                    let expected = name_str.next().unwrap_or_else(|| "Any".to_string());
-                    let unique_id = name_str.next();
+                    let split_to_name = || {
+                        let mut name_str = name_str.splitn(3, "__").map(|it| it.to_string());
 
-                    Name {
-                        filename,
-                        testname,
-                        expected,
-                        unique_id,
+                        let filename = filename.to_string();
+                        let testname = name_str.next().unwrap();
+                        let expected = name_str.next().unwrap_or_else(|| "Any".to_string());
+                        let unique_id = name_str.next();
+
+                        Name {
+                            filename,
+                            testname,
+                            expected,
+                            unique_id,
+                        }
+                    };
+
+                    NameV8 {
+                        name_v8,
+                        name: split_to_name(),
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            for name in vec {
+                let NameV8 { name_v8, name } = name;
+
+                if !pattern.is_match(&name.to_string()) {
+                    continue;
+                }
+
+                notfinished.borrow_mut().insert(name.clone());
+                let value =
+                    Local::<v8::Function>::try_from(namespace.get(scope, name_v8.into()).unwrap());
+
+                let value = match value {
+                    Ok(value) => value,
+                    Err(err) => {
+                        dbg!(err);
+                        continue;
                     }
                 };
 
-                let name = split_to_name();
+                let value = v8::Global::new(scope, value);
+                let is_last = name.testname.starts_with("close");
 
-                if pattern.is_match(&name.to_string()) {
-                    notfinished.borrow_mut().insert(name.clone());
-                    let value = Local::<v8::Function>::try_from(
-                        namespace.get(scope, name_v8.into()).unwrap(),
-                    );
+                let spawner = if is_last { &last_set } else { &test_set };
 
-                    let value = match value {
-                        Ok(value) => value,
-                        Err(err) => {
-                            dbg!(err);
-                            continue;
-                        }
-                    };
+                let runtime = runtime.clone();
+                let errors = errors.clone();
 
-                    let value = v8::Global::new(scope, value);
-                    let is_last = name.testname.starts_with("close");
+                let notfinished = spawner.notfinished.clone();
+                notfinished.borrow_mut().insert(name.clone());
 
-                    let spawning = || {
-                        let runtime = runtime.clone();
-                        let errors = errors.clone();
-                        let notfinished = notfinished.clone();
-                        async move {
-                            tracing::debug!("running {name}");
-                            let result = tokio::time::timeout(
-                                std::time::Duration::from_secs(60),
-                                test_function(runtime.clone(), name.clone(), value),
-                            )
-                            .await
-                            .map_err(|it| anyhow::anyhow!(it))
-                            .and_then(|it| it);
+                let fut = async move {
+                    tracing::debug!("running {name}");
+                    let mut result = Box::pin(tokio::time::timeout(
+                        std::time::Duration::from_secs(180),
+                        test_function(runtime.clone(), name.clone(), value),
+                    ));
 
-                            tracing::debug!("finished {name}");
+                    let result = futures::future::poll_fn(|cx| result.poll_unpin(cx))
+                        .await
+                        .map_err(|it| anyhow::anyhow!(it))
+                        .and_then(|it| it);
 
-                            if let Err(err) = result {
-                                tracing::trace!("error {name}: {}", err);
-                                errors.borrow_mut().push(err);
-                            }
-
-                            notfinished.borrow_mut().remove(&name);
-                        }
-                    };
-
-                    if is_last {
-                        last_set.spawn_local(spawning());
-                    } else {
-                        test_set.spawn_local(spawning());
+                    if let Err(err) = result {
+                        tracing::trace!("error {name}: {}", err);
+                        errors.borrow_mut().push(err);
                     }
-                }
+
+                    notfinished.borrow_mut().remove(&name);
+                    let len = notfinished.borrow().len();
+                    tracing::debug!("finished {name}, {len} left");
+                };
+
+                spawner.set.spawn_local(fut);
             }
         });
     }
 
+    let spawner = |spawner: LocalSet| {
+        local_set.block_on(&tokio, async {
+            tokio::time::timeout(std::time::Duration::from_secs(180), spawner).await
+        })
+    };
+
     macro_rules! block {
         ($name:ident) => {{
             tracing::debug!("running {}", stringify!($name));
-            let result = local_set.block_on(&tokio, async move {
-                tokio::time::timeout(std::time::Duration::from_secs(180), $name).await
-            });
+            let result = spawner($name.set);
 
             if let Err(err) = &result {
                 tracing::error!("{}", err);
-                tracing::error!("{:?}", notfinished);
+                tracing::error!("{:?}", $name.notfinished);
             }
 
             result
@@ -202,7 +236,11 @@ pub fn script_test() -> Result<(), Box<dyn std::error::Error>> {
             .await
     };
 
-    block!(stop_collecting)??;
+    local_set.block_on(&tokio, async move {
+        tokio::time::timeout(std::time::Duration::from_secs(60), stop_collecting).await
+    })??;
+
+    drop(runtime);
 
     if errors.borrow().is_empty() {
         return Ok(());
@@ -259,6 +297,12 @@ impl std::fmt::Display for Name {
     }
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(
+        name = %name,
+    )
+)]
 async fn test_function(
     mut runtime: Runtime,
     name: Name,
@@ -290,7 +334,9 @@ async fn test_function(
     };
 
     tracing::debug!("resolving value {name}");
-    let value = runtime.resolve_value(promise).await;
+    let value = runtime
+        .resolve_named_value(promise, Some(name.to_string()))
+        .await;
 
     let value = match value {
         Ok(value) => value,
@@ -381,7 +427,7 @@ fn check_type<T>(
     value: v8::Global<v8::Value>,
 ) -> Result<ResultTest<T>, anyhow::Error>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + serde::Serialize,
 {
     runtime.with_scope_state(|scope, state| {
         // let name = format!("{}__{}", filename, part.join("__"));
@@ -393,6 +439,11 @@ where
 
         let value = mado_deno::from_v8::<mado_deno::ResultJson<T>>(scope, real_value)
             .map(|it| it.to_result(state));
+
+        if let Err(ref err) = value {
+            println!("{err}");
+        }
+
 
         let mut print_error = |error: Option<anyhow::Error>| {
             use std::fmt::Write;
@@ -477,7 +528,9 @@ pub fn expected_error(error: &mado_deno::error::Error, expected: Option<&str>) -
                 _ => false,
             }
         }
-        Some(expected) => expected == error.to_string_variant(),
+        Some(expected) => {
+            expected == error.to_string_variant()
+        }
         None => true,
     }
 }

@@ -124,7 +124,7 @@ impl ChapterInfo {
         }
 
         write_if!("Vol. {} ", volume);
-        write_if!("Chapter {}", chapter);
+        write_if!("Chapter {} ", chapter);
 
         fn is_not_empty(string: &Option<String>) -> bool {
             match string {
@@ -134,14 +134,14 @@ impl ChapterInfo {
         }
 
         if (is_not_empty(&self.volume) || is_not_empty(&self.chapter)) && is_not_empty(&self.title) {
-            write!(f, " -")?;
+            write!(f, "- ")?;
         }
-        write_if!(" {}", title);
+        write_if!("{} ", title);
 
         if !self.scanlator.is_empty() {
-            write!(f, " [{}]", self.scanlator.join(", "))?;
+            write!(f, "[{}] ", self.scanlator.join(", "))?;
         }
-        write!(f, " [{}]", self.language)?;
+        write!(f, "[{}]", self.language)?;
 
         Ok(())
         //

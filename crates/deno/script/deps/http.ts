@@ -17,6 +17,8 @@ export interface HttpResponse {
   json_data(): Promise<any>;
 
   close(): Promise<void>;
+
+  result: any;
 }
 
 export interface HttpClient {

@@ -13,6 +13,7 @@ futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-log = "0.1"
+parking_lot = "0.12"
 
 thiserror = "1.0"
 async-trait = "0.1"

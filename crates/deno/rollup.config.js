@@ -1,6 +1,8 @@
 import common from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import multiInputPkg from "rollup-plugin-multi-input";
+import { string } from "rollup-plugin-string";
+
 const multiInput = multiInputPkg.default;
 import ts from "rollup-plugin-typescript2";
 
@@ -18,6 +20,9 @@ export default {
     },
   },
   plugins: [
+    string({
+      include: "script/resource/**/*.html",
+    }),
     multiInput({ relative: "script/" }),
     // nodePolyfills(),
     nodeResolve({ browser: true }),

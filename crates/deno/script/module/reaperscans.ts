@@ -51,7 +51,8 @@ class ReaperScans implements HttpModule {
     // this.browser = new BrowserWrapper(browser);
   }
 
-  async getInfo(url: string): Promise<MangaAndChapters> {
+  async getInfo(id: string): Promise<MangaAndChapters> {
+    let url = id;
     let browser = new Cloudflare(this.browser);
     try {
       const CHAPTER_QUERY =
@@ -96,7 +97,7 @@ class ReaperScans implements HttpModule {
           break;
         }
 
-        url = `${url}?page=${current}`;
+        url = `${id}?page=${current}`;
       }
 
       chapters.reverse();
@@ -171,7 +172,7 @@ class ReaperScans implements HttpModule {
       id: doc.selectString("@href"),
       ...ch,
       language: "en",
-      scanlator: [],
+      scanlator: [this.name],
     };
 
     return info;

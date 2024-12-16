@@ -69,7 +69,15 @@ impl DownloadChapterInfo {
         self.status.lock()
     }
 
+    #[tracing::instrument(
+        skip_all,
+        fields(
+            self.title,
+            status,
+        )
+    )]
     pub fn set_status(&self, status: DownloadStatus) {
+        tracing::trace!("setting status to {:?}", status);
         let mut lock = self.status.lock();
         *lock = status;
         self.observers

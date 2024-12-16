@@ -63,6 +63,7 @@ export class MangaDex implements HttpModule {
     let query = CommonClosure.query(json);
 
     let title =
+      query("$.data.attributes.title.ja-ro") ||
       query("$.data.attributes.title.en") ||
       query("$.data.attributes.title.ja") ||
       query("$.data.attributes.title[0]") ||

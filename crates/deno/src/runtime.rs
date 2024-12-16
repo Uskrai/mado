@@ -1,9 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, num::NonZeroI32, path::Path, rc::Rc, sync::Arc};
+use std::{
+    borrow::Borrow, cell::RefCell, collections::HashMap, num::NonZeroI32, path::Path, rc::Rc,
+    sync::Arc,
+};
 
 use anyhow::Context;
 use deno_core::{
     v8::{self, Global, Local},
-    JsRuntime, RuntimeOptions,
+    JsRuntime, OpState, RuntimeOptions,
 };
 use event_listener::{Event, EventListener};
 use futures::FutureExt;
@@ -15,7 +18,7 @@ use crate::{DenoMadoModule, ModuleLoop};
 #[derive(Default)]
 pub struct ModuleLoader {
     runtime: Runtime,
-    max_module: i32,
+    max_module: usize,
 }
 
 impl ModuleLoader {
@@ -26,12 +29,12 @@ impl ModuleLoader {
         }
     }
 
-    pub fn max_module(&self) -> i32 {
+    pub fn max_module(&self) -> usize {
         self.max_module
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn load_file(&mut self, path: &Path) -> Result<i32, anyhow::Error> {
+    pub async fn load_file(&mut self, path: &Path) -> Result<usize, anyhow::Error> {
         let path = path.canonicalize().unwrap();
         let path = format!("file://{}", path.to_string_lossy());
         tracing::trace!("loading {}", path);
@@ -39,15 +42,21 @@ impl ModuleLoader {
 
         let module = self
             .runtime
+            .0
             .js
             .borrow_mut()
-            .load_side_module(&url, None)
+            .load_side_es_module(&url)
             .await?;
 
         if module > self.max_module() {
-            let _receiver = self.runtime.js.borrow_mut().mod_evaluate(module);
-            self.runtime.js.borrow_mut().run_event_loop(false).await?;
-            _receiver.await??;
+            let _receiver = self.runtime.0.js.borrow_mut().mod_evaluate(module);
+            self.runtime
+                .0
+                .js
+                .borrow_mut()
+                .run_event_loop(deno_core::PollEventLoopOptions::default())
+                .await?;
+            _receiver.await?;
             self.max_module = module;
         }
 
@@ -56,10 +65,10 @@ impl ModuleLoader {
 
     pub async fn init_module(
         &mut self,
-        module: i32,
+        module: usize,
     ) -> Result<Vec<Result<(DenoMadoModule, ModuleLoop), ModuleLoadError>>, ModuleLoadError> {
         let (array, length) = {
-            let namespace = self.runtime.js.borrow_mut().get_module_namespace(module);
+            let namespace = self.runtime.0.js.borrow_mut().get_module_namespace(module);
             self.runtime.with_scope(|scope| {
                 let name = v8::String::new(scope, "initMadoModule").unwrap();
                 let null = v8::null(scope);
@@ -124,12 +133,14 @@ impl ModuleLoader {
     }
 }
 
-/// wrapper for Rc<RefCell<JsRuntime>>
-#[derive(Clone)]
-pub struct Runtime {
+struct RuntimeInner {
     js: Rc<RefCell<JsRuntime>>,
     event: Arc<event_listener::Event>,
 }
+
+/// wrapper for Rc<RefCell<JsRuntime>>
+#[derive(Clone)]
+pub struct Runtime(Arc<RuntimeInner>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleLoadError {
@@ -141,6 +152,9 @@ pub enum ModuleLoadError {
     #[error("{0}")]
     WrongTypeError(anyhow::Error),
 }
+
+pub struct WeakRuntime(std::sync::Weak<RuntimeInner>);
+impl deno_core::Resource for WeakRuntime {}
 
 impl Default for Runtime {
     fn default() -> Self {
@@ -155,18 +169,26 @@ impl Runtime {
 
         js.handle_scope().set_promise_hook(promise_hook);
 
-        let this = Self {
+        let this = RuntimeInner {
             js: Rc::new(RefCell::new(js)),
             event,
         };
+        let this = Arc::new(this);
 
         this.js
             .borrow_mut()
             .op_state()
             .borrow_mut()
-            .put(this.clone());
+            .put(WeakRuntime(Arc::downgrade(&this)));
 
-        this
+        Runtime(this)
+    }
+
+    pub fn from_op_state(state: &OpState) -> Option<Self> {
+        use core::ops::Deref;
+        let rt = state.deref().borrow::<WeakRuntime>();
+
+        std::sync::Weak::upgrade(&rt.0).map(|it| Runtime(it))
     }
 
     pub fn new_with_option<F>(option: F) -> Self
@@ -176,7 +198,6 @@ impl Runtime {
         let mut options = deno_core::RuntimeOptions {
             module_loader: Some(Rc::new(deno_core::FsModuleLoader)),
             extensions: crate::extensions(),
-            extensions_with_js: crate::extensions(),
             ..Default::default()
         };
 
@@ -185,11 +206,11 @@ impl Runtime {
         Self::new(options)
     }
 
-    fn with_runtime<F, R>(&mut self, fun: F) -> R
+    fn with_runtime<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&Self, &mut JsRuntime) -> R,
     {
-        let runtime = &mut *self.js.borrow_mut();
+        let runtime = &mut *self.0.js.borrow_mut();
 
         fun(self, runtime)
     }
@@ -298,9 +319,10 @@ impl Runtime {
         Ok((sender, looper))
     }
 
-    pub async fn resolve_value(
+    pub async fn resolve_named_value(
         &self,
         value: v8::Global<v8::Value>,
+        name: Option<String>
     ) -> Result<Global<v8::Value>, anyhow::Error> {
         let value = self.clone().with_scope(|scope| {
             let value = v8::Local::new(scope, value);
@@ -310,7 +332,7 @@ impl Runtime {
                     let function = build_function(scope, fn_catch_callback);
 
                     let promise = promise.catch(scope, function).unwrap();
-                    v8::Local::<v8::Value>::try_from(promise).unwrap()
+                    v8::Local::<v8::Value>::from(promise)
                 }
                 Err(_) => value,
             };
@@ -318,22 +340,33 @@ impl Runtime {
             PROMISE_SPAN.with(|slot| {
                 slot.borrow_mut().insert(
                     value.get_hash(),
-                    TracingSpan::Span(tracing::Span::current()),
+                    TracingSpan::Span(tracing::Span::current(), name.clone()),
                 );
             });
 
             v8::Global::new(scope, value)
         });
 
-        ValueResolver::new(self, value).await
+        let resolver = self.js().borrow_mut().resolve(value);
+
+        ValueResolver::new(self, resolver, name).await
     }
 
-    pub async fn with_event_loop<T>(&mut self, fut: impl std::future::Future<Output = T>) -> T {
+    pub async fn resolve_value(
+        &self,
+        value: v8::Global<v8::Value>,
+    ) -> Result<Global<v8::Value>, anyhow::Error> {
+        self.resolve_named_value(value, None).await
+    }
+
+    pub async fn with_event_loop<T>(&self, fut: impl std::future::Future<Output = T>) -> T {
         futures::pin_mut!(fut);
 
         loop {
             let it = futures::future::poll_fn(|cx| {
-                self.with_runtime(|_, js| js.poll_event_loop(cx, false))
+                self.with_runtime(|_, js| {
+                    js.poll_event_loop(cx, deno_core::PollEventLoopOptions::default())
+                })
             });
 
             tokio::select! {
@@ -355,34 +388,42 @@ impl Runtime {
     // }
 
     pub fn js(&self) -> &RefCell<JsRuntime> {
-        self.js.as_ref()
+        self.0.js.as_ref()
     }
 }
 
 // https://github.com/denoland/deno/issues/13458
-struct ValueResolver {
-    value: v8::Global<v8::Value>,
+struct ValueResolver<F> {
+    value: F,
     listener: Option<EventListener>,
     event: Arc<Event>,
     prev_err: Option<anyhow::Error>,
     js: Rc<RefCell<JsRuntime>>,
     timer: async_io::Timer,
+    name: Option<String>
 }
 
-impl ValueResolver {
-    pub fn new(runtime: &Runtime, value: v8::Global<v8::Value>) -> Self {
+impl<F> ValueResolver<F>
+where
+    F: std::future::Future<Output = Result<v8::Global<v8::Value>, anyhow::Error>> + Unpin,
+{
+    pub fn new(runtime: &Runtime, value: F, name: Option<String>) -> Self {
         Self {
             value,
-            listener: Some(runtime.event.listen()),
-            event: runtime.event.clone(),
+            listener: Some(runtime.0.event.listen()),
+            event: runtime.0.event.clone(),
             prev_err: None,
-            js: runtime.js.clone(),
+            js: runtime.0.js.clone(),
             timer: async_io::Timer::interval(std::time::Duration::from_millis(250)),
+            name,
         }
     }
 }
 
-impl std::future::Future for ValueResolver {
+impl<F> std::future::Future for ValueResolver<F>
+where
+    F: std::future::Future<Output = Result<v8::Global<v8::Value>, anyhow::Error>> + Unpin,
+{
     type Output = Result<Global<v8::Value>, anyhow::Error>;
 
     fn poll(
@@ -427,7 +468,37 @@ impl std::future::Future for ValueResolver {
             }
         };
 
-        let poll = js.poll_value(&this.value, cx);
+        js.poll_event_loop(cx, deno_core::PollEventLoopOptions::default());
+        let poll = this.value.poll_unpin(cx);
+        // let poll = js.resolve(this.value.clone()).poll_unpin(cx);
+        // let it = this.value.open(js.v8_isolate());
+        // let promise = v8::Local::new(&mut js.handle_scope(), this.value);
+        // let promise = v8::Local::<v8::Promise>::try_from(promise);
+
+        // let poll = if let Ok(promise) = promise {
+        //     let state = promise.state();
+        //
+        //     if state == v8::PromiseState::Pending {
+        //         std::task::Poll::Pending
+        //     } else {
+        //         let result = promise.result(&mut js.handle_scope());
+        //         let global = v8::Global::new(js.v8_isolate(), result);
+        //
+        //         match state {
+        //             v8::PromiseState::Fulfilled => {
+        //                 std::task::Poll::Ready(Ok(global))
+        //             }
+        //             v8::PromiseState::Rejected => {
+        //                 std::task::Poll::Ready(Err(global))
+        //             }
+        //             _ => std::task::Poll::Pending,
+        //         }
+        //     }
+        // } else {
+        //     std::task::Poll::Ready(Ok(this.value))
+        // };
+        // let promise = v8::Value::<v8::Promise>::try_from(it);
+        // let poll = js.poll_value(&this.value, cx);
 
         // notify event when poll is ready so another poller will wait instead.
         if poll.is_ready() {
@@ -444,6 +515,8 @@ impl std::future::Future for ValueResolver {
             }
             Err(err) => {
                 let it = err.downcast::<deno_core::error::JsError>();
+                // let local: Result<deno_core::error::JsError, _> = err.open(js.v8_isolate()).try_into();
+                // let local = v8::Local::new(&mut js.handle_scope(), err).open(js.v8_isolate());
 
                 match it {
                     Ok(err) => std::task::Poll::Ready(Err(err.into())),
@@ -471,6 +544,7 @@ fn build_function<'s>(
     v8::FunctionBuilder::<v8::Function>::build(function, scope).unwrap()
 }
 
+#[tracing::instrument(skip_all)]
 fn fn_catch_callback(
     scope: &mut v8::HandleScope,
     args: v8::FunctionCallbackArguments,
@@ -481,9 +555,10 @@ fn fn_catch_callback(
     rv.set(errors);
 }
 
+#[derive(Debug)]
 pub enum TracingSpan {
-    Span(tracing::Span),
-    EnteredGuard(tracing::span::EnteredSpan),
+    Span(tracing::Span, Option<String>),
+    EnteredGuard(tracing::span::EnteredSpan, Option<String>),
 }
 
 std::thread_local! {
@@ -492,23 +567,23 @@ std::thread_local! {
 
 fn get_slot_span(
     hash: NonZeroI32,
-    fun: impl FnOnce(&mut HashMap<NonZeroI32, TracingSpan>, tracing::Span),
+    fun: impl FnOnce(&mut HashMap<NonZeroI32, TracingSpan>, tracing::Span, Option<String>),
 ) {
     PROMISE_SPAN.with(|slot| {
         let slot = &mut slot.borrow_mut();
-        let span = match slot.entry(hash) {
+        let (span, name) = match slot.entry(hash) {
             std::collections::hash_map::Entry::Occupied(entry) => match entry.remove() {
-                TracingSpan::Span(span) => span,
-                TracingSpan::EnteredGuard(guard) => {
+                TracingSpan::Span(span, name) => (span, name),
+                TracingSpan::EnteredGuard(guard, name) => {
                     let span = guard.exit();
-                    slot.insert(hash, TracingSpan::EnteredGuard(span.clone().entered()));
-                    span
+                    slot.insert(hash, TracingSpan::EnteredGuard(span.clone().entered(), name.clone()));
+                    (span, name)
                 }
             },
             std::collections::hash_map::Entry::Vacant(_) => return,
         };
 
-        fun(slot, span);
+        fun(slot, span, name);
     })
 }
 
@@ -520,19 +595,19 @@ extern "C" fn promise_hook(
     match types {
         v8::PromiseHookType::Init => {
             if !parent.is_null_or_undefined() {
-                get_slot_span(parent.get_hash(), |slot, span| {
-                    slot.insert(current.get_hash(), TracingSpan::Span(span));
+                get_slot_span(parent.get_hash(), |slot, span, name| {
+                    slot.insert(current.get_hash(), TracingSpan::Span(span, name));
                 })
             }
         }
-        v8::PromiseHookType::Before => get_slot_span(current.get_hash(), |slot, span| {
+        v8::PromiseHookType::Before => get_slot_span(current.get_hash(), |slot, span, name| {
             slot.insert(
                 current.get_hash(),
-                TracingSpan::EnteredGuard(span.entered()),
+                TracingSpan::EnteredGuard(span.entered(), name),
             );
         }),
-        v8::PromiseHookType::Resolve => get_slot_span(current.get_hash(), |slot, span| {
-            slot.insert(current.get_hash(), TracingSpan::Span(span));
+        v8::PromiseHookType::Resolve => get_slot_span(current.get_hash(), |slot, span, name| {
+            slot.insert(current.get_hash(), TracingSpan::Span(span, name));
         }),
         v8::PromiseHookType::After => PROMISE_SPAN.with(|slot| {
             slot.borrow_mut().remove(&current.get_hash());

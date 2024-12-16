@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use gtk::prelude::*;
 use mado::engine::{
-    DownloadInfo, DownloadInfoMsg, DownloadProgressStatus, DownloadStatus,
+    AnyObserverHandleSend, DownloadChapterImageInfo, DownloadInfo, DownloadInfoMsg,
+    DownloadProgressStatus, DownloadStatus,
 };
+use parking_lot::Mutex;
 
 #[derive(Debug)]
 pub struct DownloadItem {
@@ -25,6 +27,7 @@ pub struct DownloadView {
     pub widget: gtk::Box,
     title: gtk::Label,
     status: gtk::Label,
+    path: gtk::Label,
     chapter_progress: gtk::Label,
     chapter_title: gtk::Label,
     manga_progress: gtk::Label,
@@ -45,7 +48,7 @@ impl From<&DownloadInfo> for DownloadView {
                     set_spacing: 5,
                     #[name = "title"]
                     append = &gtk::Label {
-                        set_markup: &gtk::glib::markup_escape_text(info.manga()),
+                        set_markup: "",
                         set_halign: gtk::Align::Start,
                     },
 
@@ -56,11 +59,17 @@ impl From<&DownloadInfo> for DownloadView {
                 },
 
                 append = &gtk::Box {
+                    #[name = "path"]
+                    append = &gtk::Label {
+                    }
+                },
+
+                append = &gtk::Box {
                     set_spacing: 5,
                     #[name = "status"]
                     append = &gtk::Label {
                         set_halign: gtk::Align::Start,
-                        set_text: &info.status().to_human_string(),
+                        set_text: "",
                     },
 
                     #[name = "chapter_title"]
@@ -100,14 +109,19 @@ impl From<&DownloadInfo> for DownloadView {
             .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_USER);
         widget.add_css_class(status_to_class(&info.status()));
 
-        Self {
+        let this = Self {
             widget,
             status,
             title,
+            path,
             chapter_progress,
             chapter_title,
             manga_progress,
-        }
+        };
+
+        this.sync_info(&info);
+
+        this
     }
 }
 
@@ -137,6 +151,14 @@ impl DownloadView {
 
             color
         })
+    }
+
+    pub fn sync_info(&self, info: &DownloadInfo) {
+        self.title
+            .set_markup(&gtk::glib::markup_escape_text(info.manga()));
+        self.path.set_markup(&gtk::glib::markup_escape_text(&info.path().to_string()));
+        self.update_info(info);
+        self.update_chapter_info(info);
     }
 
     pub fn set_download_status(&self, status: &DownloadStatus) {
@@ -195,50 +217,89 @@ impl DownloadView {
 
 #[derive(Debug, Clone)]
 pub struct DownloadViewController {
-    sender: gtk::glib::Sender<DownloadMsg>,
+    pub sender: gtk::glib::Sender<DownloadMsg>,
 }
 
 #[derive(Debug)]
 pub enum DownloadMsg {
     StatusChanged,
     ChapterChanged,
+    InfoChanged(Arc<DownloadInfo>),
 }
 
 impl DownloadViewController {
-    pub fn connect(view: DownloadView, info: Arc<DownloadInfo>) -> Self {
+    pub fn connect(view: DownloadView, mut info: Arc<DownloadInfo>) -> Self {
         use gtk::glib;
 
         let (sender, recv) = gtk::glib::MainContext::channel(glib::PRIORITY_DEFAULT);
         let this = Self { sender };
-        let mut handles = vec![];
+        let handles = Arc::new(Mutex::new(Vec::<AnyObserverHandleSend>::new()));
 
         let sender = this.sender.clone();
-        let handle = info.connect(move |msg| match msg {
-            DownloadInfoMsg::StatusChanged(_) => sender.send(DownloadMsg::StatusChanged).unwrap(),
-            DownloadInfoMsg::OrderChanged(_) => {}
-        });
-        handles.push(handle.send_handle_any());
 
-        for it in info.chapters().iter() {
-            let sender = this.sender.clone();
-            let handle = it.connect(move |msg| match msg {
-                mado::engine::DownloadChapterInfoMsg::StatusChanged(_) => {
-                    sender.send(DownloadMsg::ChapterChanged).unwrap()
+        let connect_info = {
+            let sender = sender.clone();
+            let mhandles = handles.clone();
+            move |info: &Arc<DownloadInfo>| {
+                let mut handles = mhandles.lock();
+                for it in handles.drain(..) {
+                    it.disconnect();
                 }
-                mado::engine::DownloadChapterInfoMsg::DownloadImagesChanged(images) => {
-                    for it in images.iter() {
-                        let sender = sender.clone();
-                        it.connect(move |msg| match msg {
-                            mado::engine::DownloadChapterImageInfoMsg::StatusChanged(_) => {
-                                sender.send(DownloadMsg::ChapterChanged).unwrap()
-                            }
-                        });
+
+                let handle = info.connect_only({
+                    let sender = sender.clone();
+                    move |msg| match msg {
+                        DownloadInfoMsg::StatusChanged(_) => {
+                            sender.send(DownloadMsg::StatusChanged).unwrap()
+                        }
+                        DownloadInfoMsg::OrderChanged(_) => {}
                     }
-                }
-            });
+                });
+                handles.push(handle.send_handle_any());
 
-            handles.push(handle.send_handle_any());
-        }
+                for chapter in info.chapters().iter() {
+                    let mhandles = mhandles.clone();
+                    let sender = sender.clone();
+
+                    let connect_images = {
+                        let sender = sender.clone();
+                        move |images: &Vec<Arc<DownloadChapterImageInfo>>,
+                              handles: &mut Vec<AnyObserverHandleSend>| {
+
+                            for it in images.iter() {
+                                let sender = sender.clone();
+                                let handle = it.connect_only(move |msg| match msg {
+                                    mado::engine::DownloadChapterImageInfoMsg::StatusChanged(_) => {
+                                        sender.send(DownloadMsg::ChapterChanged).unwrap()
+                                    }
+                                });
+
+                                handles.push(handle.send_handle_any());
+                            }
+                        }
+                    };
+
+                    connect_images(&chapter.images(), &mut handles);
+                    let handle = chapter.connect_only(move |msg| match msg {
+                        mado::engine::DownloadChapterInfoMsg::StatusChanged(_) => {
+                            sender.send(DownloadMsg::ChapterChanged).unwrap()
+                        }
+                        mado::engine::DownloadChapterInfoMsg::DownloadImagesChanged(images) => {
+                            let sender = sender.clone();
+                            let mut handles = mhandles.lock();
+                            connect_images(&images, &mut handles);
+                            sender.send(DownloadMsg::ChapterChanged).unwrap();
+                        }
+                    });
+
+
+                    handles.push(handle.send_handle_any());
+                }
+
+                sender.send(DownloadMsg::ChapterChanged).unwrap();
+                sender.send(DownloadMsg::StatusChanged).unwrap();
+            }
+        };
 
         let widget = view.widget.downgrade();
         let status = view.status.downgrade();
@@ -246,6 +307,7 @@ impl DownloadViewController {
         let chapter_progress = view.chapter_progress.downgrade();
         let manga_progress = view.manga_progress.downgrade();
         let chapter_title = view.chapter_title.downgrade();
+        let path = view.path.downgrade();
 
         let upgrade_view = move || {
             widget.upgrade().and_then(|widget| {
@@ -253,13 +315,16 @@ impl DownloadViewController {
                     chapter_title.upgrade().and_then(|chapter_title| {
                         chapter_progress.upgrade().and_then(|chapter_progress| {
                             manga_progress.upgrade().and_then(|manga_progress| {
-                                status.upgrade().map(|status| DownloadView {
-                                    widget,
-                                    title,
-                                    status,
-                                    chapter_progress,
-                                    manga_progress,
-                                    chapter_title,
+                                path.upgrade().and_then(|path| {
+                                    status.upgrade().map(|status| DownloadView {
+                                        widget,
+                                        title,
+                                        status,
+                                        path,
+                                        chapter_progress,
+                                        manga_progress,
+                                        chapter_title,
+                                    })
                                 })
                             })
                         })
@@ -281,11 +346,16 @@ impl DownloadViewController {
                         view.update_info(&info);
                         view.update_chapter_info(&info);
                     }
+                    DownloadMsg::InfoChanged(change) => {
+                        info = change;
+                        connect_info(&info);
+                        view.sync_info(&info);
+                    }
                 };
 
                 true
             } else {
-                for it in handles.iter() {
+                for it in handles.lock().iter() {
                     it.clone().disconnect();
                 }
                 false

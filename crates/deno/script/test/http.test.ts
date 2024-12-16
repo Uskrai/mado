@@ -1,5 +1,5 @@
 import { RustHttpClient } from "../deps";
-import { Ok } from "../deps/error";
+import { Ok, ResultFromJson } from "../deps/error";
 
 export function http__Ok() {
   let http = new RustHttpClient();
@@ -21,7 +21,11 @@ export function http__Ok__Clone() {
 export async function http__Err_ResourceError__Decrement() {
   let http = new RustHttpClient();
   http.close();
-  return http.close();
+  let url = "https://google.com/";
+  let response = await http.get({
+    url
+  });
+  return response.result;
 }
 
 export async function http__Ok__Response() {

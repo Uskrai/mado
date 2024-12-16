@@ -50,6 +50,7 @@ class MangaNato implements HttpModule {
     if (this.reverseChapter) {
       chapters.reverse();
     }
+    console.log(chapters)
 
     return {
       manga,
@@ -109,7 +110,7 @@ class MangaNato implements HttpModule {
       volume: null,
       chapter: null,
       language: "en",
-      scanlator: [],
+      scanlator: [this.name],
     };
 
     let { groups } = NAME_REGEX.exec(info.title) || {};
@@ -169,7 +170,7 @@ export function initModule() {
   let readmanganato = new MangaNato(
     "fa8bb4d1ceea4c8fa0e98c00755f95d4",
     "Manganato",
-    "https://chapmanganato.com",
+    "https://chapmanganato.to",
     new RustHttpClient(),
     true
   );
@@ -177,7 +178,7 @@ export function initModule() {
   let manganato = new ModuleWrapper(
     "d690b8c3-03bb-4129-b245-48aadae9eba9",
     "Manganato",
-    "https://manganato",
+    "https://manganato.com",
     readmanganato
   );
 

@@ -2,7 +2,7 @@ use std::num::NonZeroU16;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::HashMap};
 
-use deno_core::{op, Extension, ExtensionBuilder, OpState, Resource};
+use deno_core::{op2, Extension, OpState, Resource};
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -54,12 +54,13 @@ fn get_http(state: &mut OpState, rid: u32) -> ResultJson<Rc<Client>> {
         .to_result_json(state)
 }
 
-#[op]
+#[op2(fast)]
 pub fn op_http_client_new(state: &mut OpState) -> u32 {
     state.resource_table.add(Client::default())
 }
 
-#[op]
+#[op2]
+#[serde]
 pub fn op_http_client_clone(state: &mut OpState, rid: u32) -> ResultJson<u32> {
     let http = try_json!(get_http(state, rid));
     let rid = state.resource_table.add_rc(http);
@@ -67,24 +68,29 @@ pub fn op_http_client_clone(state: &mut OpState, rid: u32) -> ResultJson<u32> {
     ResultJson::Ok(rid)
 }
 
-#[op]
+#[op2]
+#[serde]
 pub fn op_http_client_close(state: &mut OpState, rid: u32) -> ResultJson<()> {
     state
         .resource_table
-        .close(rid)
+        .take_any(rid)
+        .map(|it| it.close())
         .map_err(|_| Error::resource_error(rid, "Http already closed"))
         .to_result_json(state)
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_http_client_get<'a>(
     state: Rc<RefCell<OpState>>,
     rid: u32,
-    request: RequestBuilder,
+    #[serde] request: RequestBuilder,
 ) -> ResultJson<ResponseJson> {
     let client = try_json!(get_http(&mut state.borrow_mut(), rid));
 
+    tracing::info!("sending request");
     let response = request.to_request(&client.client).send().await;
+    tracing::info!("request done");
 
     let response = try_json!(response
         .map_err(Error::from)
@@ -100,7 +106,8 @@ pub async fn op_http_client_get<'a>(
     })
 }
 
-#[op]
+#[op2(async)]
+#[serde]
 pub async fn op_http_response_text(state: Rc<RefCell<OpState>>, rid: u32) -> ResultJson<String> {
     let response = {
         let state = &mut state.borrow_mut();
@@ -125,14 +132,17 @@ pub async fn op_http_response_text(state: Rc<RefCell<OpState>>, rid: u32) -> Res
         .to_result_json_borrow(state)
 }
 
+deno_core::extension!(
+    extension,
+    ops = [
+            op_http_client_new,
+            op_http_client_close,
+            op_http_client_clone,
+            op_http_client_get,
+            op_http_response_text,
+    ]
+);
+
 pub fn init() -> Extension {
-    ExtensionBuilder::default()
-        .ops(vec![
-            op_http_client_new::decl(),
-            op_http_client_close::decl(),
-            op_http_client_clone::decl(),
-            op_http_client_get::decl(),
-            op_http_response_text::decl(),
-        ])
-        .build()
+    extension::init_ops_and_esm()
 }

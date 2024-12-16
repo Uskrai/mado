@@ -153,7 +153,13 @@ impl DownloadInfo {
     }
 
     /// Change download's status, then emit [`DownloadInfoObserver::on_status_changed`]
-    #[tracing::instrument]
+    #[tracing::instrument(
+        skip_all,
+        fields(
+            self.title,
+            status,
+        )
+    )]
     pub fn set_status(&self, status: DownloadStatus) {
         tracing::trace!("setting status to {:?}", status);
         let mut lock = self.status.lock();

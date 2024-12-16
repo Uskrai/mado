@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use relm4::{ComponentParts, ComponentSender, SimpleComponent};
 
 use crate::{
@@ -9,12 +11,14 @@ use crate::{
 pub enum TaskListMsg {
     Setup(gtk::ListItem),
     Bind(gtk::ListItem),
+    Teardown(gtk::ListItem),
 }
 
 #[derive(Clone)]
 pub struct TaskListModel {
     tasks: ListModel<DownloadItem>,
     pub selection: gtk::MultiSelection,
+    widget_map: HashMap<gtk::ListItem, DownloadViewController>,
 }
 
 fn create_selection_model(model: &ListModel<DownloadItem>) -> gtk::MultiSelection {
@@ -35,7 +39,11 @@ impl SimpleComponent for TaskListModel {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let selection = create_selection_model(&tasks);
-        let model = Self { tasks, selection };
+        let model = Self {
+            tasks,
+            selection,
+            widget_map: Default::default(),
+        };
 
         let widgets = view_output!();
 
@@ -48,12 +56,27 @@ impl SimpleComponent for TaskListModel {
                 if let Some(data) = self.tasks.get_by_object(&item.item().unwrap()) {
                     let info = data.info().clone();
                     let view = DownloadView::from(info.as_ref());
-                    let _ = DownloadViewController::connect(view.clone(), info.clone());
+                    let controller = DownloadViewController::connect(view.clone(), info.clone());
                     item.set_child(Some(&view.widget));
+                    self.widget_map.insert(item, controller);
                 }
             }
-            TaskListMsg::Bind(_) => {
-                //
+            TaskListMsg::Bind(item) => {
+                let controller = self.widget_map.get(&item);
+                let info = item.item().and_then(|it| self.tasks.get_by_object(&it));
+
+                let (controller, info) = match controller.zip(info) {
+                    Some(it) => it,
+                    None => return,
+                };
+
+                controller
+                    .sender
+                    .send(crate::task::DownloadMsg::InfoChanged(info.info().clone()))
+                    .unwrap();
+            }
+            TaskListMsg::Teardown(item) => {
+                self.widget_map.remove(&item);
             }
         }
     }
@@ -70,6 +93,9 @@ impl SimpleComponent for TaskListModel {
                 connect_bind[sender] => move |_, item| {
                     sender.input(TaskListMsg::Bind(item.clone()));
                 },
+                connect_teardown[sender] => move |_, item| {
+                    sender.input(TaskListMsg::Teardown(item.clone()));
+                }
             }
         }
     }

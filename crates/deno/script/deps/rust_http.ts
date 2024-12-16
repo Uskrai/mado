@@ -60,7 +60,7 @@ export class RustHttpClient extends Resource implements HttpClient {
   async get(request: HttpRequest): Promise<HttpResponse> {
     return new RustHttpResponse(
       ResultFromJson(
-        await Deno.core.opAsync("op_http_client_get", this.rid, request)
+        await Deno.core.ops.op_http_client_get(this.rid, request)
       )
     );
   }

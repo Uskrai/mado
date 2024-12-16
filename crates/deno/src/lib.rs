@@ -1,8 +1,8 @@
+mod chromium;
 pub mod error;
 pub mod http;
 mod module;
 mod runtime;
-mod chromium;
 pub mod task;
 
 pub use error::{Error, ErrorJson};
@@ -23,11 +23,20 @@ where
     tokio::task::spawn_local(future);
 }
 
-#[deno_core::op]
-async fn op_tokio_sleep(mili: u64) {
-    tokio::time::sleep(std::time::Duration::from_millis(mili)).await;
+#[deno_core::op2(async)]
+async fn op_tokio_sleep(mili: u32) {
+    tokio::time::sleep(std::time::Duration::from_millis(mili.into())).await;
 }
 
+#[deno_core::op2]
+#[serde]
+fn op_url_join(#[string] url: &str, #[string] end: &str) -> ResultJson<String> {
+    url::Url::parse(url)
+        .and_then(|it| it.join(end))
+        .map(|it| it.to_string())
+        .map_err(ErrorJson::custom)
+        .into()
+}
 // #[deno_core::op]
 // async fn op_resource_clone(state: &mut deno_core::OpState, rid: u32) -> Result<u32, anyhow::Error> {
 //     let it = state.resource_table.get_any(rid)?;
@@ -35,23 +44,38 @@ async fn op_tokio_sleep(mili: u64) {
 //     Ok(state.resource_table.add_rc(it))
 // }
 
+deno_core::extension!(
+    libs,
+    ops = [op_tokio_sleep, op_url_join],
+    js = [
+        "script/bootstrap/00_bootstrap.js",
+        "script/bootstrap/01_console.js",
+    ]
+);
+
 pub fn extensions() -> Vec<deno_core::Extension> {
+    // let bootstrap = deno_core::include_js_files!(
+    //     bootstrap
+    //     "script/bootstrap/00_bootstrap.js",
+    //     "script/bootstrap/01_console.js",
+    // );
     vec![
-        deno_console::init(),
+        // deno_console::deno_console::init_ops_and_esm(),
         crate::http::init(),
         crate::error::init(),
         crate::module::init(),
         crate::task::init(),
-        deno_core::ExtensionBuilder::default()
-            .ops(vec![op_tokio_sleep::decl()])
-            .build(),
-        deno_core::Extension::builder()
-            .js(deno_core::include_js_files!(
-                prefix "bootstrap",
-                "../script/bootstrap/00_bootstrap.js",
-                "../script/bootstrap/01_console.js",
-            ))
-            .build(),
+        self::libs::init_ops_and_esm(),
+        // deno_core::ExtensionBuilder::default()
+        //     .ops(vec![op_tokio_sleep::decl()])
+        //     .build(),
+        // deno_core::Extension::builder()
+        //     .js(deno_core::include_js_files!(
+        //         prefix "bootstrap",
+        //         "../script/bootstrap/00_bootstrap.js",
+        //         "../script/bootstrap/01_console.js",
+        //     ))
+        //     .build(),
         crate::chromium::init(),
     ]
 }
@@ -88,6 +112,17 @@ pub enum ResultJson<T> {
     Err(self::error::ErrorJson),
 }
 
+// impl<T> From<Result<T, ErrorJson>> for ResultJson<T> {
+//     fn from(value: Result<T, ErrorJson>) -> Self {
+//         match value {
+//             Result::Ok(v) => Self::Ok(v),
+//             Result::Err(err) => Self::Err(err),
+//         }
+//     }
+//     // pub fn from_result(result: Result<T, ErrorJson>) -> Self {
+//     // }
+// }
+//
 #[macro_export]
 macro_rules! try_json {
     ($expr:expr $(,)?) => {

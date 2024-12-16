@@ -1,0 +1,25 @@
+{
+  "post_id": 00000,
+  "noimagehtml": "<center><h4>NO IMAGE YET</h4></center>",
+  "prevUrl": "https://manhwafreak.com/",
+  "nextUrl": "",
+  "mode": "full",
+  "sources": [
+    {
+      "source": "Server 1",
+      "images": [
+        "https://cdn.discordapp.com/attachments/939143415441014854/1028052936263209060/donate.png",
+        "https://cdn.discordapp.com/attachments/939143415441014854/1028053173048447026/10.jpg",
+        "https://cdn.discordapp.com/attachments/939143415441014854/1028053616273137734/static-assets-upload3832051268753847184.jpg"
+      ]
+    }
+  ],
+  "lazyload": true,
+  "defaultSource": "Server 1",
+  "lazyloadPlaceHolder": "https://manhwafreak.com/wp-content/themes/mangareaderfix/assets/img/readerarea.svg",
+  "progressBar": true,
+  "contentmode": "advanced",
+  "protected": false,
+  "is_novel": false,
+  "unlock_token": null
+}

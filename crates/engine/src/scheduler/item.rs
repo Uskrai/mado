@@ -1,7 +1,13 @@
 use std::sync::Arc;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq)]
 pub struct QueueItem(pub by_address::ByAddress<Arc<crate::DownloadInfo>>);
+
+impl std::fmt::Debug for QueueItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("QueueItem").field(&self.0.order()).finish()
+    }
+}
 
 impl std::ops::Deref for QueueItem {
     type Target = Arc<crate::DownloadInfo>;

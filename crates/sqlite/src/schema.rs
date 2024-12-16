@@ -74,7 +74,7 @@ fn v1_download_chapter() -> &'static str {
 
             FOREIGN KEY (download_id) 
                 REFERENCES downloads(id)
-                ON DELETE CASCADE
+                ON DELETE RESTRICT
                 ON UPDATE CASCADE
         );
     "#
@@ -93,7 +93,7 @@ fn v1_download_chapter_images() -> &'static str {
 
         FOREIGN KEY (download_chapter_id)
             REFERENCES download_chapters(id)
-            ON DELETE CASCADE
+            ON DELETE RESTRICT
             ON UPDATE CASCADE
     );
     "#

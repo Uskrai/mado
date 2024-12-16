@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use deno_core::{op, Extension, ExtensionBuilder, OpState, Resource};
+use deno_core::{op2, Extension, OpState, Resource};
 use mado_core::{ChapterImageInfo, ChapterTask};
 
 use crate::{try_json, Error, ResultJson, ToResultJson};
@@ -61,10 +61,9 @@ pub fn get_chapter_task(state: &mut OpState, rid: u32) -> ResultJson<Rc<DenoChap
         .to_result_json(state)
 }
 
-#[op]
-fn op_mado_chapter_task_add(
+fn op_mado_chapter_task_add_call(
     state: Rc<RefCell<OpState>>,
-    rid: u32,
+    rid: deno_core::ResourceId,
     image: ChapterImageInfo,
 ) -> ResultJson<()> {
     let it = try_json!(get_chapter_task(&mut state.borrow_mut(), rid));
@@ -78,10 +77,21 @@ fn op_mado_chapter_task_add(
     ResultJson::Ok(())
 }
 
-#[op]
+#[op2]
+#[serde]
+fn op_mado_chapter_task_add(
+    state: Rc<RefCell<OpState>>,
+    #[smi] rid: deno_core::ResourceId,
+    #[serde] image: ChapterImageInfo,
+) -> ResultJson<()> {
+    op_mado_chapter_task_add_call(state, rid, image)
+}
+
+#[op2]
+#[serde]
 fn op_mado_chapter_task_to_array(
     state: &mut OpState,
-    rid: u32,
+    #[smi] rid: deno_core::ResourceId,
 ) -> ResultJson<Vec<ChapterImageInfo>> {
     let it = try_json!(get_chapter_task(state, rid));
 
@@ -92,7 +102,7 @@ fn op_mado_chapter_task_to_array(
     }
 }
 
-#[op]
+#[op2(fast)]
 fn op_mado_chapter_task_new(state: &mut OpState) -> u32 {
     let it = JsChapterTask {
         vec: Default::default(),
@@ -101,26 +111,28 @@ fn op_mado_chapter_task_new(state: &mut OpState) -> u32 {
     DenoChapterTask::new_type_to_state(ChapterTaskType::Js(it), state)
 }
 
+deno_core::extension!(
+    extension,
+    ops = [
+        op_mado_chapter_task_new,
+        op_mado_chapter_task_add,
+        op_mado_chapter_task_to_array,
+    ]
+);
+
 pub fn init() -> Extension {
-    ExtensionBuilder::default()
-        .ops(vec![
-            op_mado_chapter_task_new::decl(),
-            op_mado_chapter_task_add::decl(),
-            op_mado_chapter_task_to_array::decl(),
-        ])
-        .build()
+    extension::init_ops_and_esm()
 }
 
 #[cfg(test)]
 mod tests {
-
     use mado_core::MockChapterTask;
 
     use super::*;
 
     #[test]
     pub fn test_task() {
-        let state = Rc::new(RefCell::new(OpState::new(0)));
+        let state = Rc::new(RefCell::new(OpState::new(None)));
 
         let mut task = MockChapterTask::new();
 
@@ -140,7 +152,7 @@ mod tests {
         let task = DenoChapterTask::new_to_state(Box::new(task), &mut state.borrow_mut());
 
         assert!(matches!(
-            op_mado_chapter_task_add::call(state, task, info),
+            op_mado_chapter_task_add_call(state, task, info),
             ResultJson::Ok(_)
         ));
     }

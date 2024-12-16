@@ -1,4 +1,5 @@
 import { JSONPath } from "jsonpath-plus";
+import { ResultFromJson } from "./error";
 export { JSONPath };
 export {
   type Manga,
@@ -40,6 +41,13 @@ export class CommonFunction {
 
   static query(json: object, path: string) {
     return JSONPath({ path, json, wrap: false });
+  }
+
+  static url_join(url: string, end: string) {
+    console.log(url, end)
+    // return (new URL(end, url)).toString()
+    return ResultFromJson(Deno.core.ops.op_url_join(url, end)).data;
+
   }
 }
 

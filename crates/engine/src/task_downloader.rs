@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
+use futures::{channel::mpsc, Future, FutureExt, SinkExt, StreamExt};
 
 use crate::{DownloadChapterImageInfo, DownloadChapterInfo, DownloadStatus};
 
@@ -71,6 +71,7 @@ impl TaskDownloader {
                 let image = image;
                 self.download_image(image.clone()).await?;
             }
+            tracing::info!("all image downloaded");
             Ok::<_, mado_core::Error>(())
         };
 
@@ -98,24 +99,63 @@ impl TaskDownloader {
                 .get_chapter_images(&chapter_id, Box::new(image_tx))
                 .await
         }
-        .fuse()
+        .into_stream()
         .boxed();
 
-        let mut stream = image_rx.enumerate().map(move |(i, image)| {
-            let i = i + 1;
-            let filename = format!("{:0>4}.{}", i, image.extension);
-            let path = it.path().join(option.sanitize_filename(&filename));
+        let mut stream = image_rx
+            .enumerate()
+            .map(move |(i, image)| {
+                let i = i + 1;
+                let filename = format!("{:0>4}.{}", i, image.extension);
+                let path = it.path().join(option.sanitize_filename(&filename));
 
-            let image = DownloadChapterImageInfo::new(image, path, it.status().clone());
-            Ok(Arc::new(image))
-        });
+                let image = DownloadChapterImageInfo::new(image, path, it.status().clone());
+                Ok(Arc::new(image))
+            })
+            .fuse();
 
         futures::stream::poll_fn(move |cx| {
-            if let std::task::Poll::Ready(Err(err)) = get_images.as_mut().poll(cx) {
-                std::task::Poll::Ready(Some(Err(err)))
-            } else {
-                stream.poll_next_unpin(cx)
-            }
+            let mut v = || {
+                let get_image_result = get_images.poll_next_unpin(cx);
+                let stream = stream.poll_next_unpin(cx);
+
+                // check if stream is ready
+                let stream = futures::ready!(stream);
+
+                // return the item from stream wheter its ok or error
+                if let Some(it) = stream {
+                    return std::task::Poll::Ready(Some(it));
+                }
+
+                // check if get_image is ready
+                let get_image_result = futures::ready!(get_image_result);
+
+                if let Some(Err(err)) = get_image_result {
+                    return std::task::Poll::Ready(Some(Err(err)));
+                }
+
+                // return ready if ok because stream is already finished 
+                // so there isn't any image anymore
+                std::task::Poll::Ready(None)
+            };
+
+            let res = v();
+            tracing::debug!("result: {:?}", res);
+            res
+
+            // if let std::task::Poll::Ready(result) = get_images.as_mut().poll_unpin(cx) {
+            //     if let Err(err) = result {
+            //         return std::task::Poll::Ready(Some(Err(err)));
+            //     }
+            // } else {
+            //     return if let std::task::Poll::Ready(Some(msg)) = stream.poll_next_unpin(cx) {
+            //         std::task::Poll::Ready(Some(msg))
+            //     } else {
+            //         std::task::Poll::Pending
+            //     };
+            // }
+            //
+            // std::task::Poll::Ready(None)
         })
     }
 
@@ -131,14 +171,17 @@ impl TaskDownloader {
         download: Arc<DownloadChapterImageInfo>,
     ) -> Result<(), mado_core::Error> {
         let module = self.info.wait_module().await;
-        self.info
-            .set_status(DownloadStatus::resumed(DownloadResumedStatus::Downloading));
+
+        if self.info.status().is_waiting() {
+            self.info
+                .set_status(DownloadStatus::resumed(DownloadResumedStatus::Downloading));
+        }
 
         let path = download.path();
         let image = download.image();
         let exists = path.exists();
 
-        const RETRY_LIMIT: usize = 10;
+        const RETRY_LIMIT: usize = usize::MAX;
         const TIMEOUT: u64 = 10;
         let retry = Arc::new(RETRY_LIMIT.into());
         let timeout = Arc::new(TIMEOUT.into());

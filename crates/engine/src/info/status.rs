@@ -67,6 +67,10 @@ impl DownloadStatus {
             .unwrap_or(false)
     }
 
+    pub fn is_waiting(&self) -> bool {
+        self.as_resumed().map(|it| it.is_waiting()).unwrap_or(false)
+    }
+
     pub fn is_queue(&self) -> bool {
         self.as_resumed().map(|it| it.is_queue()).unwrap_or(false)
     }

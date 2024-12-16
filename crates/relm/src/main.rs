@@ -101,6 +101,7 @@ impl std::fmt::Debug for DisplayInstant {
 
 pub fn main() {
     tracing_subscriber::fmt()
+        .pretty()
         .with_env_filter(
             EnvFilter::from_default_env()
                 .add_directive("polling=error".parse().unwrap())
@@ -114,6 +115,7 @@ pub fn main() {
         .enable_all()
         .build()
         .unwrap();
+
 
     let _guard = runtime.enter();
     tracing::trace!("tokio runtime {time:?}");
@@ -142,12 +144,15 @@ pub fn main() {
         sender: loader_tx,
     };
 
+    let (deno_runtime_drop, deno_runtime_await) = futures::channel::oneshot::channel::<()>();
     let handle = runtime.handle().clone();
-
-    std::thread::Builder::new()
+    let deno_thread = std::thread::Builder::new()
         .name("deno-runtime".to_string())
         .spawn(move || {
-            let handle = handle;
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
             let task = tokio::task::LocalSet::new();
             let deno_runtime = mado_deno::Runtime::default();
             let mut deno_loader = mado_deno::ModuleLoader::from_runtime(deno_runtime);
@@ -158,7 +163,10 @@ pub fn main() {
                 }
             });
 
-            handle.block_on(task);
+            tracing::trace!("block on deno-runtime");
+
+            runtime.block_on(task.run_until(deno_runtime_await)).unwrap();
+            tracing::trace!("exiting deno-runtime");
         })
         .unwrap();
 
@@ -166,14 +174,30 @@ pub fn main() {
     tokio::spawn(mado.run());
     tracing::trace!("engine run {time:?}");
 
-    let _guard = scopeguard::guard(channel.sender(), |sender| {
-        sender.send(mado_sqlite::DbMsg::Close).unwrap();
-    });
-    runtime.spawn_blocking(|| {
-        let mut channel = channel;
-        channel.run().unwrap();
+    let sqlite_sender = channel.sender();
+
+    let sqlite_thread = std::thread::Builder::new()
+        .name("sqlite-loop".to_string())
+        .spawn(move || {
+            let mut channel = channel;
+            channel.run().unwrap();
+        })
+        .unwrap();
+
+    let _guard = scopeguard::guard((), |_| {
+        sqlite_sender.send(mado_sqlite::DbMsg::Close).unwrap();
+        tracing::info!("relm exit {time:?}");
+
+        deno_runtime_drop.send(()).ok();
+        deno_thread.join().unwrap();
+        sqlite_thread.join().unwrap();
+        tracing::trace!("thread joined {time:?}");
+
+        tracing::trace!("shutdown tokio");
+        runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+        tracing::trace!("exit program {time:?}");
     });
 
-    tracing::trace!("running relm {time:?}");
+    tracing::info!("running relm {time:?}");
     RelmApp::new("").run::<AppModel>(state);
 }

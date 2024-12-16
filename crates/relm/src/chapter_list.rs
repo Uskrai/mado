@@ -1,4 +1,9 @@
-use std::{cell::Cell, rc::Rc, sync::Arc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+    sync::Arc,
+};
 
 use gtk::prelude::*;
 use mado_core::ChapterInfo;
@@ -34,6 +39,7 @@ impl CheckChapterInfo {
     }
 
     pub fn set_active(&self, val: bool) {
+        println!("{:?} {} {}", self.info().index, val, self.info());
         self.active.set(val)
     }
 }
@@ -43,12 +49,14 @@ pub struct ChapterListModel {
     #[allow(dead_code)]
     chapters: ListModel<CheckChapterInfo>,
     selection_model: gtk::MultiSelection,
+    widget_map: HashMap<gtk::ListItem, ChapterInfoController>,
 }
 
 #[derive(Debug)]
 pub enum ChapterListMsg {
     Setup(gtk::ListItem),
     Change(gtk::ListItem),
+    Teardown(gtk::ListItem),
     Activate,
 }
 
@@ -58,9 +66,18 @@ const CHECK_BUTTON_COLUMN: i32 = 0;
 const LABEL_COLUMN: i32 = 2;
 const LABEL_ROW: i32 = 0;
 
+pub enum ChapterInfoMsg {
+    SetActive(bool),
+    ChangeChapter(CheckChapterInfo),
+}
+
+pub type ChapterInfoController = gtk::glib::Sender<ChapterInfoMsg>;
+
 impl ChapterListModel {
     /// Create gtk::Grid from ChapterInfo
-    pub fn create_chapter_info(chapter: CheckChapterInfo) -> gtk::Grid {
+    pub fn create_chapter_info(chapter: CheckChapterInfo) -> (gtk::Grid, ChapterInfoController) {
+        let (sender, recv) = gtk::glib::MainContext::channel(gtk::glib::PRIORITY_DEFAULT);
+
         let check = gtk::CheckButton::default();
         let label = gtk::Label::builder()
             .label(&format!("{}", chapter.info()))
@@ -74,11 +91,33 @@ impl ChapterListModel {
         grid.attach(&label, LABEL_COLUMN, LABEL_ROW, 1, 1);
         grid.set_column_spacing(5);
 
-        check.connect_toggled(move |it| {
-            chapter.set_active(it.is_active());
+
+        let chapter = RefCell::new(chapter.clone());
+
+        check.connect_toggled({
+            let sender = sender.clone();
+            move |it| {
+                sender
+                    .send(ChapterInfoMsg::SetActive(it.is_active()))
+                    .unwrap();
+            }
         });
 
-        grid
+        recv.attach(None, move |msg| {
+            match msg {
+                ChapterInfoMsg::SetActive(active) => chapter.borrow_mut().set_active(active),
+                ChapterInfoMsg::ChangeChapter(change) => {
+                    label.set_label(&format!("{}", change.info()));
+                    check.set_active(change.active());
+                    *chapter.borrow_mut() = change;
+                }
+            };
+
+            gtk::glib::Continue(true)
+        });
+
+
+        (grid, sender)
     }
 
     fn get_label(grid: &gtk::Grid) -> Option<gtk::Label> {
@@ -120,6 +159,7 @@ impl SimpleComponent for ChapterListModel {
         let model = ChapterListModel {
             chapters,
             selection_model,
+            widget_map: Default::default(),
         };
         let widgets = view_output!();
         ComponentParts { model, widgets }
@@ -129,11 +169,10 @@ impl SimpleComponent for ChapterListModel {
         match msg {
             // Initialize Children
             ChapterListMsg::Setup(item) => {
-                let data = item.item().and_then(|it| self.chapters.get_by_object(&it));
-
-                if let Some(data) = data {
-                    let grid = Self::create_chapter_info(data.clone());
-                    item.set_child(Some(&grid));
+                if let Some(it) = item.item().and_then(|it| self.chapters.get_by_object(&it)) {
+                    let (grid, controller) = Self::create_chapter_info(it.clone());
+                    item.set_child(Some(grid).as_ref());
+                    self.widget_map.insert(item, controller);
                 }
             }
 
@@ -144,18 +183,21 @@ impl SimpleComponent for ChapterListModel {
                     Some(child) => child,
                     _ => return
                 };
-                let check = Self::get_check(&child).unwrap();
-                let label = Self::get_label(&child).unwrap();
 
-                if let Some(data) = item.item().and_then(|it| self.chapters.get_by_object(&it)) {
-                    check.set_active(data.active());
+                let chapter = item.item().and_then(|it| self.chapters.get_by_object(&it));
+                let controller = self.widget_map.get(&item);
 
-                    let strlabel = format!("{}", data.info());
-                    if label.label() != strlabel.as_str() {
-                        label.set_label(&strlabel);
-                    }
+                let (chapter, controller) = match chapter.zip(controller) {
+                    Some(it) => it,
+                    None => return,
+                };
 
-                }
+                controller
+                    .send(ChapterInfoMsg::ChangeChapter(chapter.clone()))
+                    .unwrap();
+            }
+            ChapterListMsg::Teardown(item) => {
+                self.widget_map.remove(&item);
             }
             ChapterListMsg::Activate => {
                 let selection = self.selection_model.selection();
@@ -187,6 +229,10 @@ impl SimpleComponent for ChapterListModel {
 
                     connect_bind[sender] => move |_, item| {
                         sender.input(ChapterListMsg::Change(item.clone()))
+                    },
+
+                    connect_teardown[sender] => move |_, item| {
+                        sender.input(ChapterListMsg::Teardown(item.clone()))
                     }
                 },
                 set_single_click_activate: false,
@@ -215,7 +261,7 @@ mod tests {
         let chapter = Arc::new(ChapterInfo::default());
         let chapter = CheckChapterInfo::from(chapter);
 
-        let it = ChapterListModel::create_chapter_info(chapter.clone());
+        let (it, _) = ChapterListModel::create_chapter_info(chapter.clone());
 
         let check = ChapterListModel::get_check(&it).expect("should exist");
         for i in [true, false] {

@@ -114,15 +114,22 @@ pub async fn download_http<Buffer>(
 where
     Buffer: AsyncWrite + Unpin,
 {
+    let formatter = humansize::make_format::<usize>(humansize::DECIMAL);
     const BUFFER_SIZE: usize = 1024;
     let mut total = 0;
 
     let response = request.send().await?;
-    let length = response
-        .header_str("Content-Length")
-        .map(|it| it.to_string());
 
+    let length = response.header_str("Content-Length").map(|it| {
+        it.parse::<usize>()
+            .map(&formatter)
+            .unwrap_or_else(|_| it.to_string())
+    });
+
+    tracing::trace!("response: {:#?}", response);
     let mut stream = response.stream();
+
+    // response.
 
     loop {
         let mut buf = vec![0u8; BUFFER_SIZE];
@@ -138,7 +145,7 @@ where
         tracing::trace!(
             "Writing {} bytes to buffer, total: {}/{:?}",
             buf.len(),
-            total,
+            formatter(total),
             length
         );
 
@@ -183,11 +190,7 @@ where
         &self,
         buffer: &mut C::Buffer,
     ) -> Result<(), mado_core::Error> {
-        let request = self
-            .module
-            .download_image(self.image.clone())
-            .await
-            .unwrap();
+        let request = self.module.download_image(self.image.clone()).await?;
 
         match request {
             mado_core::RequestBuilder::Http(request) => {

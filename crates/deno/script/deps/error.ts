@@ -99,20 +99,27 @@ export class ResultOk<T> extends ResultBase<T> {
 }
 
 export async function catchAndReturn<T>(
-  action: () => Promise<T> | PromiseLike<T>
+  action: () => Promise<T> | PromiseLike<T>,
 ): Promise<Result<T>> {
-  return Promise.resolve(action)
-    .then((it) => Promise.resolve(it()))
-    .then((it) => Ok(it))
-    .catch((it) => {
+  let c = (it: any): Result<T> => {
       if (it instanceof Errors) {
-        return Err(it);
+        return Err<T>(it);
       } else if (it instanceof ResultError) {
         return it;
       } else {
-        return Err(Errors.fromCatch(it));
+        return Err<T>(Errors.fromCatch(it));
       }
-    });
+
+  };
+
+  try {
+  return Promise.resolve(action)
+    .then((it) => Promise.resolve(it()))
+    .then((it) => Ok(it))
+    .catch(c);
+  } catch (e) {
+    return c(e)
+  }
 }
 
 function fromRust(error: any) {
